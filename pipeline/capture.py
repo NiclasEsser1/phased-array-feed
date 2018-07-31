@@ -75,7 +75,7 @@ def destination(multicast_data, conf_fname, beam):
                 if max_chk < int(ip_chk[i].split(":")[1]):
                     max_chk = int(ip_chk[i].split(":")[1])
         max_min_chk.append([min_chk, max_chk])
-        node.append("pulsar@pacifix{:d}.mpifr-bonn.mpg.de".format(int(item_ip.split(".")[2])))
+        node.append("ssh -Y pulsar@pacifix{:d}.mpifr-bonn.mpg.de".format(int(item_ip.split(".")[2])))
         
     for i in range(nip):
         address_nchk[i] = sorted(address_nchk[i]) # Sort it to make it in order
