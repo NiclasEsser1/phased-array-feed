@@ -2,11 +2,14 @@
 
 import ConfigParser, parser, argparse, socket, struct, json
 import numpy as np
+import subprocess
 
-def ConfigSectionMap(conf_fname, section):
+# ./capture.py -a ../config/pipeline.conf -b ../config/system.conf -c 1340.5 -d 336 -e '10.17.0.1:17100:8', '10.17.0.1:17101:8', '10.17.0.1:17102:8', '10.17.0.1:17103:8', '10.17.0.1:17104:8', '10.17.0.1:17105:8' -f 0 -g 0
+
+def ConfigSectionMap(fname, section):
     # Play with configuration file
     Config = ConfigParser.ConfigParser()
-    Config.read(conf_fname)
+    Config.read(fname)
     
     dict_conf = {}
     options = Config.options(section)
@@ -20,121 +23,51 @@ def ConfigSectionMap(conf_fname, section):
             dict_conf[option] = None
     return dict_conf
 
-def available_beam(multicast_data, nbeam):
-    routing_table = multicast_data['routing_table']
-    beams = []
-    for beam in range(nbeam):
-        ip = []
-        for table_line in routing_table:
-            chk_ip   = table_line.split(',')[3 * beam + 2]
-            if(chk_ip != "0.0.0.0"):
-                ip.append(chk_ip)
-        if(len(ip)!=0):
-            beams.append(beam)            
-    return np.array(beams)  
-    
-def destination(multicast_data, conf_fname, beam):    
-    # check routing table
-    routing_table = multicast_data['routing_table']
-    chk           = 0
-    address       = []
-    ip_chk        = []
-    ip            = []
-    for table_line in routing_table:
-        chk_ip   = table_line.split(',')[3 * beam + 2]
-        chk_port = table_line.split(',')[3 * beam + 3]
-        if(chk_ip != "0.0.0.0" and chk_port != "0"):
-            address.append("{:s}:{:s}".format(chk_ip, chk_port))
-            ip_chk.append("{:s}:{:d}".format(chk_ip, chk))
-            ip.append(chk_ip)
-        
-        chk = chk + 1
-
-    # Get software input information from the routing table information
-    # IP, port, the number of chunks on each port, chunk maximum and minimum, etc ...
-    nchk_beam = int(ConfigSectionMap(conf_fname, "EthernetInterfaceBMF")['nchk_beam'])
-    address   = {x:address.count(x) for x in address}        
-    ip        = sorted(list((set(ip))))       # Which ip we receive data
-    nip       = len(ip)
-    max_min_chk  = []   # The maximum and minimum frequency chunks of each IP
-    address_nchk = []   # Port and number of frequency chunks on each port of each IP
-    node         = []
-    for item_ip in ip:
-        min_chk = nchk_beam
-        max_chk = 0
-        address_nchk_temp = []
-        for i in range(len(address)):  
-            if item_ip == address.keys()[i].split(":")[0]:
-                address_nchk_temp.append("{:s}:{:d}".format(address.keys()[i], address.values()[i]))
-        address_nchk.append(address_nchk_temp)
-
-        for i in range(len(ip_chk)):
-            if item_ip == ip_chk[i].split(":")[0]:
-                if min_chk > int(ip_chk[i].split(":")[1]):
-                    min_chk = int(ip_chk[i].split(":")[1])
-                if max_chk < int(ip_chk[i].split(":")[1]):
-                    max_chk = int(ip_chk[i].split(":")[1])
-        max_min_chk.append([min_chk, max_chk])
-        node.append("ssh -Y pulsar@pacifix{:d}.mpifr-bonn.mpg.de".format(int(item_ip.split(".")[2])))
-        
-    for i in range(nip):
-        address_nchk[i] = sorted(address_nchk[i]) # Sort it to make it in order
-
-    print "For beam {:d}, we will receive data with {:d} NiC, the detail with the format [IP:PORT:NCHUNK] is as follow ...".format(beam, nip)
-    for i in range(nip):
-        print "\t{:s}".format(address_nchk[i])
-    
-    # Get the number of channel on each IP
-    freq0     = float(multicast_data['sky_frequency'])
-    nchan_chk = int(ConfigSectionMap(conf_fname, "EthernetInterfaceBMF")['nchan_chk'])
-    nchan     = np.zeros(nip, dtype=int)
-    freq      = np.zeros(nip, dtype=float)
-    for i in range(nip):
-        nchan[i] = (max_min_chk[i][1] - max_min_chk[i][0] + 1) * nchan_chk;
-        freq[i]  = freq0 - 0.5 * (nchk_beam - (max_min_chk[i][1] + max_min_chk[i][0] + 1)) * nchan_chk 
-        print "The center frequency of data from {:s} is {:.1f} MHz with {:d} channels, the login detail is \"{:s}\".".format(ip[i], freq[i], nchan[i], node[i])
-    print "\n"
-    return node, address_nchk
-    
 def main(args):
-    args       = parser.parse_args()
-    conf_fname = args.conf_fname[0]
+    # Read pipeline input
+    args          = parser.parse_args()
+    pipeline_conf = args.pipeline_conf[0]
+    system_conf   = args.system_conf[0]
+    destination   = args.destination
+    nchan         = args.nchan[0]
+    hdr           = args.hdr[0]
 
-    # Configure metadata interface
-    MCAST_GRP  = ConfigSectionMap(conf_fname, "MetadataInterfaceTOS")['ip']
-    MCAST_PORT = int(ConfigSectionMap(conf_fname, "MetadataInterfaceTOS")['port'])
-    MCAST_ADDR = ('', MCAST_PORT)
-    
-    # Create the socket and get ready to receive data
-    sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Create the socket
-    group = socket.inet_aton(MCAST_GRP)
-    mreq  = struct.pack('4sL', group, socket.INADDR_ANY)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(MCAST_ADDR)                                    # Bind to the server address
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)  # Tell the operating system to add the socket to the multicast group on all interfaces.
-    
-    # Get data packet
-    pkt, addr      = sock.recvfrom(1<<16)
-    multicast_data = json.loads(pkt)
+    # Get pipeline configuration from configuration file
+    ndf_blk      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_blk'])
+    nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
+    hdr_fname    = ConfigSectionMap(pipeline_conf, "CAPTURE")['hdr_fname']
+    key          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
+    kfile_prefix = ConfigSectionMap(pipeline_conf, "CAPTURE")['kfname_prefix']
 
-    # Get information from metadata packet, which is shared with all beams
-    target_name = multicast_data['target_name']
-    ra  = float(multicast_data['beams_direction']['beam01'][0]) # RA in decimal radian, we may need to convert it to other unit
-    dec = float(multicast_data['beams_direction']['beam01'][1]) # DEC in decimal radian, we may need to convert it to other unit
-
-    # To get available beams 
-    nbeam = 36
-    beams = available_beam(multicast_data, nbeam)
-    print "The available beams are {:s}, counting from 0 ...\n".format(beams)
-    
-    # Get the desination of a given beam
-    for beam in beams:
-        node, address_nchk = destination(multicast_data, conf_fname, beam)
+    # Get system configuration from configuration file
+    nsamp_df     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
+    npol_samp    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
+    ndim_pol     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
+    nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
+    if hdr == 1:
+        nchan_chk = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
+        df_hdrsz  = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
+        blksz     = ndf_blk * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
+    else:
+        blksz   = ndf_blk * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
+    print blksz
     
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Read TOS metadata and get required information')
-    parser.add_argument('-a', '--conf_fname', type=str, nargs='+',
-                        help='The name of configuration file')
-
+    parser = argparse.ArgumentParser(description='Create DADA buffer and run capture with given parameters')
+    parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
+                        help='The name of configuration file which defines the pipeline configurations')
+    parser.add_argument('-b', '--system_conf', type=str, nargs='+',
+                        help='The name of configuration file which defines the system configurations')
+    parser.add_argument('-c', '--freq', type=float, nargs='+',
+                        help='The center frequency')
+    parser.add_argument('-d', '--nchan', type=int, nargs='+',
+                        help='The number of channels')
+    parser.add_argument('-e', '--destination', type=str, nargs='+',
+                        help='The destination')
+    parser.add_argument('-f', '--part', type=int, nargs='+', # Count from zero
+                        help='Which part of the capture for given beam')
+    parser.add_argument('-g', '--hdr', type=int, nargs='+', # Count from zero
+                        help='To capture packet header or not')
+    
     args = parser.parse_args()
     main(args)
