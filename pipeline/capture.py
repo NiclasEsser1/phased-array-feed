@@ -29,13 +29,13 @@ def ConfigSectionMap(fname, section):
 
 def capture_reftime(destination, pktsz, df_res, system_conf):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_address = (destination.split(":")[0], int(destination.split(":")[1]))
+    server_address = (destination.split("_")[0], int(destination.split("_")[1]))
     sock.bind(server_address)
     buf, address = sock.recvfrom(pktsz) # raw packet
     
     data       = np.fromstring(buf, 'uint64')
     hdr_part   = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[0]))[0])
-    sec_epoch  = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
+    df_sec     = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
     df_idf     = hdr_part & np.uint64(0x00000000ffffffff)
 
     hdr_part   = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[1]))[0])
@@ -43,15 +43,15 @@ def capture_reftime(destination, pktsz, df_res, system_conf):
     epoch      = float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)])
 
     sec_prd    = df_idf * df_res
-    df_sec     = sec_epoch + np.floor(sec_prd) + epoch * SECDAY  # Int part of seconds from 1970-01-01
+    sec_epoch  = df_sec + np.floor(sec_prd) + epoch * SECDAY  # Int part of seconds from 1970-01-01
 
-    utc_start  = time.strftime(DADA_TIMSTR, time.gmtime(df_sec))    # UTC_START of int part seconds
-    mjd_start  = df_sec/SECDAY + MJD1970                            # MJD_START of int part seconds
+    utc_start  = time.strftime(DADA_TIMSTR, time.gmtime(sec_epoch))    # UTC_START of int part seconds
+    mjd_start  = sec_epoch/SECDAY + MJD1970                            # MJD_START of int part seconds
     
     microseconds = 1.0E6 * (sec_prd - np.floor(sec_prd))
     picoseconds  = int(1E6 * round(microseconds))                # picoseconds of fraction second
         
-    return df_sec, df_idf, utc_start, mjd_start, picoseconds
+    return int(df_sec), df_idf, utc_start, mjd_start, picoseconds
     
 def check_all_ports(destination, pktsz, df_prd, ndf_check):
     nport = len(destination)
@@ -65,9 +65,9 @@ def check_all_ports(destination, pktsz, df_prd, ndf_check):
     destination_dead   = []   # The destination where we can not receive data
     for i in range(nport):
         if active[i] == 1:
-            destination_active.append("{:s}:{:d}".format(destination[i], nchunk_active[i]))
+            destination_active.append("{:s}_{:s}_{:s}_{:d}".format(destination[i].split(":")[0], destination[i].split(":")[1], destination[i].split(":")[2], nchunk_active[i]))
         else:
-            destination_dead.append("{:s}".format(destination[i]))
+            destination_dead.append("{:s}_{:s}_{:s}".format(destination[i].split(":")[0], destination[i].split(":")[1], destination[i].split(":")[2]))
     return destination_active, destination_dead
     
 def check_port(ip, port, pktsz, ndf_check):
@@ -136,7 +136,7 @@ def main(args):
     else:
         blksz   = ndf_blk * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
     
-    ## To update the desination for current capture part, which finds out the low frequency chunk, the index of frequency chunk in current capture part and active ports
+    ## To update the destination for current capture part, which finds out the low frequency chunk, the index of frequency chunk in current capture part and active ports
     #chk = []
     #for item in destination:
     #    for i in range(int(item.split(':')[2])):
@@ -156,18 +156,18 @@ def main(args):
     if (len(destination_active) == 0):
         print "There is no active port for beam {:02d}, have to abort ...".format(beam)
         exit(1)
-    print "The active destination \"[IP:PORT:NCHUNK_EXPECT:NCHUNK_ACTUAL]\" are: ", destination_active
-    print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
+    print "The active destination \"[IP_PORT_NCHUNK_EXPECT_NCHUNK_ACTUAL]\" are: ", destination_active
+    print "The dead destination \"[IP_PORT_NCHUNK_EXPECT]\" are:                 ", destination_dead
     
     # Create PSRDADA buffer
-    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
+    #os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 
     # Get reference timestamp of capture
     reftime = capture_reftime(destination_active[0], pktsz, df_res, system_conf)
     print "The reference timestamp \"(DF_SEC, DF_IDF, UTC_START, MJD_START, PICOSECONDS)\"for current capture is: ", reftime
     
     # Delete PSRDADA buffer
-    os.system("dada_db -d {:s}".format(key))
+    #os.system("dada_db -d {:s}".format(key))
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create DADA buffer and run capture with given parameters')

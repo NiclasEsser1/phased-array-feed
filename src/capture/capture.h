@@ -31,7 +31,16 @@ typedef struct conf_t
   int nchunk_dead[MPORT_CAPTURE];
 
   char hdr_fname[MSTR_LEN];
+  double center_freq;
+  int nchan;
   
+  char utc_start[MSTR_LEN];
+  double mjd_start;
+  uint64_t picoseconds;
+  uint64_t df_sec;
+  uint64_t df_idf;
+
+  char dir[MSTR_LEN];
 }conf_t;
 
 #endif
