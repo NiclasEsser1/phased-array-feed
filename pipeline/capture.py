@@ -4,6 +4,7 @@ import ConfigParser, parser, argparse, socket, struct, json, os, subprocess, thr
 import numpy as np
 
 # ./capture.py -a ../config/pipeline.conf -b ../config/system.conf -c 1340.5 -d 336 -e 10.17.0.1:17100:8:0:1:2:3:4:5:6:7 10.17.0.1:17101:8:8:9:10:11:12:13:14:15 10.17.0.1:17102:8:16:17:18:19:20:21:22:23 10.17.0.1:17103:8:24:25:26:27:28:29:30:31 10.17.0.1:17104:8:32:33:34:35:36:37:38:39 10.17.0.1:17105:8:40:41:42:43:44:45:46:47 -f 0 -g 0 -i 0
+# ./capture.py -a ../config/pipeline.conf -b ../config/system.conf -c 1340.5 -d 336 -e 10.17.0.1:17100:8 10.17.0.1:17101:8 10.17.0.1:17102:8 10.17.0.1:17103:8 10.17.0.1:17104:8 10.17.0.1:17105:8 -f 0 -g 0 -i 0
 
 SECDAY      = 86400.0
 DADA_TIMSTR = "%Y-%m-%d-%H:%M:%S"
@@ -52,24 +53,26 @@ def capture_reftime(destination, pktsz, df_res, system_conf):
         
     return df_sec, df_idf, utc_start, mjd_start, picoseconds
     
-def all_connection(destination, pktsz, df_prd):
+def check_all_ports(destination, pktsz, df_prd, ndf_check):
     nport = len(destination)
     active = np.zeros(nport, dtype = int)
+    nchunk_active = np.zeros(nport, dtype = int)
     socket.setdefaulttimeout(df_prd)  # Force to timeout after one data frame period
     
     for i in range(nport):
-        active[i] = connection(destination[i].split(":")[0], int(destination[i].split(":")[1]), pktsz)
+        active[i], nchunk_active[i] = check_port(destination[i].split(":")[0], int(destination[i].split(":")[1]), pktsz, ndf_check)
     destination_active = []   # The destination where we can receive data
     destination_dead   = []   # The destination where we can not receive data
     for i in range(nport):
         if active[i] == 1:
-            destination_active.append(destination[i])
+            destination_active.append("{:s}:{:d}".format(destination[i], nchunk_active[i]))
         else:
-            destination_dead.append(destination[i])
+            destination_dead.append("{:s}".format(destination[i]))
     return destination_active, destination_dead
     
-def connection(ip, port, pktsz):
+def check_port(ip, port, pktsz, ndf_check):
     active = 1
+    nchunk_active = 0
     data = bytearray(pktsz) 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_address = (ip, port)
@@ -79,10 +82,17 @@ def connection(ip, port, pktsz):
         nbyte, address = sock.recvfrom_into(data, pktsz)
         if (nbyte != pktsz):
             active = 0
+        else:
+            source = []
+            active = 1
+            for i in range(ndf_check):
+                buf, address = sock.recvfrom(pktsz)
+                source.append(address)
+            nchunk_active = len(set(source))
     except:
-        active = 0
-        
-    return active
+        active = 0        
+
+    return active, nchunk_active
 
 def main(args):
     # Read pipeline input
@@ -97,6 +107,7 @@ def main(args):
     
     # Get pipeline configuration from configuration file
     ndf_blk      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_blk'])
+    ndf_check    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_check'])
     nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
     hdr_fname    = ConfigSectionMap(pipeline_conf, "CAPTURE")['hdr_fname']
     key          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
@@ -125,32 +136,35 @@ def main(args):
     else:
         blksz   = ndf_blk * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
     
-    # To update the desination for current capture part, which finds out the low frequency chunk, the index of frequency chunk in current capture part and active ports
-    chk = []
-    for item in destination:
-        for i in range(int(item.split(':')[2])):
-            chk.append(int(item.split(':')[i + 3]))
-    chk = np.array(chk)
-    min_chk = min(chk)    
-    destination_update = []
-    for item in destination:
-        temp = "{:s}:{:s}:{:s}".format(item.split(":")[0], item.split(":")[1], item.split(":")[2])
-        for i in range(int(item.split(':')[2])):
-            temp = "{:s}:{:d}".format(temp, int(item.split(':')[i + 3]) - min_chk)
-        destination_update.append(temp)
+    ## To update the desination for current capture part, which finds out the low frequency chunk, the index of frequency chunk in current capture part and active ports
+    #chk = []
+    #for item in destination:
+    #    for i in range(int(item.split(':')[2])):
+    #        chk.append(int(item.split(':')[i + 3]))
+    #chk = np.array(chk)
+    #min_chk = min(chk)    
+    #destination_update = []
+    #for item in destination:
+    #    temp = "{:s}:{:s}:{:s}".format(item.split(":")[0], item.split(":")[1], item.split(":")[2])
+    #    for i in range(int(item.split(':')[2])):
+    #        temp = "{:s}:{:d}".format(temp, int(item.split(':')[i + 3]) - min_chk)
+    #    destination_update.append(temp)
     
     # Check the connection
-    destination_active, destination_dead = all_connection(destination_update, pktsz, df_prd)
+    destination_active, destination_dead = check_all_ports(destination, pktsz, df_prd, ndf_check)
+    
     if (len(destination_active) == 0):
         print "There is no active port for beam {:02d}, have to abort ...".format(beam)
         exit(1)
-    print destination_active, destination_dead
+    print "The active destination \"[IP:PORT:NCHUNK_EXPECT:NCHUNK_ACTUAL]\" are: ", destination_active
+    print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
     
     # Create PSRDADA buffer
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 
     # Get reference timestamp of capture
-    df_sec, df_idf, utc_start, mjd_start, picoseconds = capture_reftime(destination_active[0], pktsz, df_res, system_conf)
+    reftime = capture_reftime(destination_active[0], pktsz, df_res, system_conf)
+    print "The reference timestamp \"(DF_SEC, DF_IDF, UTC_START, MJD_START, PICOSECONDS)\"for current capture is: ", reftime
     
     # Delete PSRDADA buffer
     os.system("dada_db -d {:s}".format(key))

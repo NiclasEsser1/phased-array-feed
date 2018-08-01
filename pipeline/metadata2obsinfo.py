@@ -66,9 +66,9 @@ def destination(multicast_data, conf_fname, beam):
         for i in range(len(address)):
             if item_ip == address.keys()[i].split(":")[0]:
                 temp = "{:s}:{:d}".format(address.keys()[i], address.values()[i])
-                for j in range(len(address_chk)):
-                    if item_ip == address_chk[j].split(":")[0] and address.keys()[i].split(":")[1] == address_chk[j].split(":")[1]:
-                        temp = "{:s}:{:s}".format(temp, address_chk[j].split(":")[2])
+                #for j in range(len(address_chk)):
+                #    if item_ip == address_chk[j].split(":")[0] and address.keys()[i].split(":")[1] == address_chk[j].split(":")[1]:
+                #        temp = "{:s}:{:s}".format(temp, address_chk[j].split(":")[2])
                 address_nchk_temp.append(temp)
         address_nchk.append(address_nchk_temp)
 

@@ -22,15 +22,15 @@ typedef struct conf_t
   char ip_active[MPORT_CAPTURE][MSTR_LEN];
   int port_active[MPORT_CAPTURE];
   int nport_active;
-  int chunk_active[MPORT_CAPTURE][NCHK_PORT];
   int nchunk_active_expect[MPORT_CAPTURE];  
   int nchunk_active_actual[MPORT_CAPTURE];  
   
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
   int nport_dead;
-  int chunk_dead[MPORT_CAPTURE][NCHK_PORT];
   int nchunk_dead[MPORT_CAPTURE];
+
+  char hdr_fname[MSTR_LEN];
   
 }conf_t;
 

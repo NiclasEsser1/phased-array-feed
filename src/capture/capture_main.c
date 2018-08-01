@@ -7,6 +7,9 @@
 #include "dada_def.h"
 #include "capture.h"
 
+// ./capture_main -a dada -b /beegfs/DENG/docker/ -c 10.17.0.1:17100:8:8 -c 10.17.0.1:17101:8:7 -c 10.17.0.1:17102:8:7 -c 10.17.0.1:17103:8:7 -c 10.17.0.1:17104:8:7 -c 10.17.0.1:17105:8:7
+// ./capture_main -a dada -b /beegfs/DENG/docker/ -c 10.17.0.1:17100:8:8 -c 10.17.0.1:17101:8:7 -c 10.17.0.1:17102:8:7 -c 10.17.0.1:17103:8:7 -d 10.17.0.1:17104:8 -d 10.17.0.1:17105:8 -e ../../config/header_16bit.txt
+
 void usage()
 {
   fprintf (stdout,
@@ -17,7 +20,7 @@ void usage()
 	   " -b Record header of data packets or not\n"
 	   " -c Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk:chunk\" \n"
 	   " -d Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk:chunk\" \n"
-	   " -e The name of DADA header template file\n"
+	   " -e The name of DADA header file\n"
 	   " -f The center frequency of captured data\n"
 	   " -g Number of channels of current capture\n"
 	   " -h Show help\n"
@@ -55,12 +58,21 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'c':
-	  sscanf(optarg, "%[^:]:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active]);
-	  fprintf(stdout, "%d\n", conf.nchunk_active_expect[conf.nport_active]);
+	  sscanf(optarg, "%[^:]:%d:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active], &conf.nchunk_active_actual[conf.nport_active]);
+	  fprintf(stdout, "%d\t%d\n", conf.nchunk_active_expect[conf.nport_active], conf.nchunk_active_actual[conf.nport_active]);
 	  conf.nport_active++;
 	  break;
-
 	  
+	case 'd':
+	  sscanf(optarg, "%[^:]:%d:%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchunk_dead[conf.nport_dead]);
+	  fprintf(stdout, "%d\n", conf.nchunk_dead[conf.nport_dead]);
+	  conf.nport_dead++;
+	  break;
+	  
+	case 'e':	  	  
+	  sscanf(optarg, "%s", conf.hdr_fname);
+	  fprintf(stdout, "%s\n", conf.hdr_fname);
+	  break;
 	}
     }
   
