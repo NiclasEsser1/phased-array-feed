@@ -1,0 +1,10 @@
+# This file defines the relation between the epoch number from VDIF header and MJD from 1970-01-01 (40587.0)
+# The first column is the epoch number
+# The second column is the MJD
+# The third column is UTC midnight
+# We need to update this file
+36     	    17532.0	2018-01-01
+37	    17713.0	2018-07-01
+38	    17897.0	2019-01-01
+39	    18078.0	2019-07-01
+40	    18262.0	2020-01-01

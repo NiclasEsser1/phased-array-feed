@@ -39,16 +39,15 @@ def destination(multicast_data, conf_fname, beam):
     routing_table = multicast_data['routing_table']
     chk           = 0
     address       = []
-    ip_chk        = []
+    address_chk   = []
     ip            = []
     for table_line in routing_table:
         chk_ip   = table_line.split(',')[3 * beam + 2]
         chk_port = table_line.split(',')[3 * beam + 3]
         if(chk_ip != "0.0.0.0" and chk_port != "0"):
             address.append("{:s}:{:s}".format(chk_ip, chk_port))
-            ip_chk.append("{:s}:{:d}".format(chk_ip, chk))
+            address_chk.append("{:s}:{:s}:{:d}".format(chk_ip, chk_port, chk))
             ip.append(chk_ip)
-        
         chk = chk + 1
 
     # Get software input information from the routing table information
@@ -64,24 +63,28 @@ def destination(multicast_data, conf_fname, beam):
         min_chk = nchk_beam
         max_chk = 0
         address_nchk_temp = []
-        for i in range(len(address)):  
+        for i in range(len(address)):
             if item_ip == address.keys()[i].split(":")[0]:
-                address_nchk_temp.append("{:s}:{:d}".format(address.keys()[i], address.values()[i]))
+                temp = "{:s}:{:d}".format(address.keys()[i], address.values()[i])
+                for j in range(len(address_chk)):
+                    if item_ip == address_chk[j].split(":")[0] and address.keys()[i].split(":")[1] == address_chk[j].split(":")[1]:
+                        temp = "{:s}:{:s}".format(temp, address_chk[j].split(":")[2])
+                address_nchk_temp.append(temp)
         address_nchk.append(address_nchk_temp)
 
-        for i in range(len(ip_chk)):
-            if item_ip == ip_chk[i].split(":")[0]:
-                if min_chk > int(ip_chk[i].split(":")[1]):
-                    min_chk = int(ip_chk[i].split(":")[1])
-                if max_chk < int(ip_chk[i].split(":")[1]):
-                    max_chk = int(ip_chk[i].split(":")[1])
+        for i in range(len(address_chk)):
+            if item_ip == address_chk[i].split(":")[0]:
+                if min_chk > int(address_chk[i].split(":")[2]):
+                    min_chk = int(address_chk[i].split(":")[2])
+                if max_chk < int(address_chk[i].split(":")[2]):
+                    max_chk = int(address_chk[i].split(":")[2])
         max_min_chk.append([min_chk, max_chk])
         node.append("ssh -Y pulsar@pacifix{:d}.mpifr-bonn.mpg.de".format(int(item_ip.split(".")[2])))
         
     for i in range(nip):
         address_nchk[i] = sorted(address_nchk[i]) # Sort it to make it in order
 
-    print "For beam {:d}, we will receive data with {:d} NiC, the detail with the format [IP:PORT:NCHUNK] is as follow ...".format(beam, nip)
+    print "For beam {:d}, we will receive data with {:d} NiC, the detail with the format [IP:PORT:NCHUNK:CHUNK] is as follow ...".format(beam, nip)
     for i in range(nip):
         print "\t{:s}".format(address_nchk[i])
     
