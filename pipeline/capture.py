@@ -151,7 +151,6 @@ def main(args):
 
     # Get reference timestamp of capture
     df_sec, df_idf, utc_start, mjd_start, picoseconds = capture_reftime(destination_active[0], pktsz, df_res, system_conf)
-    print df_sec, df_idf, utc_start, mjd_start, picoseconds
     
     # Delete PSRDADA buffer
     os.system("dada_db -d {:s}".format(key))
