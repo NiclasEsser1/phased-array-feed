@@ -24,7 +24,11 @@ typedef struct conf_t
   int nport_active;
   int nchunk_active_expect[MPORT_CAPTURE];  
   int nchunk_active_actual[MPORT_CAPTURE];  
-  
+  int port_cpu[MPORT_CAPTURE];
+  int sync_cpu, monitor_cpu;
+  int thread_bind;
+
+  int pktsz, pktoff;
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
   int nport_dead;

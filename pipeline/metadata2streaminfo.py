@@ -99,15 +99,12 @@ def destination(multicast_data, conf_fname, beam):
         print "The center frequency of data from {:s} is {:.1f} MHz with {:d} channels, the login detail is \"{:s}\".".format(ip[i], freq[i], nchan[i], node[i])
     print "\n"
     
-    return node, address_nchk
+    return node, address_nchk, freq, nchan
     
-def main(args):
-    args       = parser.parse_args()
-    conf_fname = args.conf_fname[0]
-
+def metadata2streaminfo(system_conf):
     # Configure metadata interface
-    MCAST_GRP  = ConfigSectionMap(conf_fname, "MetadataInterfaceTOS")['ip']
-    MCAST_PORT = int(ConfigSectionMap(conf_fname, "MetadataInterfaceTOS")['port'])
+    MCAST_GRP  = ConfigSectionMap(system_conf, "MetadataInterfaceTOS")['ip']
+    MCAST_PORT = int(ConfigSectionMap(system_conf, "MetadataInterfaceTOS")['port'])
     MCAST_ADDR = ('', MCAST_PORT)
     
     # Create the socket and get ready to receive data
@@ -122,24 +119,24 @@ def main(args):
     pkt, addr      = sock.recvfrom(1<<16)
     multicast_data = json.loads(pkt)
 
-    ## Get information from metadata packet, which is shared with all beams
-    #target_name = multicast_data['target_name']
-    #ra  = float(multicast_data['beams_direction']['beam01'][0]) # RA in decimal radian, we may need to convert it to other unit
-    #dec = float(multicast_data['beams_direction']['beam01'][1]) # DEC in decimal radian, we may need to convert it to other unit
-
     # To get available beams 
-    nbeam = 36
+    nbeam = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbeam'])
     beams = available_beam(multicast_data, nbeam)
     print "The available beams are {:s}, counting from 0 ...\n".format(beams)
     
     # Get the desination of a given beam
+    nodes         = []
+    address_nchks = []
+    freqs         = []
+    nchans        = []
     for beam in beams:
-        node, address_nchk = destination(multicast_data, conf_fname, beam)
-    
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Read TOS metadata and get required observation information')
-    parser.add_argument('-a', '--conf_fname', type=str, nargs='+',
-                        help='The name of configuration file which defines the system interfaces')
+        node, address_nchk, freq, nchan = destination(multicast_data, system_conf, beam)
+        nodes.append(node)
+        address_nchks.append(address_nchk)
+        freqs.append(freq)
+        nchans.append(nchan)
+        
+    # Clsoe metadata socket
+    sock.close()        
 
-    args = parser.parse_args()
-    main(args)
+    return nodes, address_nchks, freqs, nchans

@@ -7,9 +7,8 @@
 #include "dada_def.h"
 #include "capture.h"
 
-// ./capture_main -a dada -b /beegfs/DENG/docker/ -c 10.17.0.1_17100_8_8 -c 10.17.0.1_17101_8_7 -c 10.17.0.1_17102_8_7 -c 10.17.0.1_17103_8_7 -c 10.17.0.1_17104_8_7 -c 10.17.0.1_17105_8_7  -e ../../config/header_16bit.txt -f 1340.5 -g 336 -i 2749527_16035_2018-08-01-19:15:46_58331.802615740744_731780000000 -j /beegfs/DENG/docker
-// ./capture_main -a dada -b /beegfs/DENG/docker/ -c 10.17.0.1_17100_8_8 -c 10.17.0.1_17101_8_7 -c 10.17.0.1_17102_8_7 -c 10.17.0.1_17103_8_7 -d 10.17.0.1_17104_8 -d 10.17.0.1_17105_8 -e ../../config/header_16bit.txt -f 1340.5 -g 336 -i 2749527_16035_2018-08-01-19:15:46_58331.802615740744_731780000000 -j /beegfs/DENG/docker
-  
+multilog_t *runtime_log;
+
 void usage()
 {
   fprintf (stdout,
@@ -17,15 +16,19 @@ void usage()
 	   "\n"
 	   "Usage: paf_capture [options]\n"
 	   " -a Hexadecimal shared memory key for capture \n"
-	   " -b Record header of data packets or not\n"
-	   " -c Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk_nchunk\" \n"
-	   " -d Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk\" \n"
-	   " -e The name of DADA header file\n"
-	   " -f The center frequency of captured data\n"
-	   " -g Number of channels of current capture\n"
+	   " -b Required packet size\n"
+	   " -c Start point of packet\n"
+	   " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk_nchunk_cpu\" \n"
+	   " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk\" \n"
+	   " -f The name of DADA header file\n"
+	   " -g The center frequency of captured data\n"
+	   " -i Number of channels of current capture\n"
 	   " -h Show help\n"
-	   " -i Reference for the current capture, the format of it is \"dfsec_dfidf_utcstart_mjdstart_picoseconds\"\n"
-	   " -j Which directory to put log file\n"
+	   " -j Reference for the current capture, the format of it is \"dfsec_dfidf_utcstart_mjdstart_picoseconds\"\n"
+	   " -k Which directory to put log file\n"
+	   " -l The CPU for sync thread\n"
+	   " -m The CPU for monitor thread\n"
+	   " -n Bind thread to CPU or not\n"
 	   );
 }
 
@@ -37,7 +40,12 @@ int main(int argc, char **argv)
   
   conf.nport_active = 0;
   conf.nport_dead   = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:")) != -1)
+  conf.sync_cpu     = 0;
+  conf.monitor_cpu  = 0;
+  conf.thread_bind  = 0; // Default do not bind thread to cpu
+  for (i = 0; i < MPORT_CAPTURE; i++)
+    conf.port_cpu[i] = 0;
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:")) != -1)
     {
       switch(arg)
 	{
@@ -54,44 +62,94 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'b':	  	  
-	  sscanf(optarg, "%d", &conf.hdr);
+	  sscanf(optarg, "%d", &conf.pktsz);
 	  break;
 
-	case 'c':
-	  sscanf(optarg, "%[^_]_%d_%d_%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active], &conf.nchunk_active_actual[conf.nport_active]);
-	  //fprintf(stdout, "%d\t%d\n", conf.nchunk_active_expect[conf.nport_active], conf.nchunk_active_actual[conf.nport_active]);
+	case 'c':	  	  
+	  sscanf(optarg, "%d", &conf.pktoff);
+	  break;
+
+	case 'd':
+	  sscanf(optarg, "%[^_]_%d_%d_%d_%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active], &conf.nchunk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
+	  fprintf(stdout, "%d\t%d\t%d\n", conf.nchunk_active_expect[conf.nport_active], conf.nchunk_active_actual[conf.nport_active], conf.port_cpu[conf.nport_active]);
 	  conf.nport_active++;
 	  break;
 	  
-	case 'd':
+	case 'e':
 	  sscanf(optarg, "%[^_]_%d_%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchunk_dead[conf.nport_dead]);
-	  //fprintf(stdout, "%d\n", conf.nchunk_dead[conf.nport_dead]);
 	  conf.nport_dead++;
 	  break;
 	  
-	case 'e':	  	  
+	case 'f':	  	  
 	  sscanf(optarg, "%s", conf.hdr_fname);
-	  //fprintf(stdout, "%s\n", conf.hdr_fname);
-	  break;
-
-	case 'f':
-	  sscanf(optarg, "%lf", &conf.center_freq);
 	  break;
 
 	case 'g':
-	  sscanf(optarg, "%d", &conf.nchan);
+	  sscanf(optarg, "%lf", &conf.center_freq);
 	  break;
 
 	case 'i':
-	  //sscanf(optarg, "%"SCNu64"::%"SCNu64"::%s::%lf::%"SCNu64"", &conf.df_sec, &conf.df_idf, conf.utc_start, &conf.mjd_start, &conf.picoseconds);
+	  sscanf(optarg, "%d", &conf.nchan);
+	  break;
+
+	case 'j':
 	  sscanf(optarg, "%"SCNu64"_%"SCNu64"_%[^_]_%lf_%"SCNu64"", &conf.df_sec, &conf.df_idf, conf.utc_start, &conf.mjd_start, &conf.picoseconds);
 	  break;
 	  
-	case 'j':
+	case 'k':
 	  sscanf(optarg, "%s", conf.dir);
+	  break;
+	  
+	case 'l':
+	  sscanf(optarg, "%d", &conf.sync_cpu);
+	  break;
+	  
+	case 'm':
+	  sscanf(optarg, "%d", &conf.monitor_cpu);
+	  break;
+	  
+	case 'n':
+	  sscanf(optarg, "%d", &conf.thread_bind);
 	  break;
 	}
     }
-  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\t%s\t%f\t%"PRIu64"\n", conf.df_sec, conf.df_idf, conf.utc_start, conf.mjd_start, conf.picoseconds);
+
+  /* Setup log interface */
+  char fname_log[MSTR_LEN];
+  FILE *fp_log = NULL;
+  sprintf(fname_log, "%s/capture.log", conf.dir);
+  fp_log = fopen(fname_log, "ab+"); 
+  if(fp_log == NULL)
+    {
+      fprintf(stderr, "Can not open log file %s\n", fname_log);
+      return EXIT_FAILURE;
+    }
+  runtime_log = multilog_open("capture", 1);
+  multilog_add(runtime_log, fp_log);
+  multilog(runtime_log, LOG_INFO, "CAPTURE START\n");
+    
+  /* To make sure that we are not going to bind all threads to one sigle CPU */
+  if(!(conf.thread_bind == 0))
+    {
+      for (i = 0; i < MPORT_CAPTURE; i++)
+	{
+	  if (((conf.port_cpu[i] == conf.monitor_cpu)?0:1) == 1)
+	    break;
+	  if (((conf.port_cpu[i] == conf.sync_cpu)?0:1) == 1)
+	    break;
+	}
+      if (i == MPORT_CAPTURE)
+	{
+	  fprintf(stdout, "We can not bind all threads into one single CPU!\n");
+	  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  return EXIT_FAILURE;
+	}
+    }
+  
+  /* Destory log interface */
+  multilog(runtime_log, LOG_INFO, "CAPTURE END\n\n");
+  multilog_close(runtime_log);
+  fclose(fp_log);
+
   return EXIT_SUCCESS;
 }
