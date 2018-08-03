@@ -49,7 +49,8 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
         pktoff = df_hdrsz                                                 # The start point of each BMF packet
     else:
         pktoff = 0
-    
+#    exit()
+
     # Do the real work here
     sec_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
     nchunk = nchans[beam][part]/nchan_chk;

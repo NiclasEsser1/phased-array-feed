@@ -15,7 +15,7 @@
 #define MPORT_CAPTURE 16
 #define NCHK_PORT     16
 #define DADA_HDR_SIZE 4096
-#define MCHAN_CAPTURE 336
+#define MCHK_CAPTURE  48
 
 typedef struct conf_t
 { 
@@ -59,7 +59,7 @@ typedef struct conf_t
 int init_capture(conf_t *conf);
 void *capture_thread(void *conf);
 int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf);
-int acquire_ifreq(hdr_t hdr, conf_t conf, int *ifreq);
+int acquire_ichk(hdr_t hdr, conf_t conf, int *ifreq);
 int init_buf(conf_t *conf);
 
 #endif

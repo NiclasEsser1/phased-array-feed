@@ -28,7 +28,7 @@ int force_switch;
 int ithread_extern;
 
 uint64_t ndf_port[MPORT_CAPTURE];
-uint64_t ndf_chan[MCHAN_CAPTURE];
+uint64_t ndf_chk[MCHK_CAPTURE];
 
 int transit[MPORT_CAPTURE];
 uint64_t tail[MPORT_CAPTURE];
@@ -36,19 +36,22 @@ hdr_t hdr_ref[MPORT_CAPTURE];
 hdr_t hdr_current[MPORT_CAPTURE];
 
 pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutexattr_t ithread_mutex_attr;
+//pthread_mutexattr_t ithread_mutex_attr;
 
 pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutexattr_t quit_mutex_attr;
+//pthread_mutexattr_t quit_mutex_attr;
 
 pthread_mutex_t force_switch_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutexattr_t force_switch_mutex_attr;
+//pthread_mutexattr_t force_switch_mutex_attr;
 
 pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutexattr_t hdr_ref_mutex_attr[MPORT_CAPTURE];
+//pthread_mutexattr_t hdr_ref_mutex_attr[MPORT_CAPTURE];
 
-pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutexattr_t hdr_current_mutex_attr[MPORT_CAPTURE];
+//pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
+//pthread_mutexattr_t hdr_current_mutex_attr[MPORT_CAPTURE];
+
+//pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
+//pthread_mutexattr_t ndf_port_mutex_attr[MPORT_CAPTURE];
 
 int init_buf(conf_t *conf)
 {
@@ -176,7 +179,7 @@ void *capture_thread(void *conf)
 {
   char *df = NULL;
   conf_t *captureconf = (conf_t *)conf;
-  int sock, ithread, pktsz, pktoff, required_pktsz, ifreq; 
+  int sock, ithread, pktsz, pktoff, required_pktsz, ichk; 
   struct sockaddr_in sa;
   struct timeval time_out={captureconf->sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
   socklen_t fromlen = sizeof(sa);
@@ -221,16 +224,16 @@ void *capture_thread(void *conf)
 	}      
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
             
-      pthread_mutex_lock(&hdr_current_mutex[ithread]);
+      //pthread_mutex_lock(&hdr_current_mutex[ithread]);
       hdr_current[ithread] = hdr;
-      pthread_mutex_unlock(&hdr_current_mutex[ithread]);
+      //pthread_mutex_unlock(&hdr_current_mutex[ithread]);
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
       acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
 
-      acquire_ifreq(hdr, *captureconf, &ifreq);
-      
+      acquire_ichk(hdr, *captureconf, &ichk);
+            
       if (idf < 0 )
 	// Drop data frams which are behind time;
 	continue;
@@ -257,7 +260,7 @@ void *capture_thread(void *conf)
 		We also foce to quit if we have time out problem;
 	      */
 	      transit[ithread]++;
-	     	      
+	      
 	      if(idf >= (2 * captureconf->rbuf_ndf_chk)) // quit
 		{
 		  /* Force to quit if we do not get any data in one data block */
@@ -266,7 +269,7 @@ void *capture_thread(void *conf)
 		  pthread_mutex_unlock(&quit_mutex);
 		  		  
 #ifdef DEBUG
-		  fprintf(stdout, "Too many temp data frames:\t%d\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n", ithread, ntohs(sa.sin_port), ifreq, hdr_ref[ithread].sec, hdr_ref[ithread].idf, hdr.sec, hdr.idf, idf);
+		  fprintf(stdout, "Too many temp data frames:\t%d\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n", ithread, ntohs(sa.sin_port), ichk, hdr_ref[ithread].sec, hdr_ref[ithread].idf, hdr.sec, hdr.idf, idf);
 #endif
 		  conf = (void *)captureconf;
 		  pthread_exit(NULL);
@@ -274,6 +277,7 @@ void *capture_thread(void *conf)
 		}
 	      else if(((idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) && (idf < (2 * captureconf->rbuf_ndf_chk))))   // Force to get a new ring buffer block
 		{
+		  fprintf(stdout, "%"PRIu64"\n", idf);
 		  /* 
 		     One possibility here: if we lose more that rbuf_ndf_nchk data frames continually, we will miss one data block;
 		     for rbuf_ndf_chk = 12500, that will be about 1 second data;
@@ -281,7 +285,7 @@ void *capture_thread(void *conf)
 		     I force the thread quit and also tell other threads quit if we loss one buffer;
 		  */
 #ifdef DEBUG
-		  fprintf(stdout, "Forced force_switch %d\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\n", ithread, hdr.sec, hdr.idf, ifreq, idf);
+		  fprintf(stdout, "Forced force_switch %d\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\n", ithread, hdr.sec, hdr.idf, ichk, idf);
 #endif
 		  pthread_mutex_lock(&force_switch_mutex);
 		  force_switch = 1;
@@ -289,27 +293,33 @@ void *capture_thread(void *conf)
 		}
 	      else  // Put data in to temp buffer
 		{
-		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchunk + ifreq); // This is in TFTFP order
+		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchunk + ichk); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
 		  tbuf[tbuf_loc] = 'Y';
 		  memcpy(tbuf + tbuf_loc + 1, df + pktoff, required_pktsz);
-
+		  
+		  //pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
-		  ndf_chan[ifreq]++;
+		  //pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+		  
+		  ndf_chk[ichk]++;
 		}
 	    }
 	  else
 	    {
 	      transit[ithread] = 0;
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
-	      cbuf_loc = (uint64_t)((idf * captureconf->nchunk + ifreq) * required_pktsz); // This is in TFTFP order
-	      //cbuf_loc = (uint64_t)((idf + ifreq * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
+	      cbuf_loc = (uint64_t)((idf * captureconf->nchunk + ichk) * required_pktsz); // This is in TFTFP order
+	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 
+	      //pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
-	      ndf_chan[ifreq]++;
+	      //pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+	      
+	      ndf_chk[ichk]++;
 	    }
 	}  
     }
@@ -328,8 +338,8 @@ int init_capture(conf_t *conf)
   init_buf(conf);  // Initi ring buffer and setup DADA header
 
   ithread_extern = 0;
-  for(i = 0; i < conf->nchan; i++) // Setup the counter for each frequency
-    ndf_chan[i] = 0;
+  for(i = 0; i < conf->nchunk; i++) // Setup the counter for each frequency
+    ndf_chk[i] = 0;
   
   /* Init status */
   //fprintf(stdout, "%d\n", conf->nport_active);
@@ -345,20 +355,22 @@ int init_capture(conf_t *conf)
   force_switch = 0;
   quit = 0;
   
-  /* Initialise mutex */
-  pthread_mutexattr_init(&ithread_mutex_attr);
-  pthread_mutexattr_settype(&ithread_mutex_attr, PTHREAD_PROCESS_SHARED);
-  pthread_mutexattr_init(&quit_mutex_attr);
-  pthread_mutexattr_settype(&quit_mutex_attr, PTHREAD_PROCESS_SHARED);
-  pthread_mutex_init(&ithread_mutex, &ithread_mutex_attr);
-  pthread_mutexattr_init(&force_switch_mutex_attr);
-  pthread_mutexattr_settype(&force_switch_mutex_attr, PTHREAD_PROCESS_SHARED);
-  for(i = 0; i < conf->nport_active; i++)
-    {      
-      pthread_mutexattr_init(&hdr_ref_mutex_attr[i]);
-      pthread_mutexattr_settype(&hdr_ref_mutex_attr[i], PTHREAD_PROCESS_SHARED);
-      pthread_mutex_init(&hdr_ref_mutex[i], &hdr_ref_mutex_attr[i]);
-    }
+  ///* Initialise mutex */
+  //pthread_mutexattr_init(&ithread_mutex_attr);
+  //pthread_mutexattr_settype(&ithread_mutex_attr, PTHREAD_PROCESS_SHARED);
+  //pthread_mutex_init(&ithread_mutex, &ithread_mutex_attr);
+  //
+  //pthread_mutexattr_init(&quit_mutex_attr);
+  //pthread_mutexattr_settype(&quit_mutex_attr, PTHREAD_PROCESS_SHARED);
+  //
+  //pthread_mutexattr_init(&force_switch_mutex_attr);
+  //pthread_mutexattr_settype(&force_switch_mutex_attr, PTHREAD_PROCESS_SHARED);
+  //for(i = 0; i < conf->nport_active; i++)
+  //  {      
+  //    pthread_mutexattr_init(&hdr_ref_mutex_attr[i]);
+  //    pthread_mutexattr_settype(&hdr_ref_mutex_attr[i], PTHREAD_PROCESS_SHARED);
+  //    pthread_mutex_init(&hdr_ref_mutex[i], &hdr_ref_mutex_attr[i]);
+  //  }
   
   /* Get the buffer block ready */
   uint64_t block_id = 0;
@@ -367,9 +379,9 @@ int init_capture(conf_t *conf)
   return EXIT_SUCCESS;
 }
 
-int acquire_ifreq(hdr_t hdr, conf_t conf, int *ifreq)
+int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
 {  
-  *ifreq = (int)((hdr.freq - conf.center_freq - 0.5)/(conf.nchan/conf.nchunk) + conf.nchunk/2);
+  *ichk = (int)((hdr.freq - conf.center_freq - 0.5)/(conf.nchan/conf.nchunk) + conf.nchunk/2);
   return EXIT_SUCCESS;
 }
 

@@ -17,7 +17,7 @@
 
 extern char *cbuf;
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
-extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
+//extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
 
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
@@ -29,7 +29,9 @@ extern int quit;
 extern multilog_t *runtime_log;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
-extern uint64_t ndf_chan[MCHAN_CAPTURE];
+//extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
+
+extern uint64_t ndf_chk[MCHK_CAPTURE];
 
 int threads(conf_t *conf)
 {
@@ -92,14 +94,16 @@ void *sync_thread(void *conf)
 	{
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
-	      pthread_mutex_lock(&hdr_current_mutex[i]);
+	      //pthread_mutex_lock(&hdr_current_mutex[i]);
 	      hdr = hdr_current[i];
-	      pthread_mutex_unlock(&hdr_current_mutex[i]);
+	      //pthread_mutex_unlock(&hdr_current_mutex[i]);
 
 	      ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
-	      ndf_port_actual[i] = ndf_port[i];	      
+	      //pthread_mutex_lock(&ndf_port_mutex[i]);
+	      ndf_port_actual[i] = ndf_port[i];
+	      //pthread_mutex_unlock(&ndf_port_mutex[i]);
 
-	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", ndf_chan[i], ndf_port_expect[i], ndf_port_actual[i], captureconf->nchunk_active_actual[i], captureconf->ndf_chk_prd, hdr.sec, captureconf->sec_start, hdr.idf, captureconf->idf_start);
+	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", ndf_chk[i], ndf_port_expect[i], ndf_port_actual[i], captureconf->nchunk_active_actual[i], captureconf->ndf_chk_prd, hdr.sec, captureconf->sec_start, hdr.idf, captureconf->idf_start);
 	    }
 	  ref_time = current_time;
 	}
@@ -125,6 +129,7 @@ void *sync_thread(void *conf)
 	    {
 	      // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block;
 	      // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
+	      
 	      pthread_mutex_lock(&hdr_ref_mutex[i]);
 	      hdr_ref[i].idf += captureconf->rbuf_ndf_chk;
 	      if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)                       // Here I assume that we could not lose one period;
@@ -162,6 +167,7 @@ void *sync_thread(void *conf)
 		  //ifreq = i - idf * nchunk;
 		  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
 		  //cbuf_loc = (uint64_t)(ifreq * captureconf-> captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
+
 		  memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
 		  tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
 		  // If we do not do that, we may have too many data frames to copy later
