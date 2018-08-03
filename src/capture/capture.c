@@ -35,23 +35,17 @@ uint64_t tail[MPORT_CAPTURE];
 hdr_t hdr_ref[MPORT_CAPTURE];
 hdr_t hdr_current[MPORT_CAPTURE];
 
-pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_mutexattr_t ithread_mutex_attr;
-
 pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_mutexattr_t quit_mutex_attr;
-
 pthread_mutex_t force_switch_mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_mutexattr_t force_switch_mutex_attr;
+pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t ndf_chk_mutex[MCHK_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 
 pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-//pthread_mutexattr_t hdr_ref_mutex_attr[MPORT_CAPTURE];
+pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 
-//pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-//pthread_mutexattr_t hdr_current_mutex_attr[MPORT_CAPTURE];
-
-//pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-//pthread_mutexattr_t ndf_port_mutex_attr[MPORT_CAPTURE];
+pthread_mutex_t transit_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 
 int init_buf(conf_t *conf)
 {
@@ -224,9 +218,9 @@ void *capture_thread(void *conf)
 	}      
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
             
-      //pthread_mutex_lock(&hdr_current_mutex[ithread]);
+      pthread_mutex_lock(&hdr_current_mutex[ithread]);
       hdr_current[ithread] = hdr;
-      //pthread_mutex_unlock(&hdr_current_mutex[ithread]);
+      pthread_mutex_unlock(&hdr_current_mutex[ithread]);
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
       acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
@@ -259,7 +253,9 @@ void *capture_thread(void *conf)
 		We force to quit the capture if we do not get any data in one block;
 		We also foce to quit if we have time out problem;
 	      */
+	      pthread_mutex_lock(&transit_mutex[ithread]);
 	      transit[ithread]++;
+	      pthread_mutex_unlock(&transit_mutex[ithread]);
 	      
 	      if(idf >= (2 * captureconf->rbuf_ndf_chk)) // quit
 		{
@@ -269,8 +265,11 @@ void *capture_thread(void *conf)
 		  pthread_mutex_unlock(&quit_mutex);
 		  		  
 #ifdef DEBUG
+		  pthread_mutex_lock(&hdr_ref_mutex[ithread]);
 		  fprintf(stdout, "Too many temp data frames:\t%d\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n", ithread, ntohs(sa.sin_port), ichk, hdr_ref[ithread].sec, hdr_ref[ithread].idf, hdr.sec, hdr.idf, idf);
 #endif
+		  pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
+		  
 		  conf = (void *)captureconf;
 		  pthread_exit(NULL);
 		  return NULL;
@@ -295,31 +294,39 @@ void *capture_thread(void *conf)
 		{
 		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchunk + ichk); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
-		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
+		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
+		  		  
 		  tbuf[tbuf_loc] = 'Y';
 		  memcpy(tbuf + tbuf_loc + 1, df + pktoff, required_pktsz);
 		  
-		  //pthread_mutex_lock(&ndf_port_mutex[ithread]);
+		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
-		  //pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-		  
+		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+
+		  pthread_mutex_lock(&ndf_chk_mutex[ithread]);
 		  ndf_chk[ichk]++;
+		  pthread_mutex_unlock(&ndf_chk_mutex[ithread]);
 		}
 	    }
 	  else
 	    {
+	      pthread_mutex_lock(&transit_mutex[ithread]);
 	      transit[ithread] = 0;
+	      pthread_mutex_unlock(&transit_mutex[ithread]);
+	      
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
 	      cbuf_loc = (uint64_t)((idf * captureconf->nchunk + ichk) * required_pktsz); // This is in TFTFP order
 	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 
-	      //pthread_mutex_lock(&ndf_port_mutex[ithread]);
+	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
-	      //pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 	      
+	      pthread_mutex_lock(&ndf_chk_mutex[ithread]);
 	      ndf_chk[ichk]++;
+	      pthread_mutex_unlock(&ndf_chk_mutex[ithread]);
 	    }
 	}  
     }
@@ -342,7 +349,6 @@ int init_capture(conf_t *conf)
     ndf_chk[i] = 0;
   
   /* Init status */
-  //fprintf(stdout, "%d\n", conf->nport_active);
   for(i = 0; i < conf->nport_active; i++)
     {
       transit[i] = 0;

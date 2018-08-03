@@ -15,23 +15,32 @@
 #include "sync.h"
 #include "capture.h"
 
+extern multilog_t *runtime_log;
+
 extern char *cbuf;
-extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
-//extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
+extern char *tbuf;
+
+extern int quit;
+extern int force_switch;
+
+extern uint64_t ndf_port[MPORT_CAPTURE];
+extern uint64_t ndf_chk[MCHK_CAPTURE];
 
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
-extern int force_switch;
-extern char *tbuf;
 extern hdr_t hdr_ref[MPORT_CAPTURE];
 extern hdr_t hdr_current[MPORT_CAPTURE];
-extern int quit;
-extern multilog_t *runtime_log;
 
-extern uint64_t ndf_port[MPORT_CAPTURE];
-//extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t quit_mutex;
+extern pthread_mutex_t force_switch_mutex;
 
-extern uint64_t ndf_chk[MCHK_CAPTURE];
+extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
+
+extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t ndf_chk_mutex[MCHK_CAPTURE];
+
+extern pthread_mutex_t transit_mutex[MPORT_CAPTURE];
 
 int threads(conf_t *conf)
 {
@@ -85,6 +94,9 @@ void *sync_thread(void *conf)
   hdr_t hdr;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
   uint64_t ndf_port_actual[MPORT_CAPTURE];
+  uint64_t ndf_chk_actual[MCHK_CAPTURE];
+  uint64_t ndf_chk_expect[MCHK_CAPTURE];
+  int switch_status, quit_status;
   
   clock_gettime(CLOCK_REALTIME, &ref_time);
   while(true)
@@ -94,26 +106,38 @@ void *sync_thread(void *conf)
 	{
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
-	      //pthread_mutex_lock(&hdr_current_mutex[i]);
+	      pthread_mutex_lock(&hdr_current_mutex[i]);
 	      hdr = hdr_current[i];
-	      //pthread_mutex_unlock(&hdr_current_mutex[i]);
+	      pthread_mutex_unlock(&hdr_current_mutex[i]);
 
 	      ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
-	      //pthread_mutex_lock(&ndf_port_mutex[i]);
+	      pthread_mutex_lock(&ndf_port_mutex[i]);
 	      ndf_port_actual[i] = ndf_port[i];
-	      //pthread_mutex_unlock(&ndf_port_mutex[i]);
+	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 
-	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", ndf_chk[i], ndf_port_expect[i], ndf_port_actual[i], captureconf->nchunk_active_actual[i], captureconf->ndf_chk_prd, hdr.sec, captureconf->sec_start, hdr.idf, captureconf->idf_start);
+	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+	      pthread_mutex_lock(&ndf_chk_mutex[i]);
+	      ndf_chk_actual[i] = ndf_chk[i];
+	      pthread_mutex_unlock(&ndf_chk_mutex[i]);
+
+	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", ndf_chk_actual[i], ndf_chk_expect[i], ndf_port_actual[i], ndf_port_expect[i]);
 	    }
 	  ref_time = current_time;
 	}
 	
       ntransit = 0; 
       for(i = 0; i < captureconf->nport_active; i++)
-	ntransit += transit[i];
+	{
+	  pthread_mutex_lock(&transit_mutex[i]);
+	  ntransit += transit[i];
+	  pthread_mutex_unlock(&transit_mutex[i]);
+	}
       
       /* To see if we need to move to next buffer block */
-      if((ntransit > nchunk) || force_switch)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
+      pthread_mutex_lock(&force_switch_mutex);
+      switch_status = force_switch;
+      pthread_mutex_unlock(&force_switch_mutex);      
+      if((ntransit > nchunk) || switch_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 	  /* Close current buffer */
 	  if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0)
@@ -144,7 +168,11 @@ void *sync_thread(void *conf)
 	    {
 	      ntransit = 0;
 	      for(i = 0; i < captureconf->nport_active; i++)
-		ntransit += transit[i];
+		{
+		  pthread_mutex_lock(&transit_mutex[i]);
+		  ntransit += transit[i];
+		  pthread_mutex_unlock(&transit_mutex[i]);
+		}
 	      if(ntransit == 0)
 		break;
 	    }
@@ -175,11 +203,16 @@ void *sync_thread(void *conf)
 	    }
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    tail[i] = 0;  // Reset the location of tbuf;
-
+	  
+	  pthread_mutex_lock(&force_switch_mutex);
 	  force_switch = 0;
+	  pthread_mutex_unlock(&force_switch_mutex);
 	}
-
-      if(quit == 1)
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit_status = quit;
+      pthread_mutex_unlock(&quit_mutex);
+      if(quit_status == 1)
 	{
 	  if (ipcio_close_block_write (captureconf->hdu->data_block, captureconf->rbufsz) < 0) // This should enable eod at current buffer
 	    {
