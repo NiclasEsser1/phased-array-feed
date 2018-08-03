@@ -27,6 +27,9 @@ int quit;
 int force_switch;
 int ithread_extern;
 
+uint64_t ndf_port[MPORT_CAPTURE];
+uint64_t ndf_chan[MCHAN_CAPTURE];
+
 int transit[MPORT_CAPTURE];
 uint64_t tail[MPORT_CAPTURE];
 hdr_t hdr_ref[MPORT_CAPTURE];
@@ -217,7 +220,7 @@ void *capture_thread(void *conf)
 	  return NULL;
 	}      
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-
+            
       pthread_mutex_lock(&hdr_current_mutex[ithread]);
       hdr_current[ithread] = hdr;
       pthread_mutex_unlock(&hdr_current_mutex[ithread]);
@@ -272,7 +275,7 @@ void *capture_thread(void *conf)
 	      else if(((idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) && (idf < (2 * captureconf->rbuf_ndf_chk))))   // Force to get a new ring buffer block
 		{
 		  /* 
-		     One possibility here: if we lose more that RBUF_NDF data frames continually, we will miss one data block;
+		     One possibility here: if we lose more that rbuf_ndf_nchk data frames continually, we will miss one data block;
 		     for rbuf_ndf_chk = 12500, that will be about 1 second data;
 		     Do we need to deal with it?
 		     I force the thread quit and also tell other threads quit if we loss one buffer;
@@ -291,9 +294,10 @@ void *capture_thread(void *conf)
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
 		  tbuf[tbuf_loc] = 'Y';
-		  memcpy(tbuf + tbuf_loc + 1, df + pktoff, required_pktsz);	  
-		  captureconf->ndf_port[ithread]++;
-		  captureconf->ndf_chan[ifreq]++;
+		  memcpy(tbuf + tbuf_loc + 1, df + pktoff, required_pktsz);
+
+		  ndf_port[ithread]++;
+		  ndf_chan[ifreq]++;
 		}
 	    }
 	  else
@@ -302,9 +306,10 @@ void *capture_thread(void *conf)
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
 	      cbuf_loc = (uint64_t)((idf * captureconf->nchunk + ifreq) * required_pktsz); // This is in TFTFP order
 	      //cbuf_loc = (uint64_t)((idf + ifreq * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
-	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);	      
-	      captureconf->ndf_port[ithread]++;
-	      captureconf->ndf_chan[ifreq]++;
+	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
+
+	      ndf_port[ithread]++;
+	      ndf_chan[ifreq]++;
 	    }
 	}  
     }
@@ -322,16 +327,18 @@ int init_capture(conf_t *conf)
 
   init_buf(conf);  // Initi ring buffer and setup DADA header
 
+  ithread_extern = 0;
   for(i = 0; i < conf->nchan; i++) // Setup the counter for each frequency
-    conf->ndf_chan[i] = 0;
+    ndf_chan[i] = 0;
   
   /* Init status */
+  //fprintf(stdout, "%d\n", conf->nport_active);
   for(i = 0; i < conf->nport_active; i++)
     {
       transit[i] = 0;
       tail[i] = 0;
 
-      conf->ndf_port[i] = 0;
+      ndf_port[i] = 0;
       hdr_ref[i].sec = conf->sec_start;
       hdr_ref[i].idf = conf->idf_start;
     }

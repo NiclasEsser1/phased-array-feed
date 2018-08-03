@@ -23,8 +23,6 @@ typedef struct conf_t
   int hdr;
   dada_hdu_t *hdu;
   
-  uint64_t ndf_port[MPORT_CAPTURE];
-  uint64_t ndf_chan[MCHAN_CAPTURE];
   uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
 
   int pktsz, pktoff, required_pktsz;

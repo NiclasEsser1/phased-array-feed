@@ -28,6 +28,9 @@ extern hdr_t hdr_current[MPORT_CAPTURE];
 extern int quit;
 extern multilog_t *runtime_log;
 
+extern uint64_t ndf_port[MPORT_CAPTURE];
+extern uint64_t ndf_chan[MCHAN_CAPTURE];
+
 int threads(conf_t *conf)
 {
   int i, ret[MPORT_CAPTURE + 1], node;
@@ -76,9 +79,31 @@ void *sync_thread(void *conf)
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ifreq, idf;
   uint64_t block_id = 0;
+  struct timespec ref_time, current_time;
+  hdr_t hdr;
+  uint64_t ndf_port_expect[MPORT_CAPTURE];
+  uint64_t ndf_port_actual[MPORT_CAPTURE];
   
+  clock_gettime(CLOCK_REALTIME, &ref_time);
   while(true)
     {
+      clock_gettime(CLOCK_REALTIME, &current_time);
+      if((current_time.tv_sec - ref_time.tv_sec) > captureconf->monitor_sec) // Check the traffic status every monitor_sec;
+	{
+	  for(i = 0; i < captureconf->nport_active; i++)
+	    {
+	      pthread_mutex_lock(&hdr_current_mutex[i]);
+	      hdr = hdr_current[i];
+	      pthread_mutex_unlock(&hdr_current_mutex[i]);
+
+	      ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+	      ndf_port_actual[i] = ndf_port[i];	      
+
+	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", ndf_chan[i], ndf_port_expect[i], ndf_port_actual[i], captureconf->nchunk_active_actual[i], captureconf->ndf_chk_prd, hdr.sec, captureconf->sec_start, hdr.idf, captureconf->idf_start);
+	    }
+	  ref_time = current_time;
+	}
+	
       ntransit = 0; 
       for(i = 0; i < captureconf->nport_active; i++)
 	ntransit += transit[i];
