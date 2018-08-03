@@ -42,18 +42,22 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
     nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
     nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
     df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
+    ndf_prd      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndf_prd'])
+    ndf_blk      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_blk'])
+    ndf_temp     = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_temp'])
+    pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if(hdr == 0):
-        pktsz  = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df  # The needed size of each BMF packet
         pktoff = df_hdrsz                                                 # The start point of each BMF packet
     else:
-        pktsz  = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
         pktoff = 0
-        
+    
     # Do the real work here
+    df_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_prd'])
+    nchunk = nchans[beam][part]/nchan_chk;
     if (len(destination_dead) == 0):
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:s} -g {:f} -i {:d} -j {:d}_{:d}_{:s}_{:f}_{:d} -k {:s} -l {:d} -m {:d} -n {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), hdr_fname, freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], refinfo[2], refinfo[3], refinfo[4], dir_capture, cpu + 1, cpu + 2, bind)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:s} -g {:f} -i {:d} -j {:d}_{:d}_{:s}_{:f}_{:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r PAF-BEAM-{:02d} -s {:d} -t {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), hdr_fname, freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], refinfo[2], refinfo[3], refinfo[4], dir_capture, cpu + 1, cpu + 2, bind, df_prd, nchunk, ndf_blk, beam, ndf_temp, ndf_prd)
     else:
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:s} -g {:f} -i {:d} -j {:d}_{:d}_{:s}_{:f}_{:d} -k {:s} -l {:d} -m {:d} -n {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), hdr_fname, freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], refinfo[2], refinfo[3], refinfo[4], dir_capture, cpu + 1, cpu + 2, bind)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:s} -g {:f} -i {:d} -j {:d}_{:d}_{:s}_{:f}_{:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r PAF-BEAM-{:02d} -s {:d} -t {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), hdr_fname, freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], refinfo[2], refinfo[3], refinfo[4], dir_capture, cpu + 1, cpu + 2, bind, df_prd, nchunk, ndf_blk, beam, ndf_temp, ndf_prd)
     print capture_command
     os.system(capture_command)
     

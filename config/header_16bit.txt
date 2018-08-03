@@ -40,6 +40,6 @@ NBIT         8                 # number of bits per sample
 NDIM         2                 # dimension of samples (2=complex, 1=real)
 NPOL         2                 # number of polarizations observed
 NCHAN        336               # number of channels here
-RESOLUTION   1                 # a parameter that is unclear
+RESOLUTION   1                 
 DSB          1
 # end of header

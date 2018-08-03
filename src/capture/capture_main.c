@@ -6,6 +6,7 @@
 #include "multilog.h"
 #include "dada_def.h"
 #include "capture.h"
+#include "sync.h"
 
 multilog_t *runtime_log;
 
@@ -16,7 +17,7 @@ void usage()
 	   "\n"
 	   "Usage: paf_capture [options]\n"
 	   " -a Hexadecimal shared memory key for capture \n"
-	   " -b Required packet size\n"
+	   " -b BMF packet size\n"
 	   " -c Start point of packet\n"
 	   " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk_nchunk_cpu\" \n"
 	   " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk\" \n"
@@ -29,6 +30,12 @@ void usage()
 	   " -l The CPU for sync thread\n"
 	   " -m The CPU for monitor thread\n"
 	   " -n Bind thread to CPU or not\n"
+	   " -o Time out for sockets\n"
+	   " -p The number of chunks\n"
+	   " -q The number of data frames in each buffer block\n"
+	   " -r Instrument name, for PAF is beam with its id\n"
+	   " -s The number of data frames in each temp buffer\n"
+	   " -t The number of data frames in period\n"
 	   );
 }
 
@@ -45,7 +52,7 @@ int main(int argc, char **argv)
   conf.thread_bind  = 0; // Default do not bind thread to cpu
   for (i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
     {
       switch(arg)
 	{
@@ -111,9 +118,33 @@ int main(int argc, char **argv)
 	case 'n':
 	  sscanf(optarg, "%d", &conf.thread_bind);
 	  break;
+	  
+	case 'o':
+	  sscanf(optarg, "%d", &conf.df_prd);
+	  break;
+	  
+	case 'p':
+	  sscanf(optarg, "%d", &conf.nchunk);
+	  break;
+	  
+	case 'q':
+	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf);
+	  break;
+	  
+	case 'r':
+	  sscanf(optarg, "%s", conf.instrument);
+	  break;
+	  
+	case 's':
+	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf);
+	  break;
+	  
+	case 't':
+	  sscanf(optarg, "%"SCNu64"", &conf.ndf_prd);
+	  break;
 	}
     }
-
+  
   /* Setup log interface */
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;
@@ -145,6 +176,12 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	}
     }
+
+  /* Init capture */
+  init_capture(&conf);
+
+  /* Do the job */
+  threads(&conf);
   
   /* Destory log interface */
   multilog(runtime_log, LOG_INFO, "CAPTURE END\n\n");

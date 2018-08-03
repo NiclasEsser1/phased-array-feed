@@ -118,9 +118,9 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     df_res       = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
     pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if hdr == 1:
-        blksz     = ndf_blk * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
+        blksz    = ndf_blk * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
     else:
-        blksz   = ndf_blk * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
+        blksz    = ndf_blk * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
     
     # Check the connection
     destination_active, destination_dead = check_all_ports(destination, pktsz, df_prd, ndf_check)
