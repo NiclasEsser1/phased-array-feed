@@ -324,8 +324,8 @@ int init_capture(conf_t *conf)
       tail[i] = 0;
 
       conf->ndf_port[i] = 0;
-      hdr_ref[i].sec = conf->df_sec;
-      hdr_ref[i].idf = conf->df_idf;
+      hdr_ref[i].sec = conf->sec_start;
+      hdr_ref[i].idf = conf->idf_start;
     }
   force_switch = 0;
   quit = 0;

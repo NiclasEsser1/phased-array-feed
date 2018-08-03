@@ -51,8 +51,8 @@ typedef struct conf_t
   char utc_start[MSTR_LEN];
   double mjd_start;
   uint64_t picoseconds;
-  uint64_t df_sec;
-  uint64_t df_idf;
+  uint64_t sec_start;
+  uint64_t idf_start;
 
   int nchunk;
   double bw, resolution;

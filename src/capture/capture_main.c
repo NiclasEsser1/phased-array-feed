@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'j':
-	  sscanf(optarg, "%"SCNu64"_%"SCNu64"_%[^_]_%lf_%"SCNu64"", &conf.df_sec, &conf.df_idf, conf.utc_start, &conf.mjd_start, &conf.picoseconds);
+	  sscanf(optarg, "%"SCNu64"_%"SCNu64"_%[^_]_%lf_%"SCNu64"", &conf.sec_start, &conf.idf_start, conf.utc_start, &conf.mjd_start, &conf.picoseconds);
 	  break;
 	  
 	case 'k':
