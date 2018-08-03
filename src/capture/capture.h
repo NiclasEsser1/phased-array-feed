@@ -50,6 +50,7 @@ typedef struct conf_t
 
   int nchunk;
   int sec_prd;
+  int monitor_sec;
   char dir[MSTR_LEN];
 
   uint64_t rbufsz, tbufsz;

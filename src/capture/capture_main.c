@@ -35,6 +35,7 @@ void usage()
 	   " -q The number of data frames in each buffer block of each frequency chunk\n"
 	   " -r The number of data frames in each temp buffer of each frequency chunk\n"
 	   " -s The number of data frames in period or each frequency chunk\n"
+	   " -t Interval in seconds to monitor the traffic\n"
 	   );
 }
 
@@ -51,7 +52,7 @@ int main(int argc, char **argv)
   conf.thread_bind  = 0; // Default do not bind thread to cpu
   for (i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
     {
       switch(arg)
 	{
@@ -135,6 +136,10 @@ int main(int argc, char **argv)
 	  
 	case 's':
 	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chk_prd);
+	  break;
+	  
+	case 't':
+	  sscanf(optarg, "%d", &conf.monitor_sec);
 	  break;
 	}
     }

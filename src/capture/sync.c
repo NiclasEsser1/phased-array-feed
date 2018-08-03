@@ -17,12 +17,14 @@
 
 extern char *cbuf;
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
 
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
 extern int force_switch;
 extern char *tbuf;
 extern hdr_t hdr_ref[MPORT_CAPTURE];
+extern hdr_t hdr_current[MPORT_CAPTURE];
 extern int quit;
 extern multilog_t *runtime_log;
 

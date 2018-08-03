@@ -43,6 +43,7 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
     ndf_chk_prd  = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndf_chk_prd'])
     ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
     ndf_chk_tbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_tbuf'])
+    monitor_sec  = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['monitor_sec'])
     pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if(hdr == 0):
         pktoff = df_hdrsz                                                 # The start point of each BMF packet
@@ -53,9 +54,9 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
     sec_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
     nchunk = nchans[beam][part]/nchan_chk;
     if (len(destination_dead) == 0):
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d} -j {:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d} -j {:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:d} -t {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, monitor_sec)
     else:
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:d} -j {:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:d} -j {:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:d} -t {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, monitor_sec)
     print capture_command
     os.system(capture_command)
     

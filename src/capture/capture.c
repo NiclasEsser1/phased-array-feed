@@ -30,6 +30,7 @@ int ithread_extern;
 int transit[MPORT_CAPTURE];
 uint64_t tail[MPORT_CAPTURE];
 hdr_t hdr_ref[MPORT_CAPTURE];
+hdr_t hdr_current[MPORT_CAPTURE];
 
 pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutexattr_t ithread_mutex_attr;
@@ -42,6 +43,9 @@ pthread_mutexattr_t force_switch_mutex_attr;
 
 pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutexattr_t hdr_ref_mutex_attr[MPORT_CAPTURE];
+
+pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutexattr_t hdr_current_mutex_attr[MPORT_CAPTURE];
 
 int init_buf(conf_t *conf)
 {
@@ -213,12 +217,17 @@ void *capture_thread(void *conf)
 	  return NULL;
 	}      
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-      acquire_ifreq(hdr, *captureconf, &ifreq);              
+
+      pthread_mutex_lock(&hdr_current_mutex[ithread]);
+      hdr_current[ithread] = hdr;
+      pthread_mutex_unlock(&hdr_current_mutex[ithread]);
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
       acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
 
+      acquire_ifreq(hdr, *captureconf, &ifreq);
+      
       if (idf < 0 )
 	// Drop data frams which are behind time;
 	continue;
