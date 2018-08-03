@@ -180,6 +180,7 @@ void *capture_thread(void *conf)
   int64_t idf;
   uint64_t tbuf_loc, cbuf_loc;
   hdr_t hdr;
+  int quit_status;
   
   pktsz          = captureconf->pktsz;
   pktoff         = captureconf->pktoff;
@@ -200,7 +201,11 @@ void *capture_thread(void *conf)
   sa.sin_addr.s_addr = inet_addr(captureconf->ip_active[ithread]);
   bind(sock, (struct sockaddr *)&sa, sizeof(sa));
 
-  while(true)
+  pthread_mutex_lock(&quit_mutex);
+  quit_status = quit;
+  pthread_mutex_unlock(&quit_mutex);
+  
+  while(quit_status == 0)
     {      
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&sa, &fromlen) == -1)
 	{
@@ -212,6 +217,7 @@ void *capture_thread(void *conf)
 	  quit = 1;
 	  pthread_mutex_unlock(&quit_mutex);
 
+	  free(df);
 	  conf = (void *)captureconf;
 	  pthread_exit(NULL);
 	  return NULL;
@@ -269,7 +275,8 @@ void *capture_thread(void *conf)
 		  fprintf(stdout, "Too many temp data frames:\t%d\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n", ithread, ntohs(sa.sin_port), ichk, hdr_ref[ithread].sec, hdr_ref[ithread].idf, hdr.sec, hdr.idf, idf);
 #endif
 		  pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-		  
+
+		  free(df);
 		  conf = (void *)captureconf;
 		  pthread_exit(NULL);
 		  return NULL;
@@ -328,13 +335,18 @@ void *capture_thread(void *conf)
 	      ndf_chk[ichk]++;
 	      pthread_mutex_unlock(&ndf_chk_mutex[ithread]);
 	    }
-	}  
+	}
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit_status = quit;
+      pthread_mutex_unlock(&quit_mutex);
     }
-  free(df);
     
   /* Exit */
+  free(df);
   conf = (void *)captureconf;
   pthread_exit(NULL);
+
   return NULL;
 }
 
@@ -360,24 +372,7 @@ int init_capture(conf_t *conf)
     }
   force_switch = 0;
   quit = 0;
-  
-  ///* Initialise mutex */
-  //pthread_mutexattr_init(&ithread_mutex_attr);
-  //pthread_mutexattr_settype(&ithread_mutex_attr, PTHREAD_PROCESS_SHARED);
-  //pthread_mutex_init(&ithread_mutex, &ithread_mutex_attr);
-  //
-  //pthread_mutexattr_init(&quit_mutex_attr);
-  //pthread_mutexattr_settype(&quit_mutex_attr, PTHREAD_PROCESS_SHARED);
-  //
-  //pthread_mutexattr_init(&force_switch_mutex_attr);
-  //pthread_mutexattr_settype(&force_switch_mutex_attr, PTHREAD_PROCESS_SHARED);
-  //for(i = 0; i < conf->nport_active; i++)
-  //  {      
-  //    pthread_mutexattr_init(&hdr_ref_mutex_attr[i]);
-  //    pthread_mutexattr_settype(&hdr_ref_mutex_attr[i], PTHREAD_PROCESS_SHARED);
-  //    pthread_mutex_init(&hdr_ref_mutex[i], &hdr_ref_mutex_attr[i]);
-  //  }
-  
+    
   /* Get the buffer block ready */
   uint64_t block_id = 0;
   cbuf = ipcio_open_block_write(conf->hdu->data_block, &block_id);

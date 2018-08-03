@@ -96,10 +96,15 @@ void *sync_thread(void *conf)
   uint64_t ndf_port_actual[MPORT_CAPTURE];
   uint64_t ndf_chk_actual[MCHK_CAPTURE];
   uint64_t ndf_chk_expect[MCHK_CAPTURE];
-  int switch_status, quit_status;
+  int force_switch_status, quit_status;
   
+  pthread_mutex_lock(&quit_mutex);
+  quit_status = quit;
+  pthread_mutex_unlock(&quit_mutex);
+
   clock_gettime(CLOCK_REALTIME, &ref_time);
-  while(true)
+  
+  while(quit_status == 0)
     {
       clock_gettime(CLOCK_REALTIME, &current_time);
       if((current_time.tv_sec - ref_time.tv_sec) > captureconf->monitor_sec) // Check the traffic status every monitor_sec;
@@ -120,7 +125,7 @@ void *sync_thread(void *conf)
 	      ndf_chk_actual[i] = ndf_chk[i];
 	      pthread_mutex_unlock(&ndf_chk_mutex[i]);
 
-	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", ndf_chk_actual[i], ndf_chk_expect[i], ndf_port_actual[i], ndf_port_expect[i]);
+	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 	    }
 	  ref_time = current_time;
 	}
@@ -135,15 +140,21 @@ void *sync_thread(void *conf)
       
       /* To see if we need to move to next buffer block */
       pthread_mutex_lock(&force_switch_mutex);
-      switch_status = force_switch;
+      force_switch_status = force_switch;
       pthread_mutex_unlock(&force_switch_mutex);      
-      if((ntransit > nchunk) || switch_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
+      if((ntransit > nchunk) || force_switch_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 	  /* Close current buffer */
 	  if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0)
 	    {
 	      multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
 	      fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      
+	      pthread_mutex_lock(&quit_mutex);
+	      quit = 1;
+	      pthread_mutex_unlock(&quit_mutex);
+
+	      pthread_exit(NULL);
 	      return NULL;
 	    }
 
@@ -212,17 +223,6 @@ void *sync_thread(void *conf)
       pthread_mutex_lock(&quit_mutex);
       quit_status = quit;
       pthread_mutex_unlock(&quit_mutex);
-      if(quit_status == 1)
-	{
-	  if (ipcio_close_block_write (captureconf->hdu->data_block, captureconf->rbufsz) < 0) // This should enable eod at current buffer
-	    {
-	      multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
-	      fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      return NULL;
-	    }
-	  pthread_exit(NULL);
-	  return NULL;
-	}
     }
   
   /* Exit */
@@ -230,9 +230,10 @@ void *sync_thread(void *conf)
     {
       multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
       fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      pthread_exit(NULL);
       return NULL;
-    }
-  
+    }  
   pthread_exit(NULL);
   return NULL;
 }
