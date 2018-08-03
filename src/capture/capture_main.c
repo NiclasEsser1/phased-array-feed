@@ -19,21 +19,22 @@ void usage()
 	   " -a Hexadecimal shared memory key for capture \n"
 	   " -b BMF packet size\n"
 	   " -c Start point of packet\n"
-	   " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk_nchunk_cpu\" \n"
-	   " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk\" \n"
+	   " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected:nchunk_actual:cpu\" \n"
+	   " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected\" \n"
 	   " -f The center frequency of captured data\n"
 	   " -g Number of channels of current capture\n"
 	   " -h Show help\n"
-	   " -i Reference for the current capture, the format of it is \"dfsec_dfidf_utcstart_mjdstart_picoseconds\"\n"
-	   " -j Which directory to put log file\n"
-	   " -k The CPU for sync thread\n"
-	   " -l The CPU for monitor thread\n"
-	   " -m Bind thread to CPU or not\n"
-	   " -n Time out for sockets\n"
-	   " -o The number of chunks\n"
-	   " -p The number of data frames in each buffer block of each frequency chunk\n"
-	   " -q The number of data frames in each temp buffer of each frequency chunk\n"
-	   " -r The number of data frames in period or each frequency chunk\n"
+	   " -i Reference second for the current capture, get from BMF packet header\n"
+	   " -j Reference data frame index for the current capture, get from BMF packet header\n"	   
+	   " -k Which directory to put log file\n"
+	   " -l The CPU for sync thread\n"
+	   " -m The CPU for monitor thread\n"
+	   " -n Bind thread to CPU or not\n"
+	   " -o Time out for sockets\n"
+	   " -p The number of chunks\n"
+	   " -q The number of data frames in each buffer block of each frequency chunk\n"
+	   " -r The number of data frames in each temp buffer of each frequency chunk\n"
+	   " -s The number of data frames in period or each frequency chunk\n"
 	   );
 }
 
@@ -50,7 +51,7 @@ int main(int argc, char **argv)
   conf.thread_bind  = 0; // Default do not bind thread to cpu
   for (i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:")) != -1)
     {
       switch(arg)
 	{
@@ -75,13 +76,12 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'd':
-	  sscanf(optarg, "%[^_]_%d_%d_%d_%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active], &conf.nchunk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
-	  fprintf(stdout, "%d\t%d\t%d\n", conf.nchunk_active_expect[conf.nport_active], conf.nchunk_active_actual[conf.nport_active], conf.port_cpu[conf.nport_active]);
+	  sscanf(optarg, "%[^:]:%d:%d:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active], &conf.nchunk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
 	  conf.nport_active++;
 	  break;
 	  
 	case 'e':
-	  sscanf(optarg, "%[^_]_%d_%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchunk_dead[conf.nport_dead]);
+	  sscanf(optarg, "%[^:]:%d:%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchunk_dead[conf.nport_dead]);
 	  conf.nport_dead++;
 	  break;
 	  
@@ -94,42 +94,46 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'i':
-	  sscanf(optarg, "%"SCNu64"_%"SCNu64"", &conf.sec_start, &conf.idf_start);
+	  sscanf(optarg, "%"SCNu64"", &conf.sec_start);
 	  break;
 	  
 	case 'j':
-	  sscanf(optarg, "%s", conf.dir);
+	  sscanf(optarg, "%"SCNu64"", &conf.idf_start);
 	  break;
 	  
 	case 'k':
-	  sscanf(optarg, "%d", &conf.sync_cpu);
+	  sscanf(optarg, "%s", conf.dir);
 	  break;
 	  
 	case 'l':
-	  sscanf(optarg, "%d", &conf.monitor_cpu);
+	  sscanf(optarg, "%d", &conf.sync_cpu);
 	  break;
 	  
 	case 'm':
-	  sscanf(optarg, "%d", &conf.thread_bind);
+	  sscanf(optarg, "%d", &conf.monitor_cpu);
 	  break;
 	  
 	case 'n':
-	  sscanf(optarg, "%d", &conf.sec_prd);
+	  sscanf(optarg, "%d", &conf.thread_bind);
 	  break;
 	  
 	case 'o':
-	  sscanf(optarg, "%d", &conf.nchunk);
+	  sscanf(optarg, "%d", &conf.sec_prd);
 	  break;
 	  
 	case 'p':
-	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf_chk);
+	  sscanf(optarg, "%d", &conf.nchunk);
 	  break;
 	  
 	case 'q':
-	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf_chk);
+	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf_chk);
 	  break;
 	  
 	case 'r':
+	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf_chk);
+	  break;
+	  
+	case 's':
 	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chk_prd);
 	  break;
 	}

@@ -28,11 +28,10 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
     
     # To set up cpu cores if we decide to bind threads
     ncpu_numa    = int(ConfigSectionMap(system_conf, "NUMA")['ncpu_numa'])
-    if((bind != 0)):
-        node = int(destination_active[0].split("_")[0].split(".")[3])
-        for i in range(len(destination_active)):
-            cpu = (node - 1) * ncpu_numa + i
-            destination_active[i] = "{:s}_{:d}".format(destination_active[i], cpu)
+    node = int(destination_active[0].split(":")[0].split(".")[3])
+    for i in range(len(destination_active)):
+        cpu = (node - 1) * ncpu_numa + i
+        destination_active[i] = "{:s}:{:d}".format(destination_active[i], cpu)
 
     # To setup buffer size for single packet and reading start of it    
     nsamp_df     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
@@ -54,9 +53,9 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
     sec_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
     nchunk = nchans[beam][part]/nchan_chk;
     if (len(destination_dead) == 0):
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}_{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d} -j {:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd)
     else:
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:d}_{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:d} -j {:d} -k {:s} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], dir_capture, cpu + 1, cpu + 2, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd)
     print capture_command
     os.system(capture_command)
     

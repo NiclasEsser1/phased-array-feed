@@ -26,7 +26,7 @@ def ConfigSectionMap(fname, section):
 
 def capture_refinfo(destination, pktsz):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_address = (destination.split("_")[0], int(destination.split("_")[1]))
+    server_address = (destination.split(":")[0], int(destination.split(":")[1]))
     sock.bind(server_address)
     buf, address = sock.recvfrom(pktsz) # raw packet
     
@@ -49,9 +49,9 @@ def check_all_ports(destination, pktsz, sec_prd, ndf_check):
     destination_dead   = []   # The destination where we can not receive data
     for i in range(nport):
         if active[i] == 1:
-            destination_active.append("{:s}_{:s}_{:s}_{:d}".format(destination[i].split(":")[0], destination[i].split(":")[1], destination[i].split(":")[2], nchunk_active[i]))
+            destination_active.append("{:s}:{:s}:{:s}:{:d}".format(destination[i].split(":")[0], destination[i].split(":")[1], destination[i].split(":")[2], nchunk_active[i]))
         else:
-            destination_dead.append("{:s}_{:s}_{:s}".format(destination[i].split(":")[0], destination[i].split(":")[1], destination[i].split(":")[2]))
+            destination_dead.append("{:s}:{:s}:{:s}".format(destination[i].split(":")[0], destination[i].split(":")[1], destination[i].split(":")[2]))
     return destination_active, destination_dead
     
 def check_port(ip, port, pktsz, ndf_check):
@@ -114,14 +114,14 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     if (len(destination_active) == 0):
         print "There is no active port for beam {:02d}, have to abort ...".format(beam)
         exit(1)
-    print "The active destination \"[IP_PORT_NCHUNK_EXPECT_NCHUNK_ACTUAL]\" are: ", destination_active
-    print "The dead destination \"[IP_PORT_NCHUNK_EXPECT]\" are:                 ", destination_dead
+    print "The active destination \"[IP:PORT:NCHUNK_EXPECT:NCHUNK_ACTUAL]\" are: ", destination_active
+    print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
     
     # Create PSRDADA buffer
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 
     # Get reference timestamp of capture
     refinfo = capture_refinfo(destination_active[0], pktsz)
-    print "The reference timestamp \"(DF_SEC, DF_IDF, UTC_START, MJD_START, PICOSECONDS)\"for current capture is: ", refinfo
+    print "The reference timestamp \"(DF_SEC, DF_IDF)\"for current capture is: ", refinfo
     
     return destination_active, destination_dead, refinfo, key

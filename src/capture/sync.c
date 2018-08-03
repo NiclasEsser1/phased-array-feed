@@ -33,12 +33,6 @@ int threads(conf_t *conf)
   pthread_attr_t attr;
   cpu_set_t cpus;
   int nport_active = conf->nport_active;
-
-#ifdef DEBUG
-  fprintf(stdout, "*********************************************\n");
-  fprintf(stdout, "WE ARE ON CAPTURE PART...\n");
-  fprintf(stdout, "*********************************************\n");
-#endif
   
   for(i = 0; i < nport_active; i++)   // Create threads
     {
