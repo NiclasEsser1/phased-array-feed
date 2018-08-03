@@ -24,7 +24,7 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-def capture_reftime(destination, pktsz, df_res, system_conf):
+def capture_refinfo(destination, pktsz):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_address = (destination.split("_")[0], int(destination.split("_")[1]))
     sock.bind(server_address)
@@ -32,29 +32,16 @@ def capture_reftime(destination, pktsz, df_res, system_conf):
     
     data       = np.fromstring(buf, 'uint64')
     hdr_part   = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[0]))[0])
-    df_sec     = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
-    df_idf     = hdr_part & np.uint64(0x00000000ffffffff)
+    sec_ref     = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
+    idf_ref     = hdr_part & np.uint64(0x00000000ffffffff)
 
-    hdr_part   = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[1]))[0])
-    epoch      = (hdr_part & np.uint64(0x00000000fc000000)) >> np.uint64(26)
-    epoch      = float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)])
-
-    sec_prd    = df_idf * df_res
-    sec_epoch  = df_sec + np.floor(sec_prd) + epoch * SECDAY  # Int part of seconds from 1970-01-01
-
-    utc_start  = time.strftime(DADA_TIMSTR, time.gmtime(sec_epoch))    # UTC_START of int part seconds
-    mjd_start  = sec_epoch/SECDAY + MJD1970                            # MJD_START of int part seconds
+    return int(sec_ref), idf_ref
     
-    microseconds = 1.0E6 * (sec_prd - np.floor(sec_prd))
-    picoseconds  = int(1E6 * round(microseconds))                # picoseconds of fraction second
-        
-    return int(df_sec), df_idf, utc_start, mjd_start, picoseconds
-    
-def check_all_ports(destination, pktsz, df_prd, ndf_check):
+def check_all_ports(destination, pktsz, sec_prd, ndf_check):
     nport = len(destination)
     active = np.zeros(nport, dtype = int)
     nchunk_active = np.zeros(nport, dtype = int)
-    socket.setdefaulttimeout(df_prd)  # Force to timeout after one data frame period
+    socket.setdefaulttimeout(sec_prd)  # Force to timeout after one data frame period
     
     for i in range(nport):
         active[i], nchunk_active[i] = check_port(destination[i].split(":")[0], int(destination[i].split(":")[1]), pktsz, ndf_check)
@@ -93,7 +80,7 @@ def check_port(ip, port, pktsz, ndf_check):
 
 def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part):
     # Get pipeline configuration from configuration file
-    ndf_blk      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_blk'])
+    ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
     ndf_check    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_check'])
     nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
     key          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
@@ -108,22 +95,21 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     kfile.close()
     
     # Get system configuration from configuration file
-    df_prd       = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_prd'])
+    sec_prd      = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
     nsamp_df     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
     npol_samp    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
     ndim_pol     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
     nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
     nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
     df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
-    df_res       = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
     pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if hdr == 1:
-        blksz    = ndf_blk * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
+        blksz    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
     else:
-        blksz    = ndf_blk * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
+        blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
     
     # Check the connection
-    destination_active, destination_dead = check_all_ports(destination, pktsz, df_prd, ndf_check)
+    destination_active, destination_dead = check_all_ports(destination, pktsz, sec_prd, ndf_check)
     
     if (len(destination_active) == 0):
         print "There is no active port for beam {:02d}, have to abort ...".format(beam)
@@ -135,7 +121,7 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 
     # Get reference timestamp of capture
-    refinfo = capture_reftime(destination_active[0], pktsz, df_res, system_conf)
+    refinfo = capture_refinfo(destination_active[0], pktsz)
     print "The reference timestamp \"(DF_SEC, DF_IDF, UTC_START, MJD_START, PICOSECONDS)\"for current capture is: ", refinfo
     
     return destination_active, destination_dead, refinfo, key

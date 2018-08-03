@@ -23,45 +23,38 @@ typedef struct conf_t
   int hdr;
   dada_hdu_t *hdu;
   
-  int sock[MPORT_CAPTURE];
   uint64_t ndf_port[MPORT_CAPTURE];
   uint64_t ndf_chan[MCHAN_CAPTURE];
-  uint64_t rbuf_ndf;
-  uint64_t tbuf_ndf;
+  uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
+
+  int pktsz, pktoff, required_pktsz;
+  int port_cpu[MPORT_CAPTURE];
+  int sync_cpu, monitor_cpu;
+  int thread_bind;
   
   char ip_active[MPORT_CAPTURE][MSTR_LEN];
   int port_active[MPORT_CAPTURE];
   int nport_active;
   int nchunk_active_expect[MPORT_CAPTURE];  
   int nchunk_active_actual[MPORT_CAPTURE];  
-  int port_cpu[MPORT_CAPTURE];
-  int sync_cpu, monitor_cpu;
-  int thread_bind;
 
-  int pktsz, pktoff, required_pktsz;
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
   int nport_dead;
   int nchunk_dead[MPORT_CAPTURE];
 
-  char hdr_fname[MSTR_LEN];
   double center_freq;
   int nchan;
   
-  char utc_start[MSTR_LEN];
-  double mjd_start;
-  uint64_t picoseconds;
-  uint64_t sec_start;
-  uint64_t idf_start;
+  uint64_t sec_start, idf_start;
 
   int nchunk;
-  double bw, resolution;
-  char instrument[MSTR_LEN];
-  int df_prd;
+  int sec_prd;
   char dir[MSTR_LEN];
 
-  uint64_t rbufsz;
-  uint64_t ndf_prd;
+  uint64_t rbufsz, tbufsz;
+  
+  uint64_t ndf_chk_prd;
 }conf_t;
 
 int init_capture(conf_t *conf);

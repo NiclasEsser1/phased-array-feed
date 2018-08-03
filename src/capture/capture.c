@@ -50,7 +50,7 @@ int init_buf(conf_t *conf)
 
   /* Create HDU and check the size of buffer bolck */
   conf->required_pktsz = conf->pktsz - conf->pktoff;
-  conf->rbufsz = conf->nchunk * conf->required_pktsz * conf->rbuf_ndf;  // The required buffer block size in byte;
+  conf->rbufsz = conf->nchunk * conf->required_pktsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
   conf->hdu = dada_hdu_create(runtime_log);
   dada_hdu_set_key(conf->hdu, conf->key);
   if(dada_hdu_connect(conf->hdu) < 0)
@@ -79,9 +79,8 @@ int init_buf(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  uint64_t tbufsz;
-  tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf * conf->nchunk;
-  tbuf = (char *)malloc(tbufsz * sizeof(char));// init temp buffer
+  conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchunk;
+  tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
   
   ///* Register header */
   //char *hdrbuf = NULL;
@@ -172,7 +171,7 @@ void *capture_thread(void *conf)
   conf_t *captureconf = (conf_t *)conf;
   int sock, ithread, pktsz, pktoff, required_pktsz, ifreq; 
   struct sockaddr_in sa;
-  struct timeval time_out={captureconf->df_prd, 0};  // Force to timeout if we could not receive data frames for one period.
+  struct timeval time_out={captureconf->sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
   socklen_t fromlen = sizeof(sa);
   int64_t idf;
   uint64_t tbuf_loc, cbuf_loc;
@@ -225,7 +224,7 @@ void *capture_thread(void *conf)
 	continue;
       else
 	{
-	  if(idf >= captureconf->rbuf_ndf)
+	  if(idf >= captureconf->rbuf_ndf_chk)
 	    {
 	      /*
 		Means we can not put the data into current ring buffer block anymore and we have to use temp buffer;
@@ -234,20 +233,20 @@ void *capture_thread(void *conf)
 		If the temp buffer is too big, we will waste time to copy the data from it to ring buffer;
 	      
 		The above is the original plan, but it is too strict that we may stuck on some point;
-		THE NEW PLAN IS we count the data frames which are not recorded with ring buffer, later than RBUF_NDF;
+		THE NEW PLAN IS we count the data frames which are not recorded with ring buffer, later than rbuf_ndf_chk;
 		If the counter is bigger than the active links, we active a new ring buffer block;
-		Meanwhile, before reference hdr is updated, the data frames can still be put into temp buffer if it is not behind RBUF_NDF + TBUF_NDF;
+		Meanwhile, before reference hdr is updated, the data frames can still be put into temp buffer if it is not behind rbuf_ndf_chk + tbuf_ndf_chk;
 		The data frames which are behind the limit will have to be dropped;
 		the reference hdr update follows tightly and then sleep for about 1 millisecond to wait all capture threads move to new ring buffer block;
 		at this point, no data frames will be put into temp buffer anymore and we are safe to copy data from it into the new ring buffer block and reset the temp buffer;
-		If the data frames are later than RBUF_NDF + TBUF_NDF, we force the swtich of ring buffer blocks;
+		If the data frames are later than rbuf_ndf_chk + tbuf_ndf_chk, we force the swtich of ring buffer blocks;
 		The new plan will drop couple of data frames every ring buffer block, but it guarentee that we do not stuck on some point;
 		We force to quit the capture if we do not get any data in one block;
 		We also foce to quit if we have time out problem;
 	      */
 	      transit[ithread]++;
 	     	      
-	      if(idf >= (2 * captureconf->rbuf_ndf)) // quit
+	      if(idf >= (2 * captureconf->rbuf_ndf_chk)) // quit
 		{
 		  /* Force to quit if we do not get any data in one data block */
 		  pthread_mutex_lock(&quit_mutex);
@@ -261,11 +260,11 @@ void *capture_thread(void *conf)
 		  pthread_exit(NULL);
 		  return NULL;
 		}
-	      else if(((idf >= (captureconf->rbuf_ndf + captureconf->tbuf_ndf)) && (idf < (2 * captureconf->rbuf_ndf))))   // Force to get a new ring buffer block
+	      else if(((idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) && (idf < (2 * captureconf->rbuf_ndf_chk))))   // Force to get a new ring buffer block
 		{
 		  /* 
 		     One possibility here: if we lose more that RBUF_NDF data frames continually, we will miss one data block;
-		     for RBUF_NDF = 12500, that will be about 1 second data;
+		     for rbuf_ndf_chk = 12500, that will be about 1 second data;
 		     Do we need to deal with it?
 		     I force the thread quit and also tell other threads quit if we loss one buffer;
 		  */
@@ -278,7 +277,7 @@ void *capture_thread(void *conf)
 		}
 	      else  // Put data in to temp buffer
 		{
-		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf) * captureconf->nchunk + ifreq); // This is in TFTFP order
+		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchunk + ifreq); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
@@ -291,9 +290,9 @@ void *capture_thread(void *conf)
 	  else
 	    {
 	      transit[ithread] = 0;
-	      // Put data into current ring buffer block if it is before RBUF_NDF;
+	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
 	      cbuf_loc = (uint64_t)((idf * captureconf->nchunk + ifreq) * required_pktsz); // This is in TFTFP order
-	      //cbuf_loc = (uint64_t)((idf + ifreq * RBUF_NDF) * required_pktsz);   // This should give us FTTFP (FTFP) order
+	      //cbuf_loc = (uint64_t)((idf + ifreq * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);	      
 	      captureconf->ndf_port[ithread]++;
 	      captureconf->ndf_chan[ifreq]++;
@@ -360,6 +359,6 @@ int acquire_ifreq(hdr_t hdr, conf_t conf, int *ifreq)
 
 int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf)
 {
-  *idf = (int64_t)hdr.idf + (int64_t)(hdr.sec - hdr_ref.sec) / conf.df_prd * conf.ndf_prd - (int64_t)hdr_ref.idf;
+  *idf = (int64_t)hdr.idf + (int64_t)(hdr.sec - hdr_ref.sec) / conf.sec_prd * conf.ndf_chk_prd - (int64_t)hdr_ref.idf;
   return EXIT_SUCCESS;
 }

@@ -21,21 +21,19 @@ void usage()
 	   " -c Start point of packet\n"
 	   " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk_nchunk_cpu\" \n"
 	   " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunk\" \n"
-	   " -f The name of DADA header file\n"
-	   " -g The center frequency of captured data\n"
-	   " -i Number of channels of current capture\n"
+	   " -f The center frequency of captured data\n"
+	   " -g Number of channels of current capture\n"
 	   " -h Show help\n"
-	   " -j Reference for the current capture, the format of it is \"dfsec_dfidf_utcstart_mjdstart_picoseconds\"\n"
-	   " -k Which directory to put log file\n"
-	   " -l The CPU for sync thread\n"
-	   " -m The CPU for monitor thread\n"
-	   " -n Bind thread to CPU or not\n"
-	   " -o Time out for sockets\n"
-	   " -p The number of chunks\n"
-	   " -q The number of data frames in each buffer block\n"
-	   " -r Instrument name, for PAF is beam with its id\n"
-	   " -s The number of data frames in each temp buffer\n"
-	   " -t The number of data frames in period\n"
+	   " -i Reference for the current capture, the format of it is \"dfsec_dfidf_utcstart_mjdstart_picoseconds\"\n"
+	   " -j Which directory to put log file\n"
+	   " -k The CPU for sync thread\n"
+	   " -l The CPU for monitor thread\n"
+	   " -m Bind thread to CPU or not\n"
+	   " -n Time out for sockets\n"
+	   " -o The number of chunks\n"
+	   " -p The number of data frames in each buffer block of each frequency chunk\n"
+	   " -q The number of data frames in each temp buffer of each frequency chunk\n"
+	   " -r The number of data frames in period or each frequency chunk\n"
 	   );
 }
 
@@ -52,7 +50,7 @@ int main(int argc, char **argv)
   conf.thread_bind  = 0; // Default do not bind thread to cpu
   for (i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:")) != -1)
     {
       switch(arg)
 	{
@@ -87,60 +85,52 @@ int main(int argc, char **argv)
 	  conf.nport_dead++;
 	  break;
 	  
-	case 'f':	  	  
-	  sscanf(optarg, "%s", conf.hdr_fname);
-	  break;
-
-	case 'g':
+	case 'f':
 	  sscanf(optarg, "%lf", &conf.center_freq);
 	  break;
 
-	case 'i':
+	case 'g':
 	  sscanf(optarg, "%d", &conf.nchan);
 	  break;
 
-	case 'j':
-	  sscanf(optarg, "%"SCNu64"_%"SCNu64"_%[^_]_%lf_%"SCNu64"", &conf.sec_start, &conf.idf_start, conf.utc_start, &conf.mjd_start, &conf.picoseconds);
+	case 'i':
+	  sscanf(optarg, "%"SCNu64"_%"SCNu64"", &conf.sec_start, &conf.idf_start);
 	  break;
 	  
-	case 'k':
+	case 'j':
 	  sscanf(optarg, "%s", conf.dir);
 	  break;
 	  
-	case 'l':
+	case 'k':
 	  sscanf(optarg, "%d", &conf.sync_cpu);
 	  break;
 	  
-	case 'm':
+	case 'l':
 	  sscanf(optarg, "%d", &conf.monitor_cpu);
 	  break;
 	  
-	case 'n':
+	case 'm':
 	  sscanf(optarg, "%d", &conf.thread_bind);
 	  break;
 	  
-	case 'o':
-	  sscanf(optarg, "%d", &conf.df_prd);
+	case 'n':
+	  sscanf(optarg, "%d", &conf.sec_prd);
 	  break;
 	  
-	case 'p':
+	case 'o':
 	  sscanf(optarg, "%d", &conf.nchunk);
 	  break;
 	  
+	case 'p':
+	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf_chk);
+	  break;
+	  
 	case 'q':
-	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf);
+	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf_chk);
 	  break;
 	  
 	case 'r':
-	  sscanf(optarg, "%s", conf.instrument);
-	  break;
-	  
-	case 's':
-	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf);
-	  break;
-	  
-	case 't':
-	  sscanf(optarg, "%"SCNu64"", &conf.ndf_prd);
+	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chk_prd);
 	  break;
 	}
     }
@@ -176,7 +166,7 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	}
     }
-
+  
   /* Init capture */
   init_capture(&conf);
 

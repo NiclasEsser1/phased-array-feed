@@ -105,14 +105,12 @@ void *sync_thread(void *conf)
 	      // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block;
 	      // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
 	      pthread_mutex_lock(&hdr_ref_mutex[i]);
-	      //fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t", hdr_ref[0].sec, hdr_ref[0].idf, captureconf->ndf_prd);
-	      hdr_ref[i].idf += captureconf->rbuf_ndf;
-	      if(hdr_ref[i].idf >= captureconf->ndf_prd)                       // Here I assume that we could not lose one period;
+	      hdr_ref[i].idf += captureconf->rbuf_ndf_chk;
+	      if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)                       // Here I assume that we could not lose one period;
 		{
-		  hdr_ref[i].sec += captureconf->df_prd;
-		  hdr_ref[i].idf -= captureconf->ndf_prd;
+		  hdr_ref[i].sec += captureconf->sec_prd;
+		  hdr_ref[i].idf -= captureconf->ndf_chk_prd;
 		}
-	      //fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\n", hdr_ref[0].sec, hdr_ref[0].idf, captureconf->ndf_prd, ntransit);
 	      pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	    }
 	  
@@ -139,10 +137,10 @@ void *sync_thread(void *conf)
 	      tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
 	      if(tbuf[tbuf_loc] == 'Y')
 		{		  
-		  //idf = (int)(i / NCHK_NIC);
-		  //ifreq = i - idf * NCHK_NIC;
+		  //idf = (int)(i / nchunk);
+		  //ifreq = i - idf * nchunk;
 		  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
-		  //cbuf_loc = (uint64_t)(ifreq * RBUF_NDF + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
+		  //cbuf_loc = (uint64_t)(ifreq * captureconf-> captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
 		  memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
 		  tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
 		  // If we do not do that, we may have too many data frames to copy later
