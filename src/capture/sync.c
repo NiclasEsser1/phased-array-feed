@@ -24,7 +24,6 @@ extern char *cbuf;
 extern char *tbuf;
 
 extern int quit;
-extern int force_count;
 extern int force_next;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
@@ -36,7 +35,7 @@ extern hdr_t hdr_ref[MPORT_CAPTURE];
 extern hdr_t hdr_current[MPORT_CAPTURE];
 
 extern pthread_mutex_t quit_mutex;
-extern pthread_mutex_t force_mutex;
+extern pthread_mutex_t force_next_mutex;
 
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
@@ -163,10 +162,10 @@ void *sync_thread(void *conf)
 	  pthread_mutex_unlock(&transit_mutex[i]);
 	}
       
-      /* To see if we need to move to next buffer block */
-      pthread_mutex_lock(&force_mutex);
+      /* To see if we need to move to next buffer block or quit */
+      pthread_mutex_lock(&force_next_mutex);
       force_next_status = force_next;
-      pthread_mutex_unlock(&force_mutex);      
+      pthread_mutex_unlock(&force_next_mutex);
       if((ntransit > nchunk) || force_next_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 	  /* Close current buffer */
@@ -244,9 +243,9 @@ void *sync_thread(void *conf)
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    tail[i] = 0;  // Reset the location of tbuf;
 	  
-	  pthread_mutex_lock(&force_mutex);
+	  pthread_mutex_lock(&force_next_mutex);
 	  force_next = 0;
-	  pthread_mutex_unlock(&force_mutex);
+	  pthread_mutex_unlock(&force_next_mutex);
 	}
       
       pthread_mutex_lock(&quit_mutex);
