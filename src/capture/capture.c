@@ -174,9 +174,9 @@ void *capture_thread(void *conf)
   char *df = NULL;
   conf_t *captureconf = (conf_t *)conf;
   int sock, ithread, pktsz, pktoff, required_pktsz, ichk; 
-  struct sockaddr_in sa;
-  struct timeval time_out={captureconf->sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
-  socklen_t fromlen = sizeof(sa);
+  struct sockaddr_in sa, fromsa;
+  struct timeval tout={captureconf->sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
+  socklen_t fromlen;// = sizeof(fromsa);
   int64_t idf;
   uint64_t tbuf_loc, cbuf_loc;
   hdr_t hdr;
@@ -194,12 +194,26 @@ void *capture_thread(void *conf)
   pthread_mutex_unlock(&ithread_mutex);
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&time_out, sizeof(time_out));  
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));  
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(captureconf->port_active[ithread]);
   sa.sin_addr.s_addr = inet_addr(captureconf->ip_active[ithread]);
-  bind(sock, (struct sockaddr *)&sa, sizeof(sa));
+  if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
+    {
+      multilog(runtime_log, LOG_ERR,  "Can not bind to %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      fprintf (stderr, "Can not bind to %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      
+      /* Force to quit if we have time out */
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+
+      free(df);
+      conf = (void *)captureconf;
+      pthread_exit(NULL);
+      return NULL;
+    }
 
   pthread_mutex_lock(&quit_mutex);
   quit_status = quit;
@@ -207,7 +221,7 @@ void *capture_thread(void *conf)
   
   while(quit_status == 0)
     {      
-      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&sa, &fromlen) == -1)
+      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
 	{
 	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 	  fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -278,6 +292,8 @@ void *capture_thread(void *conf)
 
 		  free(df);
 		  conf = (void *)captureconf;
+		  close(sock);
+		  
 		  pthread_exit(NULL);
 		  return NULL;
 		}
@@ -345,6 +361,7 @@ void *capture_thread(void *conf)
   /* Exit */
   free(df);
   conf = (void *)captureconf;
+  close(sock);
   pthread_exit(NULL);
 
   return NULL;
@@ -389,5 +406,30 @@ int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
 int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf)
 {
   *idf = (int64_t)hdr.idf + (int64_t)(hdr.sec - hdr_ref.sec) / conf.sec_prd * conf.ndf_chk_prd - (int64_t)hdr_ref.idf;
+  return EXIT_SUCCESS;
+}
+
+int destroy_capture(conf_t conf)
+{
+  int i;
+  
+  pthread_mutex_destroy(&ithread_mutex);
+  pthread_mutex_destroy(&quit_mutex);
+  pthread_mutex_destroy(&force_switch_mutex);
+  for(i = 0; i < MPORT_CAPTURE; i++)
+    {
+      pthread_mutex_destroy(&hdr_ref_mutex[i]);
+      pthread_mutex_destroy(&hdr_current_mutex[i]);
+      pthread_mutex_destroy(&transit_mutex[i]);
+      pthread_mutex_destroy(&ndf_port_mutex[i]);
+    }
+
+  for(i = 0; i < MCHK_CAPTURE; i++)
+    pthread_mutex_destroy(&ndf_chk_mutex[i]);
+  
+  dada_hdu_unlock_write(conf.hdu);
+  dada_hdu_disconnect(conf.hdu);
+  dada_hdu_destroy(conf.hdu);
+  
   return EXIT_SUCCESS;
 }

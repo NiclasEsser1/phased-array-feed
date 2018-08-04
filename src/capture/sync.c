@@ -10,10 +10,13 @@
 #include <stdbool.h>
 #include <sched.h>
 #include <math.h>
+#include <sys/socket.h>
+#include <linux/un.h>
 
 #include "ipcbuf.h"
 #include "sync.h"
 #include "capture.h"
+#include "monitor.h"
 
 extern multilog_t *runtime_log;
 
@@ -44,8 +47,8 @@ extern pthread_mutex_t transit_mutex[MPORT_CAPTURE];
 
 int threads(conf_t *conf)
 {
-  int i, ret[MPORT_CAPTURE + 1], node;
-  pthread_t thread[MPORT_CAPTURE + 1];
+  int i, ret[MPORT_CAPTURE + 2], node;
+  pthread_t thread[MPORT_CAPTURE + 2];
   pthread_attr_t attr;
   cpu_set_t cpus;
   int nport_active = conf->nport_active;
@@ -73,11 +76,33 @@ int threads(conf_t *conf)
       pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
       ret[nport_active] = pthread_create(&thread[nport_active], &attr, sync_thread, (void *)conf);
       pthread_attr_destroy(&attr);
+      
+      pthread_attr_init(&attr);
+      CPU_ZERO(&cpus);
+      CPU_SET(conf->monitor_cpu, &cpus);      
+      pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
+      ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], &attr, monitor_thread, (void *)conf);
+      pthread_attr_destroy(&attr);
     }
   else
-    ret[nport_active] = pthread_create(&thread[nport_active], NULL, sync_thread, (void *)conf);
-    
-  for(i = 0; i < nport_active + 1; i++)   // Join threads and unbind cpus
+    {
+      ret[nport_active] = pthread_create(&thread[nport_active], NULL, sync_thread, (void *)conf);
+      ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], NULL, monitor_thread, (void *)conf);
+    }
+  
+  //if(!(conf->thread_bind == 0))
+  //  {
+  //    pthread_attr_init(&attr);
+  //    CPU_ZERO(&cpus);
+  //    CPU_SET(conf->monitor_cpu, &cpus);      
+  //    pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
+  //    ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], &attr, monitor_thread, (void *)conf);
+  //    pthread_attr_destroy(&attr);
+  //  }
+  //else
+  //  ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], NULL, monitor_thread, (void *)conf);
+  
+  for(i = 0; i < nport_active + 2; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
 
   return EXIT_SUCCESS;
@@ -103,9 +128,8 @@ void *sync_thread(void *conf)
   pthread_mutex_unlock(&quit_mutex);
 
   clock_gettime(CLOCK_REALTIME, &ref_time);
-  
   while(quit_status == 0)
-    {
+    {      
       clock_gettime(CLOCK_REALTIME, &current_time);
       if((current_time.tv_sec - ref_time.tv_sec) > captureconf->monitor_sec) // Check the traffic status every monitor_sec;
 	{
@@ -230,10 +254,11 @@ void *sync_thread(void *conf)
     {
       multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
       fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
+
       pthread_exit(NULL);
       return NULL;
-    }  
+    }
+  
   pthread_exit(NULL);
   return NULL;
 }

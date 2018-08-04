@@ -60,5 +60,6 @@ void *capture_thread(void *conf);
 int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf);
 int acquire_ichk(hdr_t hdr, conf_t conf, int *ifreq);
 int init_buf(conf_t *conf);
+int destroy_capture(conf_t conf);
 
 #endif

@@ -181,6 +181,9 @@ int main(int argc, char **argv)
 
   /* Do the job */
   threads(&conf);
+
+  /* Destory capture */
+  destroy_capture(conf);
   
   /* Destory log interface */
   multilog(runtime_log, LOG_INFO, "CAPTURE END\n\n");
