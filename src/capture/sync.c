@@ -169,10 +169,13 @@ void *sync_thread(void *conf)
       if((ntransit > nchunk) || force_switch_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 	  /* Close current buffer */
-	  if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0)
+	  //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0)
+	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
-	      multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
-	      fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      //multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
+	      //fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      multilog (runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed\n");
+	      fprintf(stderr, "close_buffer: ipcbuf_mark_filled failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
@@ -182,7 +185,8 @@ void *sync_thread(void *conf)
 	      return NULL;
 	    }
 
-	  cbuf = ipcio_open_block_write(captureconf->hdu->data_block, &block_id);
+	  //cbuf = ipcio_open_block_write(captureconf->hdu->data_block, &block_id);
+	  cbuf = ipcbuf_get_next_write ((ipcbuf_t*)captureconf->hdu->data_block);
 	  
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
@@ -250,11 +254,15 @@ void *sync_thread(void *conf)
     }
   
   /* Exit */
-  if (ipcio_close_block_write (captureconf->hdu->data_block, captureconf->rbufsz) < 0)  // This should enable eod at current buffer
+  //if (ipcio_close_block_write (captureconf->hdu->data_block, captureconf->rbufsz) < 0)  // This should enable eod at current buffer
+  if(ipcbuf_mark_filled ((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
     {
-      multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
-      fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      //multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
+      //fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog (runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed\n");
+      fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
+      
       pthread_exit(NULL);
       return NULL;
     }

@@ -63,26 +63,27 @@ int init_buf(conf_t *conf)
       fprintf (stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;    
     }
-  db = (ipcbuf_t *) conf->hdu->data_block;
-  if(conf->rbufsz != ipcbuf_get_bufsz((ipcbuf_t *)db))  // Check the buffer size
-    {
-      multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;    
-    }
+  
   if (dada_hdu_lock_write (conf->hdu) < 0) // make ourselves the write client 
     {
       multilog (runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if(ipcbuf_disable_sod((ipcbuf_t *)db) < 0)  // Disable SOD by default
+  
+  db = (ipcbuf_t *)conf->hdu->data_block;
+  if(conf->rbufsz != ipcbuf_get_bufsz(db))  // Check the buffer size
+    {
+      multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf (stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;    
+    }
+  if(ipcbuf_disable_sod(db) < 0)
     {
       multilog (runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-
   conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchunk;
   tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
   
@@ -371,7 +372,7 @@ int init_capture(conf_t *conf)
 {
   int i;
 
-  init_buf(conf);  // Initi ring buffer and setup DADA header
+  init_buf(conf);  // Initi ring buffer
 
   ithread_extern = 0;
   for(i = 0; i < conf->nchunk; i++) // Setup the counter for each frequency
@@ -392,7 +393,8 @@ int init_capture(conf_t *conf)
     
   /* Get the buffer block ready */
   uint64_t block_id = 0;
-  cbuf = ipcio_open_block_write(conf->hdu->data_block, &block_id);
+  //cbuf = ipcio_open_block_write(conf->hdu->data_block, &block_id);
+  cbuf = ipcbuf_get_next_write ((ipcbuf_t*)conf->hdu->data_block);
   
   return EXIT_SUCCESS;
 }

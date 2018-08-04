@@ -30,8 +30,8 @@ void *monitor_thread(void *conf)
   struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 second;
   char command[MSTR_LEN];
   int quit_status;
-  uint64_t start_bytes;
-  ipcio_t *db = NULL;
+  uint64_t start_byte, start_buf;
+  ipcbuf_t *db = NULL;
     
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
@@ -73,7 +73,7 @@ void *monitor_thread(void *conf)
     {
       if(recvfrom(sock, (void *)command, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
-	  db = captureconf->hdu->data_block;
+	  db = (ipcbuf_t *)captureconf->hdu->data_block;
 	  if(strstr(command, "END-OF-CAPTURE") != NULL)
 	    {
 	      pthread_mutex_lock(&quit_mutex);
@@ -85,16 +85,18 @@ void *monitor_thread(void *conf)
 	      return NULL;
 	    }	  
 	  if(strstr(command, "END-OF-DATA") != NULL)
-	    ipcio_stop(db);
-	    
+	    //ipcio_stop(db);
+	    //ipcbuf_enable_eod(db);
+	    ipcbuf_disable_sod(db);
+	  
 	  if(strstr(command, "START-OF-DATA") != NULL)
 	    {
-	      sscanf(command, "%*s:%"SCNu64"", &start_bytes); // Read the start bytes from socket or get the minimum number from the buffer
-	      if(start_bytes == 0)
-		start_bytes = ipcio_get_start_minimum (db);
+	      sscanf(command, "%*s:%"SCNu64":%"SCNu64"", &start_byte, &start_buf); // Read the start bytes from socket or get the minimum number from the buffer
+	      if(start_buf == 0)
+		start_buf = ipcbuf_get_sod_minbuf(db);
 	      else
-		start_bytes = (start_bytes > ipcio_get_start_minimum (db)) ? start_bytes : ipcio_get_start_minimum (db); // To make sure the start bytes is valuable
-	      ipcio_start(db, start_bytes);
+		start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_byte :  ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
+	      ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}
 
