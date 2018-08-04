@@ -27,10 +27,12 @@ void *monitor_thread(void *conf)
   struct sockaddr_un sa, fromsa;
   socklen_t fromlen;
   conf_t *captureconf = (conf_t *)conf;
-  struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 microsecond
+  struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 second;
   char command[MSTR_LEN];
   int quit_status;
-  
+  uint64_t start_bytes;
+  ipcio_t *db = NULL;
+    
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
@@ -60,7 +62,6 @@ void *monitor_thread(void *conf)
       pthread_mutex_unlock(&quit_mutex);
 
       close(sock);
-      //unlink("/tmp/capture_socket");
       pthread_exit(NULL);
       return NULL;
     }
@@ -72,15 +73,29 @@ void *monitor_thread(void *conf)
     {
       if(recvfrom(sock, (void *)command, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
-	  fprintf(stdout, "%s\n", command);
-	  pthread_mutex_lock(&quit_mutex);
-	  quit = 1;
-	  pthread_mutex_unlock(&quit_mutex);
-
-	  close(sock);
-	  //unlink("/tmp/capture_socket");
-	  pthread_exit(NULL);
-	  return NULL;
+	  db = captureconf->hdu->data_block;
+	  if(strstr(command, "END-OF-CAPTURE") != NULL)
+	    {
+	      pthread_mutex_lock(&quit_mutex);
+	      quit = 1;
+	      pthread_mutex_unlock(&quit_mutex);
+	      
+	      close(sock);
+	      pthread_exit(NULL);
+	      return NULL;
+	    }	  
+	  if(strstr(command, "END-OF-DATA") != NULL)
+	    ipcio_stop(db);
+	    
+	  if(strstr(command, "START-OF-DATA") != NULL)
+	    {
+	      sscanf(command, "%*s:%"SCNu64"", &start_bytes); // Read the start bytes from socket or get the minimum number from the buffer
+	      if(start_bytes == 0)
+		start_bytes = ipcio_get_start_minimum (db);
+	      else
+		start_bytes = (start_bytes > ipcio_get_start_minimum (db)) ? start_bytes : ipcio_get_start_minimum (db); // To make sure the start bytes is valuable
+	      ipcio_start(db, start_bytes);
+	    }
 	}
 
       pthread_mutex_lock(&quit_mutex);
@@ -89,7 +104,6 @@ void *monitor_thread(void *conf)
     }
 
   close(sock);
-  //unlink("/tmp/capture_socket");
   pthread_exit(NULL);
   return NULL;
 }
