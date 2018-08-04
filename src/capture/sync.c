@@ -24,7 +24,8 @@ extern char *cbuf;
 extern char *tbuf;
 
 extern int quit;
-extern int force_switch;
+extern int force_count;
+extern int force_next;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
 extern uint64_t ndf_chk[MCHK_CAPTURE];
@@ -35,7 +36,7 @@ extern hdr_t hdr_ref[MPORT_CAPTURE];
 extern hdr_t hdr_current[MPORT_CAPTURE];
 
 extern pthread_mutex_t quit_mutex;
-extern pthread_mutex_t force_switch_mutex;
+extern pthread_mutex_t force_mutex;
 
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
@@ -121,7 +122,7 @@ void *sync_thread(void *conf)
   uint64_t ndf_port_actual[MPORT_CAPTURE];
   uint64_t ndf_chk_actual[MCHK_CAPTURE];
   uint64_t ndf_chk_expect[MCHK_CAPTURE];
-  int force_switch_status, quit_status;
+  int force_next_status, quit_status;
   
   pthread_mutex_lock(&quit_mutex);
   quit_status = quit;
@@ -163,10 +164,10 @@ void *sync_thread(void *conf)
 	}
       
       /* To see if we need to move to next buffer block */
-      pthread_mutex_lock(&force_switch_mutex);
-      force_switch_status = force_switch;
-      pthread_mutex_unlock(&force_switch_mutex);      
-      if((ntransit > nchunk) || force_switch_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
+      pthread_mutex_lock(&force_mutex);
+      force_next_status = force_next;
+      pthread_mutex_unlock(&force_mutex);      
+      if((ntransit > nchunk) || force_next_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 	  /* Close current buffer */
 	  //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0)
@@ -243,9 +244,9 @@ void *sync_thread(void *conf)
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    tail[i] = 0;  // Reset the location of tbuf;
 	  
-	  pthread_mutex_lock(&force_switch_mutex);
-	  force_switch = 0;
-	  pthread_mutex_unlock(&force_switch_mutex);
+	  pthread_mutex_lock(&force_mutex);
+	  force_next = 0;
+	  pthread_mutex_unlock(&force_mutex);
 	}
       
       pthread_mutex_lock(&quit_mutex);

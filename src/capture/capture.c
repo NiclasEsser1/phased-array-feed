@@ -24,7 +24,8 @@ char *cbuf = NULL;
 char *tbuf = NULL;
 
 int quit;
-int force_switch;
+int force_next;
+int force_count;
 int ithread_extern;
 
 uint64_t ndf_port[MPORT_CAPTURE];
@@ -36,7 +37,7 @@ hdr_t hdr_ref[MPORT_CAPTURE];
 hdr_t hdr_current[MPORT_CAPTURE];
 
 pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t force_switch_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t force_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
@@ -300,7 +301,6 @@ void *capture_thread(void *conf)
 		}
 	      else if(((idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) && (idf < (2 * captureconf->rbuf_ndf_chk))))   // Force to get a new ring buffer block
 		{
-		  fprintf(stdout, "%"PRIu64"\n", idf);
 		  /* 
 		     One possibility here: if we lose more that rbuf_ndf_nchk data frames continually, we will miss one data block;
 		     for rbuf_ndf_chk = 12500, that will be about 1 second data;
@@ -308,11 +308,12 @@ void *capture_thread(void *conf)
 		     I force the thread quit and also tell other threads quit if we loss one buffer;
 		  */
 #ifdef DEBUG
-		  fprintf(stdout, "Forced force_switch %d\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\n", ithread, hdr.sec, hdr.idf, ichk, idf);
+		  fprintf(stdout, "Forced force_next %d\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\n", ithread, hdr.sec, hdr.idf, ichk, idf);
 #endif
-		  pthread_mutex_lock(&force_switch_mutex);
-		  force_switch = 1;
-		  pthread_mutex_unlock(&force_switch_mutex);
+		  pthread_mutex_lock(&force_mutex);
+		  force_next = 1;
+		  force_count++;
+		  pthread_mutex_unlock(&force_mutex);
 		}
 	      else  // Put data in to temp buffer
 		{
@@ -388,7 +389,8 @@ int init_capture(conf_t *conf)
       hdr_ref[i].sec = conf->sec_start;
       hdr_ref[i].idf = conf->idf_start;
     }
-  force_switch = 0;
+  force_next = 0;
+  force_count = 0;
   quit = 0;
     
   /* Get the buffer block ready */
@@ -417,7 +419,7 @@ int destroy_capture(conf_t conf)
   
   pthread_mutex_destroy(&ithread_mutex);
   pthread_mutex_destroy(&quit_mutex);
-  pthread_mutex_destroy(&force_switch_mutex);
+  pthread_mutex_destroy(&force_mutex);
   for(i = 0; i < MPORT_CAPTURE; i++)
     {
       pthread_mutex_destroy(&hdr_ref_mutex[i]);
