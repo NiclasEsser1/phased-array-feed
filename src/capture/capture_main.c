@@ -6,7 +6,6 @@
 #include "multilog.h"
 #include "dada_def.h"
 #include "capture.h"
-#include "sync.h"
 
 multilog_t *runtime_log;
 

@@ -15,8 +15,6 @@
 #include "ipcbuf.h"
 #include "capture.h"
 #include "multilog.h"
-#include "hdr.h"
-#include "sync.h"
 
 extern multilog_t *runtime_log;
 
@@ -234,7 +232,7 @@ int init_buf(conf_t *conf)
   return EXIT_SUCCESS;
 }
 
-void *capture_thread(void *conf)
+void *capture(void *conf)
 {
   char *df = NULL;
   conf_t *captureconf = (conf_t *)conf;

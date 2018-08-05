@@ -14,16 +14,22 @@
 #include <linux/un.h>
 
 #include "ipcbuf.h"
-#include "sync.h"
 #include "capture.h"
 
 extern multilog_t *runtime_log;
 extern int quit;
 extern pthread_mutex_t quit_mutex;
+extern hdr_t hdr_current[MPORT_CAPTURE];
+extern uint64_t ndf_port[MPORT_CAPTURE];
+extern uint64_t ndf_chk[MCHK_CAPTURE];
+
+extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t ndf_chk_mutex[MCHK_CAPTURE];
 
 void *monitor_thread(void *conf)
 {  
-  int sock;
+  int sock, i;
   struct sockaddr_un sa, fromsa;
   socklen_t fromlen;
   conf_t *captureconf = (conf_t *)conf;
@@ -32,6 +38,11 @@ void *monitor_thread(void *conf)
   int quit_status;
   uint64_t start_byte, start_buf;
   ipcbuf_t *db = NULL;
+  uint64_t ndf_port_expect[MPORT_CAPTURE];
+  uint64_t ndf_port_actual[MPORT_CAPTURE];
+  uint64_t ndf_chk_actual[MCHK_CAPTURE];
+  uint64_t ndf_chk_expect[MCHK_CAPTURE];
+  hdr_t hdr;
   
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
@@ -79,6 +90,26 @@ void *monitor_thread(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
 	      fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
 
+	      for(i = 0; i < captureconf->nport_active; i++)
+		{
+		  pthread_mutex_lock(&hdr_current_mutex[i]);
+		  hdr = hdr_current[i];
+		  pthread_mutex_unlock(&hdr_current_mutex[i]);
+
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  pthread_mutex_lock(&ndf_port_mutex[i]);
+		  ndf_port_actual[i] = ndf_port[i];
+		  pthread_mutex_unlock(&ndf_port_mutex[i]);
+		  
+		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  pthread_mutex_lock(&ndf_chk_mutex[i]);
+		  ndf_chk_actual[i] = ndf_chk[i];
+		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
+		  
+		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+		}
+	      fprintf(stdout, "\n");
+	      
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
 	      pthread_mutex_unlock(&quit_mutex);
@@ -86,6 +117,28 @@ void *monitor_thread(void *conf)
 	      close(sock);
 	      pthread_exit(NULL);
 	      return NULL;
+	    }
+	  if(strstr(command, "STATUS-OF-TRAFFIC") != NULL)
+	    {	      
+	      for(i = 0; i < captureconf->nport_active; i++)
+		{
+		  pthread_mutex_lock(&hdr_current_mutex[i]);
+		  hdr = hdr_current[i];
+		  pthread_mutex_unlock(&hdr_current_mutex[i]);
+
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  pthread_mutex_lock(&ndf_port_mutex[i]);
+		  ndf_port_actual[i] = ndf_port[i];
+		  pthread_mutex_unlock(&ndf_port_mutex[i]);
+		  
+		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  pthread_mutex_lock(&ndf_chk_mutex[i]);
+		  ndf_chk_actual[i] = ndf_chk[i];
+		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
+		  
+		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+		}
+	      fprintf(stdout, "\n");
 	    }	  
 	  if(strstr(command, "END-OF-DATA") != NULL)
 	    {

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <byteswap.h>
 
-#include "hdr.h"
+#include "capture.h"
 
 int hdr_keys(char *df, hdr_t *hdr)
 {
