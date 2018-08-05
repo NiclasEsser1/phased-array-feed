@@ -26,7 +26,11 @@ part    = args.part[0]
 address = "/tmp/capture.beam{:d}.part{:d}".format(beam, part)
 command = args.command[0]
 
-sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-sock.sendto("{:s}:0:0\n".format(command), address)
+start_buf = 0
+start_byte = 48 * 7232 * 1000
 
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+command_value = "{:s}:{:d}:{:d}".format(command, start_buf, start_byte)
+print command_value
+sock.sendto("{:s}\n".format(command_value), address)
 sock.close()

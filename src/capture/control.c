@@ -392,11 +392,13 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
+	      fprintf(stdout, "%s\n", command);
+	      
 	      sscanf(command, "%*s:%"SCNu64":%"SCNu64"", &start_byte, &start_buf); // Read the start bytes from socket or get the minimum number from the buffer
-	      if(start_buf == 0)
-		start_buf = ipcbuf_get_sod_minbuf(db);
-	      else
-		start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_byte :  ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
+	      start_buf  = 0;
+	      start_byte = 347136000;
+	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
+	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_buf : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
 
 	      /* To get time stamp for current header */
 	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res; // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
@@ -495,7 +497,7 @@ void *capture_control(void *conf)
 	      	  pthread_exit(NULL);
 	      	  return NULL;
 	      	}    
-	      if(ascii_header_set(hdrbuf, "FREQ", "%.1lf", captureconf->center_freq) < 0)
+	      if(ascii_header_set(hdrbuf, "FREQ", "%.6lf", captureconf->center_freq) < 0)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -508,7 +510,7 @@ void *capture_control(void *conf)
 	      	  pthread_exit(NULL);
 	      	  return NULL;
 	      	}
-	      if(ascii_header_set(hdrbuf, "MJD_START", "%lf", mjd_start) < 0)
+	      if(ascii_header_set(hdrbuf, "MJD_START", "%.10lf", mjd_start) < 0)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -548,7 +550,7 @@ void *capture_control(void *conf)
 	      	  return NULL;
 	      	}
 	      bw = chan_res * captureconf->nchan;
-	      if(ascii_header_set(hdrbuf, "BW", "%.1lf", bw) < 0)
+	      if(ascii_header_set(hdrbuf, "BW", "%.6lf", bw) < 0)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -576,6 +578,7 @@ void *capture_control(void *conf)
 	      	  return NULL;
 	      	}
 	      
+	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
 	      ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}

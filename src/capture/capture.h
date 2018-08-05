@@ -3,7 +3,7 @@
 
 #include <netinet/in.h>
 #include <stdint.h>
-
+#include <inttypes.h>
 #include "dada_hdu.h"
 #include "dada_def.h"
 #include "ipcio.h"
