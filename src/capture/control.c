@@ -400,181 +400,181 @@ void *capture_control(void *conf)
 
 	      /* To get time stamp for current header */
 	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res; // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
-	      fprintf(stdout, "%f\n", sec_offset);
-	      
 	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
-	      fprintf(stdout, "%"PRIu64"\n", picoseconds_offset);
 	      picoseconds = picoseconds_offset + picoseconds_ref;
 	      sec = sec_ref + sec_offset;
-	      if(picoseconds < 1E12)
-		continue;
-	      else
-		{
-		  sec += 1;
-		  picoseconds -= 1E12;
-		}
-	      strftime (utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&sec_ref)); // String start time without fraction second
-	      fprintf(stdout, "%s\n", utc_start);
-	      
+	      if(!(picoseconds < 1E12))
+	      	{
+	      	  sec += 1;
+	      	  picoseconds -= 1E12;
+	      	}
 	      strftime (utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&sec)); // String start time without fraction second 
 	      mjd_start = sec / SECDAY + MJD1970;                         // Float MJD start time without fraction second
-	      fprintf(stdout, "%s\n", utc_start);
 	      
 	      /* Register header */
 	      hdrbuf = ipcbuf_get_next_write(captureconf->hdu->header_block);
 	      if(!hdrbuf)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      if(!captureconf->hfname)
-		{
-		  multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}  
-	      if(fileread(captureconf->hfname, hdrbuf, DADA_HDR_SIZE) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}  
+	      if(fileread(captureconf->hfname, hdrbuf, DADA_HDRSZ) < 0)
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      
 	      /* Setup DADA header with given values */
 	      if(ascii_header_set(hdrbuf, "UTC_START", "%s", utc_start) < 0)  
-		{
-		  multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
-	//if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", captureconf->instrument) < 0)  
-	//	{
-	//	  multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	//	  fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	//	  return EXIT_FAILURE;
-	//	}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", captureconf->instrument) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
 	      if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, picoseconds) < 0)  
-		{
-		  multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}    
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}    
 	      if(ascii_header_set(hdrbuf, "FREQ", "%.1lf", captureconf->center_freq) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      if(ascii_header_set(hdrbuf, "MJD_START", "%lf", mjd_start) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      if(ascii_header_set(hdrbuf, "NCHAN", "%d", captureconf->nchan) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}  
 	      if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &chan_res) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      bw = chan_res * captureconf->nchan;
 	      if(ascii_header_set(hdrbuf, "BW", "%.1lf", bw) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      /* donot set header parameters anymore - acqn. doesn't start */
-	      if(ipcbuf_mark_filled(captureconf->hdu->header_block, DADA_HDR_SIZE) < 0)
-		{
-		  multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  
-		  pthread_mutex_lock(&quit_mutex);
-		  quit = 1;
-		  pthread_mutex_unlock(&quit_mutex);
-		  
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
+	      if(ipcbuf_mark_filled(captureconf->hdu->header_block, DADA_HDRSZ) < 0)
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
 	      
 	      ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }

@@ -35,6 +35,7 @@ void usage()
 	  " -r The number of data frames in each period or each frequency chunk\n"
 	  " -s The address to get control signal, currently uses unix socket\n"
 	  " -t The name of header template for PSRDADA\n"
+	  " -u The name of instrument \n"
 	   );
 }
 
@@ -51,7 +52,7 @@ int main(int argc, char **argv)
   conf.thread_bind  = 0; // Default do not bind thread to cpu
   for(i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:u:")) != -1)
     {
       switch(arg)
 	{
@@ -139,6 +140,10 @@ int main(int argc, char **argv)
 	  
 	case 't':
 	  sscanf(optarg, "%s", conf.hfname);
+	  break;
+	  
+	case 'u':
+	  sscanf(optarg, "%s", conf.instrument);
 	  break;
 	}
     }

@@ -95,7 +95,7 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
     key          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
     kfile_prefix = ConfigSectionMap(pipeline_conf, "CAPTURE")['kfname_prefix']
-    kfname       = "{:s}_beam{:02d}_part{:d}.key".format(kfile_prefix, beam, part)
+    kfname       = "{:s}_beam{:02d}_part{:02d}.key".format(kfile_prefix, beam, part)
     nreader      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nreader'])
      
     # Record the key to a key file with kfname

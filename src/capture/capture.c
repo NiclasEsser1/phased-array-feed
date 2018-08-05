@@ -231,11 +231,13 @@ void *capture(void *conf)
 
       acquire_ichk(hdr, *captureconf, &ichk);
             
-      if(idf < 0 )
-	// Drop data frams which are behind time;
-	continue;
-      else
-	{
+      //if(idf < 0)
+      // Drop data frams which are behind time;
+      //continue;
+      //else
+      if(!(idf < 0))
+      	{
+	  // Drop data frams which are behind time;
 	  if(idf >= captureconf->rbuf_ndf_chk)
 	    {
 	      /*

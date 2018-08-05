@@ -13,7 +13,7 @@
 
 #define MSTR_LEN      1024
 #define MPORT_CAPTURE 16
-#define DADA_HDR_SIZE 4096
+#define DADA_HDRSZ    4096
 #define MCHK_CAPTURE  48
 #define SECDAY        86400.0
 #define MJD1970       40587.0
@@ -41,6 +41,7 @@ typedef struct conf_t
   int nport_dead;
   int nchunk_dead[MPORT_CAPTURE];
 
+  char instrument[MSTR_LEN];
   double center_freq;
   int nchan;
 
