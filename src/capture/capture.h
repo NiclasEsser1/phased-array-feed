@@ -19,14 +19,13 @@
 typedef struct conf_t
 { 
   key_t key;
-  int hdr;
   dada_hdu_t *hdu;
   
   uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
 
   int pktsz, pktoff, required_pktsz;
   int port_cpu[MPORT_CAPTURE];
-  int sync_cpu, monitor_cpu;
+  int buf_ctrl_cpu, capture_ctrl_cpu;
   int thread_bind;
   
   char ip_active[MPORT_CAPTURE][MSTR_LEN];
@@ -47,7 +46,7 @@ typedef struct conf_t
 
   int nchunk;
   int sec_prd;
-  int monitor_sec;
+  char ctrl_addr[MSTR_LEN];
   char dir[MSTR_LEN];
 
   uint64_t rbufsz, tbufsz;

@@ -26,15 +26,15 @@ void usage()
 	   " -i Reference second for the current capture, get from BMF packet header\n"
 	   " -j Reference data frame index for the current capture, get from BMF packet header\n"	   
 	   " -k Which directory to put log file\n"
-	   " -l The CPU for sync thread\n"
-	   " -m The CPU for monitor thread\n"
+	   " -l The CPU for buf control thread\n"
+	   " -m The CPU for capture control thread\n"
 	   " -n Bind thread to CPU or not\n"
 	   " -o Time out for sockets\n"
 	   " -p The number of chunks\n"
 	   " -q The number of data frames in each buffer block of each frequency chunk\n"
 	   " -r The number of data frames in each temp buffer of each frequency chunk\n"
-	   " -s The number of data frames in period or each frequency chunk\n"
-	   " -t Interval in seconds to monitor the traffic\n"
+	   " -s The number of data frames in each period or each frequency chunk\n"
+	   " -t The address to get control signal, currently uses unix socket\n"
 	   );
 }
 
@@ -46,8 +46,8 @@ int main(int argc, char **argv)
   
   conf.nport_active = 0;
   conf.nport_dead   = 0;
-  conf.sync_cpu     = 0;
-  conf.monitor_cpu  = 0;
+  conf.buf_ctrl_cpu     = 0;
+  conf.capture_ctrl_cpu = 0;
   conf.thread_bind  = 0; // Default do not bind thread to cpu
   for(i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
@@ -106,11 +106,11 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'l':
-	  sscanf(optarg, "%d", &conf.sync_cpu);
+	  sscanf(optarg, "%d", &conf.buf_ctrl_cpu);
 	  break;
 	  
 	case 'm':
-	  sscanf(optarg, "%d", &conf.monitor_cpu);
+	  sscanf(optarg, "%d", &conf.capture_ctrl_cpu);
 	  break;
 	  
 	case 'n':
@@ -138,7 +138,7 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 't':
-	  sscanf(optarg, "%d", &conf.monitor_sec);
+	  sscanf(optarg, "%s", conf.ctrl_addr);
 	  break;
 	}
     }
@@ -162,9 +162,9 @@ int main(int argc, char **argv)
     {
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
-	  if(((conf.port_cpu[i] == conf.monitor_cpu)?0:1) == 1)
+	  if(((conf.port_cpu[i] == conf.capture_ctrl_cpu)?0:1) == 1)
 	    break;
-	  if(((conf.port_cpu[i] == conf.sync_cpu)?0:1) == 1)
+	  if(((conf.port_cpu[i] == conf.buf_ctrl_cpu)?0:1) == 1)
 	    break;
 	}
       if(i == MPORT_CAPTURE)

@@ -70,14 +70,14 @@ int threads(conf_t *conf)
     {
       pthread_attr_init(&attr);
       CPU_ZERO(&cpus);
-      CPU_SET(conf->sync_cpu, &cpus);      
+      CPU_SET(conf->buf_ctrl_cpu, &cpus);      
       pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
       ret[nport_active] = pthread_create(&thread[nport_active], &attr, buf_control, (void *)conf);
       pthread_attr_destroy(&attr);
       
       pthread_attr_init(&attr);
       CPU_ZERO(&cpus);
-      CPU_SET(conf->monitor_cpu, &cpus);      
+      CPU_SET(conf->capture_ctrl_cpu, &cpus);      
       pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
       ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], &attr, capture_control, (void *)conf);
       pthread_attr_destroy(&attr);
@@ -284,8 +284,8 @@ void *capture_control(void *conf)
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
-  snprintf(sa.sun_path, UNIX_PATH_MAX, "/tmp/capture_socket");
-  unlink("/tmp/capture_socket");
+  snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", captureconf->ctrl_addr);
+  unlink(captureconf->ctrl_addr);
   
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
     {
