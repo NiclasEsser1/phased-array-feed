@@ -12,28 +12,29 @@ multilog_t *runtime_log;
 void usage()
 {
   fprintf(stdout,
-	   "paf_capture - capture PAF BMF raw data from NiC\n"
-	   "\n"
-	   "Usage: paf_capture [options]\n"
-	   " -a Hexadecimal shared memory key for capture \n"
-	   " -b BMF packet size\n"
-	   " -c Start point of packet\n"
-	   " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected:nchunk_actual:cpu\" \n"
-	   " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected\" \n"
-	   " -f The center frequency of captured data\n"
-	   " -g Number of channels of current capture\n"
-	   " -h Show help\n"
-	   " -i Reference information for the current capture, get from BMF packet header, epoch_start:sec_start:idf_start\n"
-	   " -j Which directory to put log file\n"
-	   " -k The CPU for buf control thread\n"
-	   " -l The CPU for capture control thread\n"
-	   " -m Bind thread to CPU or not\n"
-	   " -n Time out for sockets\n"
-	   " -o The number of chunks\n"
-	   " -p The number of data frames in each buffer block of each frequency chunk\n"
-	   " -q The number of data frames in each temp buffer of each frequency chunk\n"
-	   " -r The number of data frames in each period or each frequency chunk\n"
-	   " -s The address to get control signal, currently uses unix socket\n"
+	  "paf_capture - capture PAF BMF raw data from NiC\n"
+	  "\n"
+	  "Usage: paf_capture [options]\n"
+	  " -a Hexadecimal shared memory key for capture \n"
+	  " -b BMF packet size\n"
+	  " -c Start point of packet\n"
+	  " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected:nchunk_actual:cpu\" \n"
+	  " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected\" \n"
+	  " -f The center frequency of captured data\n"
+	  " -g Number of channels of current capture\n"
+	  " -h Show help\n"
+	  " -i Reference information for the current capture, get from BMF packet header, epoch_ref:sec_ref:idf_ref\n"
+	  " -j Which directory to put log file\n"
+	  " -k The CPU for buf control thread\n"
+	  " -l The CPU for capture control thread\n"
+	  " -m Bind thread to CPU or not\n"
+	  " -n Time out for sockets\n"
+	  " -o The number of chunks\n"
+	  " -p The number of data frames in each buffer block of each frequency chunk\n"
+	  " -q The number of data frames in each temp buffer of each frequency chunk\n"
+	  " -r The number of data frames in each period or each frequency chunk\n"
+	  " -s The address to get control signal, currently uses unix socket\n"
+	  " -t The name of header template for PSRDADA\n"
 	   );
 }
 
@@ -93,12 +94,8 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'i':
-	  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.epoch_start, &conf.sec_start, &conf.idf_start);
+	  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.epoch_ref, &conf.sec_ref, &conf.idf_ref);
 	  break;
-	  
-	//case 'j':
-	//  sscanf(optarg, "%"SCNu64"", &conf.idf_start);
-	//  break;
 	  
 	case 'j':
 	  sscanf(optarg, "%s", conf.dir);
@@ -138,6 +135,10 @@ int main(int argc, char **argv)
 	  
 	case 's':
 	  sscanf(optarg, "%s", conf.ctrl_addr);
+	  break;
+	  
+	case 't':
+	  sscanf(optarg, "%s", conf.hfname);
 	  break;
 	}
     }

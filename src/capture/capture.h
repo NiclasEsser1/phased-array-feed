@@ -15,7 +15,9 @@
 #define MPORT_CAPTURE 16
 #define DADA_HDR_SIZE 4096
 #define MCHK_CAPTURE  48
-
+#define SECDAY        86400.0
+#define MJD1970       40587.0
+#define DADA_TIMESTR  "%Y-%m-%d-%H:%M:%S"
 typedef struct conf_t
 { 
   key_t key;
@@ -41,9 +43,10 @@ typedef struct conf_t
 
   double center_freq;
   int nchan;
-  
-  uint64_t sec_start, idf_start;
-  double epoch_start;
+
+  char hfname[MSTR_LEN];
+  uint64_t sec_ref, idf_ref;
+  double epoch_ref;
 
   int nchunk;
   int sec_prd;

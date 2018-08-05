@@ -38,14 +38,14 @@ def capture_refinfo(destination, pktsz, system_conf):
 
     hdr_part  = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[1]))[0])
     epoch     = (hdr_part & np.uint64(0x00000000fc000000)) >> np.uint64(26)    
-    epoch_mjd = float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)])
+    epoch_ref = float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)])
     sec_prd   = idf_ref * df_res
 
-    sec        = int(np.floor(sec_prd) + sec_ref + epoch_mjd * SECDAY)
+    sec        = int(np.floor(sec_prd) + sec_ref + epoch_ref * SECDAY)
     picosecond = int(1.0E6 * round(1.0E6 * (sec_prd - np.floor(sec_prd))))
     
     #return sec, picosecond
-    return epoch_mjd, sec_ref, idf_ref
+    return epoch_ref, sec_ref, idf_ref
 
 def check_all_ports(destination, pktsz, sec_prd, ndf_check):
     nport = len(destination)

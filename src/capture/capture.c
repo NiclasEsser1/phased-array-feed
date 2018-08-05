@@ -366,8 +366,8 @@ int init_capture(conf_t *conf)
       tail[i] = 0;
 
       ndf_port[i] = 0;
-      hdr_ref[i].sec = conf->sec_start;
-      hdr_ref[i].idf = conf->idf_start;
+      hdr_ref[i].sec = conf->sec_ref;
+      hdr_ref[i].idf = conf->idf_ref;
     }
   force_next = 0;
   quit = 0;
@@ -382,9 +382,10 @@ int init_capture(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  conf->df_res   = conf->sec_prd/conf->ndf_chk_prd;
-  conf->blk_res  = conf->df_res * conf->rbuf_ndf_chk;
-  conf->buf_dfsz = conf->required_pktsz * conf->nchunk;
+  conf->df_res   = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
+  //fprintf(stdout, "%f\n", conf->df_res);
+  conf->blk_res  = conf->df_res * (double)conf->rbuf_ndf_chk;
+  conf->buf_dfsz = conf->required_pktsz * (double)conf->nchunk;
   
   return EXIT_SUCCESS;
 }

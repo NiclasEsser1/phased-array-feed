@@ -267,6 +267,21 @@ void *capture_control(void *conf)
   uint64_t ndf_chk_actual[MCHK_CAPTURE];
   uint64_t ndf_chk_expect[MCHK_CAPTURE];
   hdr_t hdr;
+  double chan_res, bw;
+  uint64_t picoseconds;
+  char utc_start[MSTR_LEN];
+  double mjd_start;
+  char *hdrbuf = NULL;
+  time_t sec_ref; // second at start
+  uint64_t picoseconds_ref; // picoseconds at start
+  double sec_prd;   // seconds in one data frame period
+  double sec_offset; // Offset from the reference time;
+  uint64_t picoseconds_offset; // The sec_offset fraction part in picoseconds
+  time_t sec;
+  
+  sec_prd = captureconf->df_res * captureconf->idf_ref;
+  sec_ref = floor(sec_prd) + captureconf->sec_ref + SECDAY * captureconf->epoch_ref;
+  picoseconds_ref = 1E6 * round(1.0E6 * (sec_prd - floor(sec_prd)));
   
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
@@ -320,12 +335,12 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
-		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  pthread_mutex_lock(&ndf_chk_mutex[i]);
 		  ndf_chk_actual[i] = ndf_chk[i];
 		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
@@ -350,12 +365,12 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
-		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_start) / captureconf->sec_prd + (hdr.idf - captureconf->idf_start));
+		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  pthread_mutex_lock(&ndf_chk_mutex[i]);
 		  ndf_chk_actual[i] = ndf_chk[i];
 		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
@@ -382,87 +397,185 @@ void *capture_control(void *conf)
 		start_buf = ipcbuf_get_sod_minbuf(db);
 	      else
 		start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_byte :  ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
+
+	      /* To get time stamp for current header */
+	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res; // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
+	      fprintf(stdout, "%f\n", sec_offset);
 	      
-  ///* Register header */
-  //char *hdrbuf = NULL;
-  //hdrbuf = ipcbuf_get_next_write(conf->hdu->header_block);
-  //if(!hdrbuf)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //if(!conf->hdr_fname)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }  
-  //if(fileread(conf->hdr_fname, hdrbuf, DADA_HDR_SIZE) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //
-  ///* Setup DADA header with given values */
-  //if(ascii_header_set(hdrbuf, "UTC_START", "%s", conf->utc_start) < 0)  
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", conf->instrument) < 0)  
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }    
-  //if(ascii_header_set(hdrbuf, "FREQ", "%.1lf", conf->center_freq) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //if(ascii_header_set(hdrbuf, "MJD_START", "%lf", conf->mjd_start) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //if(ascii_header_set(hdrbuf, "NCHAN", "%d", conf->nchan) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }  
-  //if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &conf->resolution) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //conf->bw = conf->resolution * conf->nchan;
-  //if(ascii_header_set(hdrbuf, "BW", "%.1lf", conf->bw) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  ///* donot set header parameters anymore - acqn. doesn't start */
-  //if(ipcbuf_mark_filled(conf->hdu->header_block, DADA_HDR_SIZE) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //
+	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
+	      fprintf(stdout, "%"PRIu64"\n", picoseconds_offset);
+	      picoseconds = picoseconds_offset + picoseconds_ref;
+	      sec = sec_ref + sec_offset;
+	      if(picoseconds < 1E12)
+		continue;
+	      else
+		{
+		  sec += 1;
+		  picoseconds -= 1E12;
+		}
+	      strftime (utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&sec_ref)); // String start time without fraction second
+	      fprintf(stdout, "%s\n", utc_start);
+	      
+	      strftime (utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&sec)); // String start time without fraction second 
+	      mjd_start = sec / SECDAY + MJD1970;                         // Float MJD start time without fraction second
+	      fprintf(stdout, "%s\n", utc_start);
+	      
+	      /* Register header */
+	      hdrbuf = ipcbuf_get_next_write(captureconf->hdu->header_block);
+	      if(!hdrbuf)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      if(!captureconf->hfname)
+		{
+		  multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}  
+	      if(fileread(captureconf->hfname, hdrbuf, DADA_HDR_SIZE) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      
+	      /* Setup DADA header with given values */
+	      if(ascii_header_set(hdrbuf, "UTC_START", "%s", utc_start) < 0)  
+		{
+		  multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	//if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", captureconf->instrument) < 0)  
+	//	{
+	//	  multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	//	  fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	//	  return EXIT_FAILURE;
+	//	}
+	      if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, picoseconds) < 0)  
+		{
+		  multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}    
+	      if(ascii_header_set(hdrbuf, "FREQ", "%.1lf", captureconf->center_freq) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      if(ascii_header_set(hdrbuf, "MJD_START", "%lf", mjd_start) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      if(ascii_header_set(hdrbuf, "NCHAN", "%d", captureconf->nchan) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}  
+	      if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &chan_res) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      bw = chan_res * captureconf->nchan;
+	      if(ascii_header_set(hdrbuf, "BW", "%.1lf", bw) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      /* donot set header parameters anymore - acqn. doesn't start */
+	      if(ipcbuf_mark_filled(captureconf->hdu->header_block, DADA_HDR_SIZE) < 0)
+		{
+		  multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  
+		  pthread_mutex_lock(&quit_mutex);
+		  quit = 1;
+		  pthread_mutex_unlock(&quit_mutex);
+		  
+		  close(sock);
+		  pthread_exit(NULL);
+		  return NULL;
+		}
+	      
 	      ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}
