@@ -68,7 +68,7 @@ int threads(conf_t *conf)
 	ret[i] = pthread_create(&thread[i], NULL, capture_thread, (void *)conf);
     }
 
-  if(!(conf->thread_bind == 0))
+  if(!(conf->thread_bind == 0)) 
     {
       pthread_attr_init(&attr);
       CPU_ZERO(&cpus);
@@ -89,18 +89,6 @@ int threads(conf_t *conf)
       ret[nport_active] = pthread_create(&thread[nport_active], NULL, sync_thread, (void *)conf);
       ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], NULL, monitor_thread, (void *)conf);
     }
-  
-  //if(!(conf->thread_bind == 0))
-  //  {
-  //    pthread_attr_init(&attr);
-  //    CPU_ZERO(&cpus);
-  //    CPU_SET(conf->monitor_cpu, &cpus);      
-  //    pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
-  //    ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], &attr, monitor_thread, (void *)conf);
-  //    pthread_attr_destroy(&attr);
-  //  }
-  //else
-  //  ret[nport_active + 1] = pthread_create(&thread[nport_active + 1], NULL, monitor_thread, (void *)conf);
   
   for(i = 0; i < nport_active + 2; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
@@ -169,13 +157,10 @@ void *sync_thread(void *conf)
       if((ntransit > nchunk) || force_next_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 	  /* Close current buffer */
-	  //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0)
 	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
-	      //multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
-	      //fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      multilog (runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed\n");
-	      fprintf(stderr, "close_buffer: ipcbuf_mark_filled failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
+	      fprintf(stderr, "close_buffer: ipcbuf_mark_filled failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
@@ -185,8 +170,31 @@ void *sync_thread(void *conf)
 	      return NULL;
 	    }
 
-	  //cbuf = ipcio_open_block_write(captureconf->hdu->data_block, &block_id);
-	  cbuf = ipcbuf_get_next_write ((ipcbuf_t*)captureconf->hdu->data_block);
+	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) == ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block))
+	    {	     
+	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
+	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
+	       
+	      pthread_mutex_lock(&quit_mutex);
+	      quit = 1;
+	      pthread_mutex_unlock(&quit_mutex);
+
+	      pthread_exit(NULL);
+	      return NULL;
+	    }
+	  cbuf = ipcbuf_get_next_write((ipcbuf_t*)captureconf->hdu->data_block);
+	  if(cbuf == NULL)
+	    {
+	      multilog(runtime_log, LOG_ERR, "open_buffer: ipcbuf_get_next_write failed, has to abort.\n");
+	      fprintf(stderr, "open_buffer: ipcbuf_get_next_write failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      
+	      pthread_mutex_lock(&quit_mutex);
+	      quit = 1;
+	      pthread_mutex_unlock(&quit_mutex);
+
+	      pthread_exit(NULL);
+	      return NULL; 
+	    }
 	  
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
@@ -202,8 +210,11 @@ void *sync_thread(void *conf)
 		}
 	      pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	    }
-	  
-	  while(true) // Wait until all threads are on new buffer block
+
+	  pthread_mutex_lock(&quit_mutex);   // Need to check quit starus in while loop, otherwise it will stuck here
+	  quit_status = quit;
+	  pthread_mutex_unlock(&quit_mutex);
+	  while(quit_status == 0) // Wait until all threads are on new buffer block
 	    {
 	      ntransit = 0;
 	      for(i = 0; i < captureconf->nport_active; i++)
@@ -214,13 +225,17 @@ void *sync_thread(void *conf)
 		}
 	      if(ntransit == 0)
 		break;
+	      
+	      pthread_mutex_lock(&quit_mutex);   // Need to check quit starus in while loop, otherwise it will stuck here
+	      quit_status = quit;
+	      pthread_mutex_unlock(&quit_mutex);
 	    }
 	  
 	  /* To see if we need to copy data from temp buffer into ring buffer */
 	  ntail = 0;
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    ntail = (tail[i] > ntail) ? tail[i] : ntail;
-	  
+	 	  
 #ifdef DEBUG
 	  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
 #endif
@@ -247,26 +262,23 @@ void *sync_thread(void *conf)
 	  force_next = 0;
 	  pthread_mutex_unlock(&force_next_mutex);
 	}
-      
+
       pthread_mutex_lock(&quit_mutex);
       quit_status = quit;
       pthread_mutex_unlock(&quit_mutex);
     }
   
   /* Exit */
-  //if (ipcio_close_block_write (captureconf->hdu->data_block, captureconf->rbufsz) < 0)  // This should enable eod at current buffer
-  if(ipcbuf_mark_filled ((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
+  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
     {
-      //multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
-      //fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      multilog (runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed\n");
-      fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
+      fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       
       pthread_exit(NULL);
       return NULL;
     }
-  
+
   pthread_exit(NULL);
   return NULL;
 }

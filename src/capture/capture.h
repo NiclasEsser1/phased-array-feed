@@ -12,7 +12,7 @@
 #include "hdr.h"
 
 #define MSTR_LEN      1024
-#define MPORT_CAPTURE 16
+#define MPORT_CAPTURE 6
 #define DADA_HDR_SIZE 4096
 #define MCHK_CAPTURE  48
 

@@ -12,7 +12,7 @@ multilog_t *runtime_log;
 
 void usage()
 {
-  fprintf (stdout,
+  fprintf(stdout,
 	   "paf_capture - capture PAF BMF raw data from NiC\n"
 	   "\n"
 	   "Usage: paf_capture [options]\n"
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   conf.sync_cpu     = 0;
   conf.monitor_cpu  = 0;
   conf.thread_bind  = 0; // Default do not bind thread to cpu
-  for (i = 0; i < MPORT_CAPTURE; i++)
+  for(i = 0; i < MPORT_CAPTURE; i++)
     conf.port_cpu[i] = 0;
   while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
     {
@@ -61,9 +61,9 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	  
 	case 'a':	  	  
-	  if (sscanf (optarg, "%x", &conf.key) != 1)
+	  if(sscanf(optarg, "%x", &conf.key) != 1)
 	    {
-	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf(stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
 	  break;
@@ -161,24 +161,33 @@ int main(int argc, char **argv)
   /* To make sure that we are not going to bind all threads to one sigle CPU */
   if(!(conf.thread_bind == 0))
     {
-      for (i = 0; i < MPORT_CAPTURE; i++)
+      for(i = 0; i < MPORT_CAPTURE; i++)
 	{
-	  if (((conf.port_cpu[i] == conf.monitor_cpu)?0:1) == 1)
+	  if(((conf.port_cpu[i] == conf.monitor_cpu)?0:1) == 1)
 	    break;
-	  if (((conf.port_cpu[i] == conf.sync_cpu)?0:1) == 1)
+	  if(((conf.port_cpu[i] == conf.sync_cpu)?0:1) == 1)
 	    break;
 	}
-      if (i == MPORT_CAPTURE)
+      if(i == MPORT_CAPTURE)
 	{
-	  fprintf(stdout, "We can not bind all threads into one single CPU!\n");
-	  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stdout, "We can not bind all threads into one single CPU, has to abort!\n");
+	  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  return EXIT_FAILURE;
 	}
     }
   
   /* Init capture */
-  init_capture(&conf);
+  if(init_capture(&conf))
+    {      
+      multilog(runtime_log, LOG_ERR, "Can not initial capture, has to abort, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "Can not initial capture, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
+      multilog(runtime_log, LOG_INFO, "CAPTURE END\n\n");
+      multilog_close(runtime_log);
+      fclose(fp_log);
+      return EXIT_FAILURE;
+    }
+  
   /* Do the job */
   threads(&conf);
 

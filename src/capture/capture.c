@@ -59,29 +59,93 @@ int init_buf(conf_t *conf)
   dada_hdu_set_key(conf->hdu, conf->key);
   if(dada_hdu_connect(conf->hdu) < 0)
     {
-      multilog(runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    
+      pthread_mutex_destroy(&ithread_mutex);
+      pthread_mutex_destroy(&quit_mutex);
+      pthread_mutex_destroy(&force_next_mutex);
+      for(i = 0; i < MPORT_CAPTURE; i++)
+	{
+	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
+	  pthread_mutex_destroy(&hdr_current_mutex[i]);
+	  pthread_mutex_destroy(&transit_mutex[i]);
+      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	}
+      
+      for(i = 0; i < MCHK_CAPTURE; i++)
+	pthread_mutex_destroy(&ndf_chk_mutex[i]);
+  
+      dada_hdu_destroy(conf->hdu);
       return EXIT_FAILURE;    
     }
   
-  if (dada_hdu_lock_write (conf->hdu) < 0) // make ourselves the write client 
+  if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client 
     {
-      multilog (runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+  
+      pthread_mutex_destroy(&ithread_mutex);
+      pthread_mutex_destroy(&quit_mutex);
+      pthread_mutex_destroy(&force_next_mutex);
+      for(i = 0; i < MPORT_CAPTURE; i++)
+	{
+	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
+	  pthread_mutex_destroy(&hdr_current_mutex[i]);
+	  pthread_mutex_destroy(&transit_mutex[i]);
+	  pthread_mutex_destroy(&ndf_port_mutex[i]);
+	}
+      
+      for(i = 0; i < MCHK_CAPTURE; i++)
+	pthread_mutex_destroy(&ndf_chk_mutex[i]);
+      
+      dada_hdu_disconnect(conf->hdu);
       return EXIT_FAILURE;
     }
   
   db = (ipcbuf_t *)conf->hdu->data_block;
   if(conf->rbufsz != ipcbuf_get_bufsz(db))  // Check the buffer size
     {
-      multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+        
+      pthread_mutex_destroy(&ithread_mutex);
+      pthread_mutex_destroy(&quit_mutex);
+      pthread_mutex_destroy(&force_next_mutex);
+      for(i = 0; i < MPORT_CAPTURE; i++)
+	{
+	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
+	  pthread_mutex_destroy(&hdr_current_mutex[i]);
+	  pthread_mutex_destroy(&transit_mutex[i]);
+      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	}
+      
+      for(i = 0; i < MCHK_CAPTURE; i++)
+	pthread_mutex_destroy(&ndf_chk_mutex[i]);
+  
+      dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;    
     }
   if(ipcbuf_disable_sod(db) < 0)
     {
-      multilog (runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+  
+      pthread_mutex_destroy(&ithread_mutex);
+      pthread_mutex_destroy(&quit_mutex);
+      pthread_mutex_destroy(&force_next_mutex);
+      for(i = 0; i < MPORT_CAPTURE; i++)
+	{
+	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
+	  pthread_mutex_destroy(&hdr_current_mutex[i]);
+	  pthread_mutex_destroy(&transit_mutex[i]);
+      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	}
+      
+      for(i = 0; i < MCHK_CAPTURE; i++)
+	pthread_mutex_destroy(&ndf_chk_mutex[i]);
+  
+      dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;
     }
   conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchunk;
@@ -89,7 +153,7 @@ int init_buf(conf_t *conf)
   
   ///* Register header */
   //char *hdrbuf = NULL;
-  //hdrbuf = ipcbuf_get_next_write (conf->hdu->header_block);
+  //hdrbuf = ipcbuf_get_next_write(conf->hdu->header_block);
   //if(!hdrbuf)
   //  {
   //    multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -160,7 +224,7 @@ int init_buf(conf_t *conf)
   //    return EXIT_FAILURE;
   //  }
   ///* donot set header parameters anymore - acqn. doesn't start */
-  //if (ipcbuf_mark_filled (conf->hdu->header_block, DADA_HDR_SIZE) < 0)
+  //if(ipcbuf_mark_filled(conf->hdu->header_block, DADA_HDR_SIZE) < 0)
   //  {
   //    multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
   //    fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -202,8 +266,8 @@ void *capture_thread(void *conf)
   sa.sin_addr.s_addr = inet_addr(captureconf->ip_active[ithread]);
   if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
     {
-      multilog(runtime_log, LOG_ERR,  "Can not bind to %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      fprintf (stderr, "Can not bind to %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR,  "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      fprintf(stderr, "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
       
       /* Force to quit if we have time out */
       pthread_mutex_lock(&quit_mutex);
@@ -224,8 +288,8 @@ void *capture_thread(void *conf)
     {      
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
 	{
-	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-	  fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 
 	  /* Force to quit if we have time out */
 	  pthread_mutex_lock(&quit_mutex);
@@ -249,7 +313,7 @@ void *capture_thread(void *conf)
 
       acquire_ichk(hdr, *captureconf, &ichk);
             
-      if (idf < 0 )
+      if(idf < 0 )
 	// Drop data frams which are behind time;
 	continue;
       else
@@ -392,8 +456,13 @@ int init_capture(conf_t *conf)
     
   /* Get the buffer block ready */
   uint64_t block_id = 0;
-  //cbuf = ipcio_open_block_write(conf->hdu->data_block, &block_id);
-  cbuf = ipcbuf_get_next_write ((ipcbuf_t*)conf->hdu->data_block);
+  cbuf = ipcbuf_get_next_write((ipcbuf_t*)conf->hdu->data_block);
+  if(cbuf == NULL)
+    {	     
+      multilog(runtime_log, LOG_ERR, "open_buffer: ipcbuf_get_next_write failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "open_buffer: ipcbuf_get_next_write failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
   
   return EXIT_SUCCESS;
 }

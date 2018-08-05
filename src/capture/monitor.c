@@ -32,7 +32,7 @@ void *monitor_thread(void *conf)
   int quit_status;
   uint64_t start_byte, start_buf;
   ipcbuf_t *db = NULL;
-    
+  
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
@@ -75,7 +75,10 @@ void *monitor_thread(void *conf)
 	{
 	  db = (ipcbuf_t *)captureconf->hdu->data_block;
 	  if(strstr(command, "END-OF-CAPTURE") != NULL)
-	    {
+	    {	      
+	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
+	      fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
+
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
 	      pthread_mutex_unlock(&quit_mutex);
@@ -85,12 +88,18 @@ void *monitor_thread(void *conf)
 	      return NULL;
 	    }	  
 	  if(strstr(command, "END-OF-DATA") != NULL)
-	    //ipcio_stop(db);
-	    //ipcbuf_enable_eod(db);
-	    ipcbuf_disable_sod(db);
+	    {
+	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to disable sod.\n");
+	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to disable sod.\n", __FILE__, __LINE__);
+
+	      ipcbuf_disable_sod(db);
+	    }
 	  
 	  if(strstr(command, "START-OF-DATA") != NULL)
 	    {
+	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
+	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
+
 	      sscanf(command, "%*s:%"SCNu64":%"SCNu64"", &start_byte, &start_buf); // Read the start bytes from socket or get the minimum number from the buffer
 	      if(start_buf == 0)
 		start_buf = ipcbuf_get_sod_minbuf(db);
@@ -104,7 +113,7 @@ void *monitor_thread(void *conf)
       quit_status = quit;
       pthread_mutex_unlock(&quit_mutex);
     }
-
+  
   close(sock);
   pthread_exit(NULL);
   return NULL;

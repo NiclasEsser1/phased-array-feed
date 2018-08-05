@@ -3,12 +3,19 @@
 import socket
 import os
 import time
+import parser
+import argparse
+
+parser = argparse.ArgumentParser(description='To control the capture')
+
+parser.add_argument('-a', '--command', type=str, nargs='+',
+                    help='Command to send')
+
+args    = parser.parse_args()
+command = args.command[0]
 
 server_address = "/tmp/capture_socket"
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-sock.sendto("START-OF-DATA:0:0\n", server_address)
-#sock.sendto("END-OF-DATA\n", server_address)
+sock.sendto("{:s}:0:0\n".format(command), server_address)
 
-#sock.sendto("END-OF-CAPTURE\n", server_address)
-#sock.sendto("STATUS-OF-TRAFFIC\n", server_address)
 sock.close()
