@@ -12,7 +12,7 @@
 #include "futils.h"
 
 #define MSTR_LEN      1024
-#define MPORT_CAPTURE 6
+#define MPORT_CAPTURE 16
 #define DADA_HDR_SIZE 4096
 #define MCHK_CAPTURE  48
 
@@ -43,12 +43,17 @@ typedef struct conf_t
   int nchan;
   
   uint64_t sec_start, idf_start;
+  double epoch_start;
 
   int nchunk;
   int sec_prd;
   char ctrl_addr[MSTR_LEN];
   char dir[MSTR_LEN];
 
+  double df_res;  // time resolution of each data frame, for start time determination;
+  double blk_res; // time resolution of each buffer block, for start time determination;
+  uint64_t buf_dfsz; // data fram size in buf, TFTFP order, and here is the size of each T, which is the size of each FTP. It is for the time determination with start_byte, it should be multiple of buf_size;
+  
   uint64_t rbufsz, tbufsz;
   
   uint64_t ndf_chk_prd;

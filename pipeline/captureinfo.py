@@ -24,19 +24,29 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-def capture_refinfo(destination, pktsz):
+def capture_refinfo(destination, pktsz, system_conf):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_address = (destination.split(":")[0], int(destination.split(":")[1]))
     sock.bind(server_address)
     buf, address = sock.recvfrom(pktsz) # raw packet
-    
-    data       = np.fromstring(buf, 'uint64')
-    hdr_part   = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[0]))[0])
-    sec_ref     = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
-    idf_ref     = hdr_part & np.uint64(0x00000000ffffffff)
 
-    return int(sec_ref), idf_ref
+    df_res   = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
+    data     = np.fromstring(buf, 'uint64')
+    hdr_part = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[0]))[0])
+    sec_ref  = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
+    idf_ref  = hdr_part & np.uint64(0x00000000ffffffff)
+
+    hdr_part  = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[1]))[0])
+    epoch     = (hdr_part & np.uint64(0x00000000fc000000)) >> np.uint64(26)    
+    epoch_mjd = float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)])
+    sec_prd   = idf_ref * df_res
+
+    sec        = int(np.floor(sec_prd) + sec_ref + epoch_mjd * SECDAY)
+    picosecond = int(1.0E6 * round(1.0E6 * (sec_prd - np.floor(sec_prd))))
     
+    #return sec, picosecond
+    return epoch_mjd, sec_ref, idf_ref
+
 def check_all_ports(destination, pktsz, sec_prd, ndf_check):
     nport = len(destination)
     active = np.zeros(nport, dtype = int)
@@ -121,7 +131,7 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 
     # Get reference timestamp of capture
-    refinfo = capture_refinfo(destination_active[0], pktsz)
+    refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
     print "The reference timestamp \"(DF_SEC, DF_IDF)\"for current capture is: ", refinfo
     
     return destination_active, destination_dead, refinfo, key

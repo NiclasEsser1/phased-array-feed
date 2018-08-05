@@ -382,6 +382,87 @@ void *capture_control(void *conf)
 		start_buf = ipcbuf_get_sod_minbuf(db);
 	      else
 		start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_byte :  ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
+	      
+  ///* Register header */
+  //char *hdrbuf = NULL;
+  //hdrbuf = ipcbuf_get_next_write(conf->hdu->header_block);
+  //if(!hdrbuf)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //if(!conf->hdr_fname)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }  
+  //if(fileread(conf->hdr_fname, hdrbuf, DADA_HDR_SIZE) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //
+  ///* Setup DADA header with given values */
+  //if(ascii_header_set(hdrbuf, "UTC_START", "%s", conf->utc_start) < 0)  
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", conf->instrument) < 0)  
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }    
+  //if(ascii_header_set(hdrbuf, "FREQ", "%.1lf", conf->center_freq) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //if(ascii_header_set(hdrbuf, "MJD_START", "%lf", conf->mjd_start) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //if(ascii_header_set(hdrbuf, "NCHAN", "%d", conf->nchan) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }  
+  //if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &conf->resolution) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //conf->bw = conf->resolution * conf->nchan;
+  //if(ascii_header_set(hdrbuf, "BW", "%.1lf", conf->bw) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  ///* donot set header parameters anymore - acqn. doesn't start */
+  //if(ipcbuf_mark_filled(conf->hdu->header_block, DADA_HDR_SIZE) < 0)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //
 	      ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}

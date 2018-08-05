@@ -23,18 +23,17 @@ void usage()
 	   " -f The center frequency of captured data\n"
 	   " -g Number of channels of current capture\n"
 	   " -h Show help\n"
-	   " -i Reference second for the current capture, get from BMF packet header\n"
-	   " -j Reference data frame index for the current capture, get from BMF packet header\n"	   
-	   " -k Which directory to put log file\n"
-	   " -l The CPU for buf control thread\n"
-	   " -m The CPU for capture control thread\n"
-	   " -n Bind thread to CPU or not\n"
-	   " -o Time out for sockets\n"
-	   " -p The number of chunks\n"
-	   " -q The number of data frames in each buffer block of each frequency chunk\n"
-	   " -r The number of data frames in each temp buffer of each frequency chunk\n"
-	   " -s The number of data frames in each period or each frequency chunk\n"
-	   " -t The address to get control signal, currently uses unix socket\n"
+	   " -i Reference information for the current capture, get from BMF packet header, epoch_start:sec_start:idf_start\n"
+	   " -j Which directory to put log file\n"
+	   " -k The CPU for buf control thread\n"
+	   " -l The CPU for capture control thread\n"
+	   " -m Bind thread to CPU or not\n"
+	   " -n Time out for sockets\n"
+	   " -o The number of chunks\n"
+	   " -p The number of data frames in each buffer block of each frequency chunk\n"
+	   " -q The number of data frames in each temp buffer of each frequency chunk\n"
+	   " -r The number of data frames in each period or each frequency chunk\n"
+	   " -s The address to get control signal, currently uses unix socket\n"
 	   );
 }
 
@@ -94,50 +93,50 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'i':
-	  sscanf(optarg, "%"SCNu64"", &conf.sec_start);
+	  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.epoch_start, &conf.sec_start, &conf.idf_start);
 	  break;
+	  
+	//case 'j':
+	//  sscanf(optarg, "%"SCNu64"", &conf.idf_start);
+	//  break;
 	  
 	case 'j':
-	  sscanf(optarg, "%"SCNu64"", &conf.idf_start);
-	  break;
-	  
-	case 'k':
 	  sscanf(optarg, "%s", conf.dir);
 	  break;
 	  
-	case 'l':
+	case 'k':
 	  sscanf(optarg, "%d", &conf.buf_ctrl_cpu);
 	  break;
 	  
-	case 'm':
+	case 'l':
 	  sscanf(optarg, "%d", &conf.capture_ctrl_cpu);
 	  break;
 	  
-	case 'n':
+	case 'm':
 	  sscanf(optarg, "%d", &conf.thread_bind);
 	  break;
 	  
-	case 'o':
+	case 'n':
 	  sscanf(optarg, "%d", &conf.sec_prd);
 	  break;
 	  
-	case 'p':
+	case 'o':
 	  sscanf(optarg, "%d", &conf.nchunk);
 	  break;
 	  
-	case 'q':
+	case 'p':
 	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf_chk);
 	  break;
 	  
-	case 'r':
+	case 'q':
 	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf_chk);
 	  break;
 	  
-	case 's':
+	case 'r':
 	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chk_prd);
 	  break;
 	  
-	case 't':
+	case 's':
 	  sscanf(optarg, "%s", conf.ctrl_addr);
 	  break;
 	}
