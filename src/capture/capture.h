@@ -18,6 +18,7 @@
 #define SECDAY        86400.0
 #define MJD1970       40587.0
 #define DADA_TIMESTR  "%Y-%m-%d-%H:%M:%S"
+
 typedef struct conf_t
 { 
   key_t key;
@@ -46,10 +47,10 @@ typedef struct conf_t
   int nchan;
 
   char hfname[MSTR_LEN];
-  uint64_t sec_ref, idf_ref;
+  uint64_t sec_ref, idf_ref; // Reference seconds and idf, from BMF when we start the capture 
   double epoch_ref;
 
-  int nchunk;
+  int nchunk;    // Frequency chunks of current capture, including all alive chunks and dead chunks
   int sec_prd;
   char ctrl_addr[MSTR_LEN];
   char dir[MSTR_LEN];

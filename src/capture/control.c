@@ -121,8 +121,9 @@ void *buf_control(void *conf)
       pthread_mutex_lock(&force_next_mutex);
       force_next_status = force_next;
       pthread_mutex_unlock(&force_next_mutex);
-      if((ntransit > nchunk) || force_next_status)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
+      if((ntransit > nchunk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
 	{
+	  //fprintf(stdout, "CBUF0\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block));
 	  /* Close current buffer */
 	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
@@ -136,8 +137,9 @@ void *buf_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
-
-	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) == ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block))
+	  
+	  //fprintf(stdout, "CBUF0\t%"PRIu64"\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block), ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block));
+	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) == (ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block) - 1)) // If we have a reader, there will be at least one buffer which is not full
 	    {	     
 	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
 	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
@@ -145,11 +147,24 @@ void *buf_control(void *conf)
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
 	      pthread_mutex_unlock(&quit_mutex);
-
+	  
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
-	  cbuf = ipcbuf_get_next_write((ipcbuf_t*)captureconf->hdu->data_block);
+	  
+	  //fprintf(stdout, "CBUF0\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block));
+	  pthread_mutex_lock(&quit_mutex);   // Need to check quit status before get new buffer block, otherwise it will stuck here
+	  quit_status = quit;
+	  pthread_mutex_unlock(&quit_mutex);
+	  if(quit_status == 0)
+	    cbuf = ipcbuf_get_next_write((ipcbuf_t*)captureconf->hdu->data_block);
+	  else
+	    {	      
+	      pthread_exit(NULL);
+	      return NULL; 
+	    }
+	  //fprintf(stdout, "CBUF1\n");
+	  
 	  if(cbuf == NULL)
 	    {
 	      multilog(runtime_log, LOG_ERR, "open_buffer: ipcbuf_get_next_write failed, has to abort.\n");
@@ -178,7 +193,7 @@ void *buf_control(void *conf)
 	      pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	    }
 
-	  pthread_mutex_lock(&quit_mutex);   // Need to check quit starus in while loop, otherwise it will stuck here
+	  pthread_mutex_lock(&quit_mutex);   // Need to check quit status in while loop, otherwise it will stuck here
 	  quit_status = quit;
 	  pthread_mutex_unlock(&quit_mutex);
 	  while(quit_status == 0) // Wait until all threads are on new buffer block
@@ -193,7 +208,7 @@ void *buf_control(void *conf)
 	      if(ntransit == 0)
 		break;
 	      
-	      pthread_mutex_lock(&quit_mutex);   // Need to check quit starus in while loop, otherwise it will stuck here
+	      pthread_mutex_lock(&quit_mutex);   // Need to check quit status in while loop, otherwise it will stuck here
 	      quit_status = quit;
 	      pthread_mutex_unlock(&quit_mutex);
 	    }

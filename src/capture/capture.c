@@ -68,7 +68,7 @@ int init_buf(conf_t *conf)
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
 	  pthread_mutex_destroy(&hdr_current_mutex[i]);
 	  pthread_mutex_destroy(&transit_mutex[i]);
-      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	  pthread_mutex_destroy(&ndf_port_mutex[i]);
 	}
       
       for(i = 0; i < MCHK_CAPTURE; i++)
@@ -115,7 +115,7 @@ int init_buf(conf_t *conf)
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
 	  pthread_mutex_destroy(&hdr_current_mutex[i]);
 	  pthread_mutex_destroy(&transit_mutex[i]);
-      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	  pthread_mutex_destroy(&ndf_port_mutex[i]);
 	}
       
       for(i = 0; i < MCHK_CAPTURE; i++)
@@ -137,7 +137,7 @@ int init_buf(conf_t *conf)
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
 	  pthread_mutex_destroy(&hdr_current_mutex[i]);
 	  pthread_mutex_destroy(&transit_mutex[i]);
-      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	  pthread_mutex_destroy(&ndf_port_mutex[i]);
 	}
       
       for(i = 0; i < MCHK_CAPTURE; i++)

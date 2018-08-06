@@ -12,7 +12,7 @@ multilog_t *runtime_log;
 void usage()
 {
   fprintf(stdout,
-	  "paf_capture - capture PAF BMF raw data from NiC\n"
+	  "capture_main - capture PAF BMF raw data from NiC\n"
 	  "\n"
 	  "Usage: paf_capture [options]\n"
 	  " -a Hexadecimal shared memory key for capture \n"
@@ -195,6 +195,8 @@ int main(int argc, char **argv)
   /* Do the job */
   threads(&conf);
 
+  fprintf(stdout, "HERE, ENF OF THREADS\n");
+  
   /* Destory capture */
   destroy_capture(conf);
   
