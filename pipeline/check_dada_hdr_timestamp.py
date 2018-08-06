@@ -46,6 +46,8 @@ SECDAY      = 86400.0
 #fname       = "/beegfs/DENG/docker/2018-08-05-22:19:24_0000000000000000.000000.dada"
 fname       = "/beegfs/DENG/docker/2018-08-05-22:20:46_0000000000000000.000000.dada"
 fname       = "/beegfs/DENG/docker/2018-08-05-22:21:58_0000000000000000.000000.dada"
+fname       = "/beegfs/DENG/docker/2018-08-06-08:50:50_0000000000000000.000000.dada"
+fname       = "/beegfs/DENG/docker/2018-08-06-08:53:05_0000000000000000.000000.dada"
 
 system_conf = "../config/system.conf"
 

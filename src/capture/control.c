@@ -258,7 +258,7 @@ void *capture_control(void *conf)
   socklen_t fromlen;
   conf_t *captureconf = (conf_t *)conf;
   struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 second;
-  char command[MSTR_LEN];
+  char command_line[MSTR_LEN], command[MSTR_LEN];
   int quit_status;
   uint64_t start_byte, start_buf;
   ipcbuf_t *db = NULL;
@@ -321,10 +321,10 @@ void *capture_control(void *conf)
   pthread_mutex_unlock(&quit_mutex);
   while(quit_status == 0)
     {
-      if(recvfrom(sock, (void *)command, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
+      if(recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
 	  db = (ipcbuf_t *)captureconf->hdu->data_block;
-	  if(strstr(command, "END-OF-CAPTURE") != NULL)
+	  if(strstr(command_line, "END-OF-CAPTURE") != NULL)
 	    {	      
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
 	      fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
@@ -357,7 +357,7 @@ void *capture_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
-	  if(strstr(command, "STATUS-OF-TRAFFIC") != NULL)
+	  if(strstr(command_line, "STATUS-OF-TRAFFIC") != NULL)
 	    {	      
 	      for(i = 0; i < captureconf->nport_active; i++)
 		{
@@ -379,7 +379,7 @@ void *capture_control(void *conf)
 		}
 	      fprintf(stdout, "\n");
 	    }	  
-	  if(strstr(command, "END-OF-DATA") != NULL)
+	  if(strstr(command_line, "END-OF-DATA") != NULL)
 	    {
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to disable sod.\n");
 	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to disable sod.\n", __FILE__, __LINE__);
@@ -387,16 +387,13 @@ void *capture_control(void *conf)
 	      ipcbuf_disable_sod(db);
 	    }
 	  
-	  if(strstr(command, "START-OF-DATA") != NULL)
+	  if(strstr(command_line, "START-OF-DATA") != NULL)
 	    {
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
-	      fprintf(stdout, "%s\n", command);
-	      
-	      sscanf(command, "%*s:%"SCNu64":%"SCNu64"", &start_byte, &start_buf); // Read the start bytes from socket or get the minimum number from the buffer
-	      start_buf  = 0;
-	      start_byte = 347136000;
+	      fprintf(stdout, "%s\n", command_line);
+	      sscanf(command_line, "%[^:]:%"SCNu64":%"SCNu64"", command, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
 	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
 	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_buf : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
 

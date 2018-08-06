@@ -229,7 +229,21 @@ void *capture(void *conf)
       acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
 
-      acquire_ichk(hdr, *captureconf, &ichk);
+      if(acquire_ichk(hdr, *captureconf, &ichk))
+	{	  
+	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "Frequency chunk index < 0, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+	  /* Force to quit if we have time out */
+	  pthread_mutex_lock(&quit_mutex);
+	  quit = 1;
+	  pthread_mutex_unlock(&quit_mutex);
+
+	  free(df);
+	  conf = (void *)captureconf;
+	  pthread_exit(NULL);
+	  return NULL;
+	}
             
       if(!(idf < 0))
       	{
@@ -390,6 +404,9 @@ int init_capture(conf_t *conf)
 int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
 {  
   *ichk = (int)((hdr.freq - conf.center_freq + 0.5)/((double)conf.nchan/(double)conf.nchunk) + (double)conf.nchunk/2.0);
+
+  if (*ichk < 0)
+    return EXIT_FAILURE;
   
   return EXIT_SUCCESS;
 }
