@@ -88,21 +88,13 @@ def check_port(ip, port, pktsz, ndf_check):
 
     return active, nchunk_active
 
-def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part):
+def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     # Get pipeline configuration from configuration file
     ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
     ndf_check    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_check'])
     nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
     key          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
-    kfile_prefix = ConfigSectionMap(pipeline_conf, "CAPTURE")['kfname_prefix']
-    kfname       = "{:s}_beam{:02d}_part{:02d}.key".format(kfile_prefix, beam, part)
     nreader      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nreader'])
-     
-    # Record the key to a key file with kfname
-    kfile = open(kfname, "w")
-    kfile.writelines("DADA INFO:\n")
-    kfile.writelines("key {:s}\n".format(key))
-    kfile.close()
     
     # Get system configuration from configuration file
     sec_prd      = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
@@ -120,10 +112,6 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr, beam, part)
     
     # Check the connection
     destination_active, destination_dead = check_all_ports(destination, pktsz, sec_prd, ndf_check)
-    
-    if (len(destination_active) == 0):
-        print "There is no active port for beam {:02d}, have to abort ...".format(beam)
-        exit(1)
     print "The active destination \"[IP:PORT:NCHUNK_EXPECT:NCHUNK_ACTUAL]\" are: ", destination_active
     print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
     

@@ -218,9 +218,9 @@ void *buf_control(void *conf)
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    ntail = (tail[i] > ntail) ? tail[i] : ntail;
 	 	  
-#ifdef DEBUG
+	  //#ifdef DEBUG
 	  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
-#endif
+	  //#endif
 	  
 	  for(i = 0; i < ntail; i++)
 	    {
@@ -406,9 +406,9 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
-	      fprintf(stdout, "%s\n", command_line);
+	      //fprintf(stdout, "%s\n", command_line);
 	      sscanf(command_line, "%[^:]:%"SCNu64":%"SCNu64"", command, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
-	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
+	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
 	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_buf : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
 
 	      /* To get time stamp for current header */

@@ -23,7 +23,7 @@ parser.add_argument('-c', '--command', type=str, nargs='+',
 args    = parser.parse_args()
 beam    = args.beam[0]
 part    = args.part[0]
-address = "/tmp/capture.beam{:d}.part{:d}".format(beam, part)
+address = "/tmp/capture.beam{:02d}.part{:02d}".format(beam, part)
 command = args.command[0]
 
 start_buf = 0
