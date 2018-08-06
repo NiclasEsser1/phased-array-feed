@@ -381,10 +381,9 @@ void *capture_control(void *conf)
 	    }	  
 	  if(strstr(command_line, "END-OF-DATA") != NULL)
 	    {
-	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to disable sod.\n");
-	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to disable sod.\n", __FILE__, __LINE__);
-
-	      ipcbuf_disable_sod(db);
+	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
+	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
+	      ipcbuf_enable_eod(db);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
