@@ -381,7 +381,6 @@ int init_capture(conf_t *conf)
     }
 
   conf->df_res   = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
-  //fprintf(stdout, "%f\n", conf->df_res);
   conf->blk_res  = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->buf_dfsz = conf->required_pktsz * (double)conf->nchunk;
   
@@ -390,7 +389,8 @@ int init_capture(conf_t *conf)
 
 int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
 {  
-  *ichk = (int)((hdr.freq - conf.center_freq - 0.5)/(conf.nchan/conf.nchunk) + conf.nchunk/2);
+  *ichk = (int)((hdr.freq - conf.center_freq + 0.5)/((double)conf.nchan/(double)conf.nchunk) + (double)conf.nchunk/2.0);
+  
   return EXIT_SUCCESS;
 }
 
