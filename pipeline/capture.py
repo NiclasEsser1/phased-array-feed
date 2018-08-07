@@ -21,8 +21,9 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
+# ./capture.py -a ../config/system.conf -b ../config/pipeline.conf -c 0 -d 0 -e 1 -f 1
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts)')
+    parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts) with a docker container')
     
     parser.add_argument('-a', '--system_conf', type=str, nargs='+',
                         help='The configuration of PAF system')
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     
     uid = 50000
     gid = 50000
-    ddir = "/beegfs/"
+    ddir = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
     hdir = "/home/pulsar"
     dvolume = '{:s}:{:s}'.format(ddir, ddir)
     hvolume = '{:s}:{:s}'.format(hdir, hdir)
@@ -72,12 +73,14 @@ if __name__ == "__main__":
         blksz    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
     else:
         blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
-    memsize = blksz * (nblk + 1)
+    memsize = blksz * (nblk + 1)  # + 1 to be safe
 
     instrument = "PAF-BEAM{:02d}PART{:02d}".format(beam, part)
     ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
     address_nchk = " ".join(address_nchks[beam][part])
     
-    com_line = "docker run --ipc=shareable --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia -e DISPLAY --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    #com_line = "docker run --ipc=shareable --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --rm -e DISPLAY --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    
+    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     print com_line
     os.system(com_line)

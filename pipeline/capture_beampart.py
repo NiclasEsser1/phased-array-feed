@@ -29,8 +29,9 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
         exit(1)
         
     # Put the key into a file    
-    kfile_prefix = ConfigSectionMap(pipeline_conf, "CAPTURE")['kfname_prefix']
-    kfname       = "{:s}.beam{:02d}part{:02d}.key".format(kfile_prefix, beam, part)
+    #kfile_prefix = ConfigSectionMap(pipeline_conf, "CAPTURE")['kfname_prefix']
+    #kfname       = "{:s}.beam{:02d}part{:02d}.key".format(kfile_prefix, beam, part)
+    kfname       = "capture.beam{:02d}part{:02d}.key".format(beam, part)
     kfile = open(kfname, "w")
     kfile.writelines("DADA INFO:\n")
     kfile.writelines("key {:s}\n".format(key))
@@ -76,6 +77,7 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     os.system(capture_command)
     
     # Delete PSRDADA buffer
+    time.sleep(10)
     os.system("dada_db -d {:s}".format(key))
 
 if __name__ == "__main__":

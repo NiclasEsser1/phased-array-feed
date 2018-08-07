@@ -36,21 +36,10 @@ pkt_hdrsz   = 64
 pktsz       = 7232
 MJD1970     = 40587.0
 SECDAY      = 86400.0
-#fname       = "/beegfs/DENG/docker/2018-08-05-20:41:53_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-21:15:23_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-21:22:45_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-21:32:53_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-21:39:38_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-21:45:18_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-22:06:34_0000000000000000.000000.dada"
-#fname       = "/beegfs/DENG/docker/2018-08-05-22:19:24_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-05-22:20:46_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-05-22:21:58_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-06-08:50:50_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-06-08:53:05_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-06-09:11:12_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-06-09:11:29_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-06-09:11:23_0000000000000000.000000.dada"
+fname       = "/beegfs/DENG/docker/2018-08-07-12:07:28_0000000000000000.000000.dada"
+fname       = "/beegfs/DENG/docker/2018-08-07-12:10:54_0000000000000000.000000.dada"
+fname       = "/beegfs/DENG/docker/2018-08-07-12:12:23_0000000000000000.000000.dada"
+fname       = "/beegfs/DENG/docker/2018-08-07-12:13:55_0000000000000000.000000.dada"
 
 system_conf = "../config/system.conf"
 
