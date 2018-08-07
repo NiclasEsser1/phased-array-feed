@@ -23,14 +23,14 @@ parser.add_argument('-c', '--command', type=str, nargs='+',
 args    = parser.parse_args()
 beam    = args.beam[0]
 part    = args.part[0]
-address = "/tmp/capture.beam{:02d}.part{:02d}".format(beam, part)
+address = "capture.beam{:02d}part{:02d}.socket".format(beam, part)
 command = args.command[0]
 
 start_buf = 0
 start_byte = 48 * 7232 * 1000
 
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-command_value = "{:s}:{:d}:{:d}".format(command, start_buf, start_byte)
+command_value = "{:s}:PSR J1939+2134:06 05 56.34:+23 23 40.00:{:d}:{:d}".format(command, start_buf, start_byte)  # To be safe, the RA and DEC should be "hh mm ss.ss" and "dd mm ss.ss"
 print command_value
 sock.sendto("{:s}\n".format(command_value), address)
 sock.close()

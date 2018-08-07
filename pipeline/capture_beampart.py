@@ -21,16 +21,16 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-def main(system_conf, pipeline_conf, bind, hdr, beam, part):
+def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part):
     dir_capture = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
-    destination_active, destination_dead, refinfo, key = captureinfo.captureinfo(pipeline_conf, system_conf, address_nchks[beam][part], nchans[beam][part], hdr, )
+    destination_active, destination_dead, refinfo, key = captureinfo.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
     if (len(destination_active) == 0):
         print "There is no active port for beam {:02d}, part {:02d}, have to abort ...".format(beam, part)
         exit(1)
-
+        
     # Put the key into a file    
     kfile_prefix = ConfigSectionMap(pipeline_conf, "CAPTURE")['kfname_prefix']
-    kfname       = "{:s}_beam{:02d}_part{:02d}.key".format(kfile_prefix, beam, part)
+    kfname       = "{:s}.beam{:02d}part{:02d}.key".format(kfile_prefix, beam, part)
     kfile = open(kfname, "w")
     kfile.writelines("DADA INFO:\n")
     kfile.writelines("key {:s}\n".format(key))
@@ -38,7 +38,7 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
     
     # To set up cpu cores if we decide to bind threads
     ncpu_numa = int(ConfigSectionMap(system_conf, "NUMA")['ncpu_numa'])
-    port0     = int(ConfigSectionMap(system_conf, "EthernetImterfaceBMF")['port0'])
+    port0     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['port0'])
     node      = int(destination_active[0].split(":")[0].split(".")[3])
     cpus      = []
     for i in range(len(destination_active)):  # The cpu thing here is not very smart
@@ -66,39 +66,54 @@ def main(system_conf, pipeline_conf, bind, hdr, beam, part):
 
     # Do the real work here
     sec_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
-    nchunk = nchans[beam][part]/nchan_chk;
+    nchunk = nchan/nchan_chk
     if (len(destination_dead) == 0):
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s /tmp/capture.beam{:d}.part{:d} -t {:s} -u PAF-BEAM{:02d}-PART{:02d}".format(key, pktsz, pktoff, " -d ".join(destination_active), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 2)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, beam, part, hdr_fname, beam, part)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_active), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 2)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
     else:
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s /tmp/capture.beam{:d}.part{:d} -t {:s} -u PAF-BEAM{:02d}-PART{:02d}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead[beam][part]), freqs[beam][part], nchans[beam][part], refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 2)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, beam, part, hdr_fname, beam, part)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 2)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
+    
     print capture_command
     os.system(capture_command)
     
     # Delete PSRDADA buffer
     os.system("dada_db -d {:s}".format(key))
-    
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts)')
-    
+    parser = argparse.ArgumentParser(description='To capture data from given beam and given part')    
     parser.add_argument('-a', '--system_conf', type=str, nargs='+',
                         help='The configuration of PAF system')
     parser.add_argument('-b', '--pipeline_conf', type=str, nargs='+',
-                        help='The configuration of pipeline')    
-    parser.add_argument('-c', '--beam', type=int, nargs='+',
-                        help='The beam id from 0')
-    parser.add_argument('-d', '--part', type=int, nargs='+',
-                        help='The part id from 0')
-    parser.add_argument('-e', '--hdr', type=int, nargs='+',
+                        help='The configuration of pipeline')
+    parser.add_argument('-c', '--hdr', type=int, nargs='+',
                         help='Record packet header or not')
-    parser.add_argument('-f', '--bind', type=int, nargs='+',
+    parser.add_argument('-d', '--bind', type=int, nargs='+',
                         help='Bind threads to cpu or not')
+    parser.add_argument('-e', '--nchan', type=int, nargs='+',
+                        help='The number of channels')
+    parser.add_argument('-f', '--freq', type=float, nargs='+',
+                        help='The center frequency in MHz')
+    parser.add_argument('-g', '--address_nchk', type=str, nargs='+',
+                        help='The address for current capture')
+    parser.add_argument('-i', '--ctrl_socket', type=str, nargs='+',
+                        help='The control socket')
+    parser.add_argument('-j', '--instrument', type=str, nargs='+',
+                        help='The control socket')
+    parser.add_argument('-k', '--beam', type=int, nargs='+',
+                        help='The beam id from 0')
+    parser.add_argument('-l', '--part', type=int, nargs='+',
+                        help='The part id from 0')
     
     args          = parser.parse_args()
     system_conf   = args.system_conf[0]
     pipeline_conf = args.pipeline_conf[0]
-    beam          = args.beam[0]
-    part          = args.part[0]
     hdr           = args.hdr[0]
     bind          = args.bind[0]
-    
-    main(system_conf, pipeline_conf, bind, hdr, beam, part)
+    nchan         = args.nchan[0]
+    freq          = args.freq[0]
+    address_nchk  = args.address_nchk
+    ctrl_socket   = args.ctrl_socket[0]
+    instrument    = args.instrument[0]
+    beam          = args.beam[0]
+    part          = args.part[0]
+
+    main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)

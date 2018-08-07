@@ -139,7 +139,7 @@ void *buf_control(void *conf)
 	    }
 	  
 	  //fprintf(stdout, "CBUF0\t%"PRIu64"\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block), ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block));
-	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) == (ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block) - 1)) // If we have a reader, there will be at least one buffer which is not full
+	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) > (ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block) - 2)) // If we have a reader, there will be at least one buffer which is not full
 	    {	     
 	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
 	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
@@ -293,6 +293,7 @@ void *capture_control(void *conf)
   double sec_offset; // Offset from the reference time;
   uint64_t picoseconds_offset; // The sec_offset fraction part in picoseconds
   time_t sec;
+  char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
   
   sec_prd = captureconf->df_res * captureconf->idf_ref;
   sec_ref = floor(sec_prd) + captureconf->sec_ref + SECDAY * captureconf->epoch_ref;
@@ -407,7 +408,16 @@ void *capture_control(void *conf)
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
 	      //fprintf(stdout, "%s\n", command_line);
-	      sscanf(command_line, "%[^:]:%"SCNu64":%"SCNu64"", command, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
+	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64":%"SCNu64"", command, source, ra, dec, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
+	      //fprintf(stdout, "%s\t%s\t%s\n", source, ra, dec);
+	      for(i = 0; i < MSTR_LEN; i++)
+		{
+		  if(ra[i] == ' ')
+		    ra[i] = ':';
+		  if(dec[i] == ' ')
+		    dec[i] = ':';
+		}
+	      //fprintf(stdout, "%s\t%s\t%s\n", source, ra, dec);
 	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
 	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_buf : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
 
@@ -471,6 +481,48 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf, "RA", "%s", ra) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf, "DEC", "%s", dec) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf, "SOURCE", "%s", source) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  
 	      	  pthread_mutex_lock(&quit_mutex);
 	      	  quit = 1;

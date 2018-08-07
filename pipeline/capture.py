@@ -2,7 +2,24 @@
 
 import ConfigParser, parser, argparse, socket, struct, json, os, subprocess, threading, datetime, time
 import numpy as np
-import captureinfo, metadata2streaminfo, capture_beam_part
+import captureinfo, metadata2streaminfo
+
+def ConfigSectionMap(fname, section):
+    # Play with configuration file
+    Config = ConfigParser.ConfigParser()
+    Config.read(fname)
+    
+    dict_conf = {}
+    options = Config.options(section)
+    for option in options:
+        try:
+            dict_conf[option] = Config.get(section, option)
+            if dict_conf[option] == -1:
+                DebugPrint("skip: %s" % option)
+        except:
+            print("exception on %s!" % option)
+            dict_conf[option] = None
+    return dict_conf
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts)')
@@ -28,8 +45,39 @@ if __name__ == "__main__":
     hdr           = args.hdr[0]
     bind          = args.bind[0]
     
-    nodes, address_nchks, freqs, nchans = metadata2streaminfo.metadata2streaminfo(system_conf)
-    instrument = "PAF-BEAM{:02d}PART{:02d}".format(beam, part)
-    ctrl_socket = "/tmp/capture.beam{:02d}.part{:02d}".format(beam, part)
+    uid = 50000
+    gid = 50000
+    ddir = "/beegfs/"
+    hdir = "/home/pulsar"
+    dvolume = '{:s}:{:s}'.format(ddir, ddir)
+    hvolume = '{:s}:{:s}'.format(hdir, hdir)
+
+    dname          = "paf-capture"
+    container_name = "{:s}.beam{:02d}.part{:02d}".format(dname, beam, part)
     
-    capture_beam_part.capture_beam_part(system_conf, pipeline_conf, bind, hdr, nchans[beam][part], freqs[beam][part], address_nchks[beam][part], ctrl_socket, instrument, beam, part)
+    nodes, address_nchks, freqs, nchans = metadata2streaminfo.metadata2streaminfo(system_conf)
+    freq = freqs[beam][part]
+    nchan = nchans[beam][part]
+
+    ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
+    nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
+    nsamp_df     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
+    npol_samp    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
+    ndim_pol     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
+    nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
+    nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
+    df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
+    pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
+    if hdr == 1:
+        blksz    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
+    else:
+        blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
+    memsize = blksz * (nblk + 1)
+
+    instrument = "PAF-BEAM{:02d}PART{:02d}".format(beam, part)
+    ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
+    address_nchk = " ".join(address_nchks[beam][part])
+    
+    com_line = "docker run --ipc=shareable --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia -e DISPLAY --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    print com_line
+    os.system(com_line)
