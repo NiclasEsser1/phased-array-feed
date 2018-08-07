@@ -16,9 +16,9 @@
 void usage ()
 {
   fprintf (stdout,
-	   "paf_process - Pre-process PAF BMF raw data or DADA format file for dspsr \n"
+	   "paf_baseband2baseband - Pre-process PAF BMF raw data or DADA format file for dspsr \n"
 	   "\n"
-	   "Usage: paf_process [options]\n"
+	   "Usage: paf_baseband2baseband [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
 	   " -c  The number of data frame steps of each incoming ring buffer block\n"
@@ -29,8 +29,7 @@ void usage ()
 	   " -h  show help\n"
 	   " -i  The index of GPU\n"
 	   " -j  The name of DADA header template\n"
-	   " -k  The directory for data recording\n"
-	   " -l  The source of data, stream or files\n");
+	   " -k  The directory for data recording\n"	   );
 }
 
 multilog_t *runtime_log;
@@ -54,28 +53,17 @@ int main(int argc, char *argv[])
 	case 'a':	  
 	  if (sscanf (optarg, "%x", &conf.key_in) != 1)
 	    {
-	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
 	  break;
 	  
 	case 'b':
-#ifdef FOLD_MODE
-	  if (sscanf (optarg, "%x", &conf.key_out_fold) != 1)
+	  if (sscanf (optarg, "%x", &conf.key_out) != 1)
 	    {
-	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
-#else
-	  if (sscanf (optarg, "%x", &conf.key_out_search) != 1)
-	    {
-	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-#endif
 	  break;
 	  	  
 	case 'c':
@@ -109,24 +97,20 @@ int main(int argc, char *argv[])
 	case 'k':
 	  sscanf(optarg, "%s", conf.dir);
 	  break;
-	  
-	case 'l':
-	  sscanf(optarg, "%d", &conf.stream);
-	  break;	  
 	}
     }
 
   /* Setup log interface */
-  sprintf(log_fname, "%s/paf_process.log", conf.dir);
+  sprintf(log_fname, "%s/paf_baseband2baseband.log", conf.dir);
   fp_log = fopen(log_fname, "ab+");
   if(fp_log == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
-  runtime_log = multilog_open("paf_process", 1);
+  runtime_log = multilog_open("paf_baseband2baseband", 1);
   multilog_add(runtime_log, fp_log);
-  multilog(runtime_log, LOG_INFO, "START PAF_PROCESS\n");
+  multilog(runtime_log, LOG_INFO, "START PAF_BASEBAND2BASEBAND\n");
 
   /* Here to make sure that if we only expose one GPU into docker container, we can get the right index of it */ 
   int deviceCount;
@@ -134,57 +118,19 @@ int main(int argc, char *argv[])
   if(deviceCount == 1)
     conf.device_id = 0;
 
-#ifdef DEBUG
-  struct timespec start, stop;
-  double elapsed_time;
-  clock_gettime(CLOCK_REALTIME, &start);
-#endif
-  init_process(&conf);
-#ifdef DEBUG
-      clock_gettime(CLOCK_REALTIME, &stop);
-      elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
-      fprintf(stdout, "elapsed time for processing prepare is %f s\n\n\n\n\n", elapsed_time);
-#endif
-  
-  /* Check on-board gpus */
-//#ifdef DEBUG
-//  int deviceCount, device;
-//  struct cudaDeviceProp properties;
-//  CudaSafeCall(cudaGetDeviceCount(&deviceCount));
-//  fprintf(stdout, "Number of devices %d\n", deviceCount);
-//  for(device = 0; device < deviceCount; ++device)
-//    {
-//      cudaGetDeviceProperties(&properties, device);
-//      if (properties.major != 9999) /* 9999 means emulation only */
-//  	{
-//  	  printf("multiProcessorCount %d\n",properties.multiProcessorCount);
-//  	  printf("maxThreadsPerMultiProcessor %d\n",properties.maxThreadsPerMultiProcessor);
-//  	  printf("pciDeviceID %d\n",properties.pciDeviceID);
-//  	  printf("pciBusID %d\n",properties.pciBusID);
-//  	}
-//    }
-//#endif
-  
-  /* Play with data */
-#ifdef DEBUG
-  clock_gettime(CLOCK_REALTIME, &start);
-#endif
-  if(do_process(conf))
+  init_baseband2baseband(&conf);
+
+  if(do_baseband2baseband(conf))
     {
       multilog (runtime_log, LOG_ERR, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  #ifdef DEBUG
-      clock_gettime(CLOCK_REALTIME, &stop);
-      elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
-      fprintf(stdout, "elapsed time for data processing is %f s\n", elapsed_time);
-#endif
 
-  destroy_process(conf);
+  destroy_baseband2baseband(conf);
 
   /* Destory log interface */
-  multilog(runtime_log, LOG_INFO, "FINISH PAF_PROCESS\n\n");
+  multilog(runtime_log, LOG_INFO, "FINISH PAF_BASEBAND2BASEBAND\n\n");
   multilog_close(runtime_log);
   fclose(fp_log);
   
