@@ -19,7 +19,6 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# ./dada_dbdisk.py -a ../config/pipeline.conf -b 0 -c 0 -d /beegfs/DENG/docker
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -30,23 +29,35 @@ if __name__ == "__main__":
                         help='The part id from 0')
     parser.add_argument('-d', '--directory', type=str, nargs='+',
                         help='Directory to put the data')
-    
-    uid = 50000
-    gid = 50000
+    parser.add_argument('-e', '--fname', type=str, nargs='+',
+                        help='The name of DADA file')
+    parser.add_argument('-f', '--byte', type=int, nargs='+',
+                        help='Byte to seek into the file')
     
     args          = parser.parse_args()
     pipeline_conf = args.pipeline_conf[0]
     beam          = args.beam[0]
     part          = args.part[0]
     directory     = args.directory[0]
-    key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
-    dvolume       = '{:s}:{:s}'.format(directory, directory)
+    fname         = args.fname[0]
+    byte          = args.byte[0]
     
-    #capture_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
-    capture_container_name = "paf-diskdb.beam{:02d}part{:02d}".format(beam, part)
-    dbdisk_container_name  = "paf-dbdisk.beam{:02d}part{:02d}".format(beam, part)
-        
-    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base dada_dbdisk -k {:s} -D {:s}".format(capture_container_name, dvolume, uid, gid, dbdisk_container_name, key, directory)
-    print com_line
+    key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
+    nblk          = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nblk'])
+    fname         = '{:s}/{:s}'.format(directory, fname)
+    pktsz         = int(ConfigSectionMap(pipeline_conf, "DISKDB")['pktsz'])
+    ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISKDB")['ndf_chk_rbuf'])
+    nreader       = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nreader'])
+    nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nchk_beam'])
+    blksz         = pktsz * ndf_chk_rbuf * nchk_beam
+
+    kfname       = "diskdb.beam{:02d}part{:02d}.key".format(beam, part)
+    kfile = open(kfname, "w")
+    kfile.writelines("DADA INFO:\n")
+    kfile.writelines("key {:s}\n".format(key))
+    kfile.close()
     
-    os.system(com_line)
+    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
+    print "DADA creat done"
+    os.system("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(key, fname, byte))
+    os.system("dada_db -d {:s}".format(key))

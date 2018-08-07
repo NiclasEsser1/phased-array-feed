@@ -54,7 +54,7 @@ if __name__ == "__main__":
     hvolume = '{:s}:{:s}'.format(hdir, hdir)
 
     dname          = "paf-capture"
-    container_name = "{:s}.beam{:02d}.part{:02d}".format(dname, beam, part)
+    container_name = "{:s}.beam{:02d}part{:02d}".format(dname, beam, part)
     
     nodes, address_nchks, freqs, nchans = metadata2streaminfo.metadata2streaminfo(system_conf)
     freq = freqs[beam][part]
