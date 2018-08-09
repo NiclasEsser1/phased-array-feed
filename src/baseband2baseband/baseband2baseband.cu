@@ -26,13 +26,13 @@ int init_baseband2baseband(conf_t *conf)
   
   /* Prepare buffer, stream and fft plan for process */
   conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
-  conf->nsamp1       = conf->stream_ndf_chk * NCHK_CAPTURE * NCHAN_CHK * NSAMP_DF;
-  conf->npol1        = conf->nsamp1 * NPOL_SAMP;
-  conf->ndata1       = conf->npol1  * NDIM_POL;
-		     
-  conf->nsamp2       = conf->nsamp1 * OSAMP_RATEI / NCHAN_RATEI;
-  conf->npol2        = conf->nsamp2 * NPOL_SAMP;
-  conf->ndata2       = conf->npol2  * NDIM_POL;
+  conf->nsamp1  = conf->stream_ndf_chk * NCHK_CAPTURE * NCHAN_CHK * NSAMP_DF;
+  conf->npol1   = conf->nsamp1 * NPOL_SAMP;
+  conf->ndata1  = conf->npol1  * NDIM_POL;
+		
+  conf->nsamp2  = conf->nsamp1 * OSAMP_RATEI / NCHAN_RATEI;
+  conf->npol2   = conf->nsamp2 * NPOL_SAMP;
+  conf->ndata2  = conf->npol2  * NDIM_POL;
 
   nx1        = CUFFT_NX1;
   batch1     = conf->npol1 / CUFFT_NX1;
@@ -539,6 +539,7 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header 
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", NCHAN) < 0)  
     {

@@ -17,7 +17,6 @@
 #define MCHK_CAPTURE  48
 #define SECDAY        86400.0
 #define MJD1970       40587.0
-#define DADA_TIMESTR  "%Y-%m-%d-%H:%M:%S"
 
 typedef struct conf_t
 { 

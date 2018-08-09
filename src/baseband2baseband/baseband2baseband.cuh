@@ -63,7 +63,7 @@ typedef struct conf_t
   int64_t *dbuf_in;
   int8_t *dbuf_out;
   
-  double rbufin_ndf_chk;
+  uint64_t rbufin_ndf_chk;
   uint64_t bufin_size, bufout_size;
   uint64_t sbufin_size, sbufout_size;
   uint64_t bufrt1_size, bufrt2_size;

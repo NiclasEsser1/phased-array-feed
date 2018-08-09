@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	  break;
 	  	  
 	case 'c':
-	  sscanf(optarg, "%lf", &conf.rbufin_ndf_chk);
+	  sscanf(optarg, "%"SCNu64"", &conf.rbufin_ndf_chk);
 	  break;
 	  
 	case 'd':
