@@ -16,20 +16,17 @@
 void usage ()
 {
   fprintf (stdout,
-	   "paf_baseband2baseband - Pre-process PAF BMF raw data or DADA format file for dspsr \n"
+	   "baseband2baseband_main - Convert BMF baseband data from 16bits to 8bits and remove the oversampling \n"
 	   "\n"
-	   "Usage: paf_baseband2baseband [options]\n"
+	   "Usage: baseband2baseband_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
-	   " -c  The number of data frame steps of each incoming ring buffer block\n"
-	   " -d  How many times we need to repeat the process and finish one incoming block\n"
+	   " -c  The number of data frame (per frequency chunk) of each incoming ring buffer block\n"
+	   " -d  How many times we need to repeat the process and finish each incoming block\n"
 	   " -e  The number of streams \n"
-	   " -f  The number of data stream steps of each stream\n"
-	   " -g  Enable start-of-data or not\n"
-	   " -h  show help\n"
-	   " -i  The index of GPU\n"
-	   " -j  The name of DADA header template\n"
-	   " -k  The directory for data recording\n"	   );
+	   " -f  The number of data frame (per frequency chunk) of each stream\n"
+	   " -g  The directory to put log file\n"	   
+	   " -h  show help\n");
 }
 
 multilog_t *runtime_log;
@@ -42,7 +39,7 @@ int main(int argc, char *argv[])
   char log_fname[MSTR_LEN];
   
   /* Initial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:")) != -1)
     {
       switch(arg)
 	{
@@ -67,7 +64,7 @@ int main(int argc, char *argv[])
 	  break;
 	  	  
 	case 'c':
-	  sscanf(optarg, "%lf", &conf.rbufin_ndf);
+	  sscanf(optarg, "%lf", &conf.rbufin_ndf_chk);
 	  break;
 	  
 	case 'd':
@@ -79,47 +76,29 @@ int main(int argc, char *argv[])
 	  break;
 	  
 	case 'f':
-	  sscanf(optarg, "%d", &conf.stream_ndf);
+	  sscanf(optarg, "%d", &conf.stream_ndf_chk);
 	  break;
-	  	  
+	  	
 	case 'g':
-	  sscanf(optarg, "%d", &conf.sod);
-	  break;
-	  
-	case 'i':
-	  sscanf(optarg, "%d", &conf.device_id);
-	  break;
-
-	case 'j':	  	  
-	  sscanf(optarg, "%s", conf.hfname);
-	  break;
-
-	case 'k':
 	  sscanf(optarg, "%s", conf.dir);
 	  break;
 	}
     }
 
   /* Setup log interface */
-  sprintf(log_fname, "%s/paf_baseband2baseband.log", conf.dir);
+  sprintf(log_fname, "%s/baseband2baseband.log", conf.dir);
   fp_log = fopen(log_fname, "ab+");
   if(fp_log == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
-  runtime_log = multilog_open("paf_baseband2baseband", 1);
+  runtime_log = multilog_open("baseband2baseband", 1);
   multilog_add(runtime_log, fp_log);
-  multilog(runtime_log, LOG_INFO, "START PAF_BASEBAND2BASEBAND\n");
-
-  /* Here to make sure that if we only expose one GPU into docker container, we can get the right index of it */ 
-  int deviceCount;
-  CudaSafeCall(cudaGetDeviceCount(&deviceCount));
-  if(deviceCount == 1)
-    conf.device_id = 0;
+  multilog(runtime_log, LOG_INFO, "START BASEBAND2BASEBAND\n");
 
   init_baseband2baseband(&conf);
-
+  
   if(do_baseband2baseband(conf))
     {
       multilog (runtime_log, LOG_ERR, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -130,7 +109,7 @@ int main(int argc, char *argv[])
   destroy_baseband2baseband(conf);
 
   /* Destory log interface */
-  multilog(runtime_log, LOG_INFO, "FINISH PAF_BASEBAND2BASEBAND\n\n");
+  multilog(runtime_log, LOG_INFO, "FINISH BASEBAND2BASEBAND\n\n");
   multilog_close(runtime_log);
   fclose(fp_log);
   

@@ -16,7 +16,7 @@
 
 #define MSTR_LEN    1024
 
-#define DADA_HDR_SIZE         4096
+#define DADA_HDRSZ         4096
 #define NCHK_CAPTURE          48   // How many frequency chunks we will receive, we should read the number from metadata
 #define NCHAN_CHK             7
 #define NSAMP_DF              128
@@ -42,58 +42,41 @@
 #define NCHAN                 324             // Final number of channels for fold mode
 #define NCHAN_RATEI           (28.0/27.0)     // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK)/NCHAN_KEEP2
 
-#define FOLD_SCALE            ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1))
+#define SCALE            ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1))
 
 #define SCL_INT8              127.0f          // For int8_t, for fold mode
 #define SCL_NSIG              4.0f            // 4 sigma, 99.993666%
 
-/* 
-   The following parameters are for the speedup of transpose_scale_kernel3 and transpose_scale_kernel4;
-   Be careful here as these parameters are sort of fixed. 
-   For example, if we change the NCHAN or CUFFT_NX2, we need to change the parameters here;
-   We may not be able to find a suitable parameter if we do the change;
-   In short, the current setup here only works with selected configuration.
-   The second look into it turns out that the parameters here are more general.
-*/
-
 typedef struct conf_t
 {
-  int device_id;
-  
-  char hfname[MSTR_LEN];
-  int sod;
-  int stream_ndf;
+  int stream_ndf_chk;
   int nstream;
   float sclndim;
 
   int nrun_blk;
   char dir[MSTR_LEN];
   char utc_start[MSTR_LEN];
-  uint64_t picoseconds;
   
   key_t key_out, key_in;
   dada_hdu_t *hdu_out, *hdu_in;
   
-  char *hdrbuf_in, *hdrbuf_out;
   int64_t *dbuf_in;
   int8_t *dbuf_out;
-
-  double freq;
   
-  double rbufin_ndf;
-  size_t bufin_size, bufout_size;
-  size_t sbufin_size, sbufout_size;
-  size_t bufrt1_size, bufrt2_size;
-  size_t sbufrt1_size, sbufrt2_size;
+  double rbufin_ndf_chk;
+  uint64_t bufin_size, bufout_size;
+  uint64_t sbufin_size, sbufout_size;
+  uint64_t bufrt1_size, bufrt2_size;
+  uint64_t sbufrt1_size, sbufrt2_size;
   cufftComplex *buf_rt1, *buf_rt2;
-  size_t hbufin_offset, dbufin_offset;
-  size_t bufrt1_offset, bufrt2_offset;
-  size_t dbufout_offset, hbufout_offset; 
-  size_t nsamp1, npol1, ndata1;
-  size_t nsamp2, npol2, ndata2;
-  //size_t nbufin_rbuf;   // How many input GPU memory buffer can be fitted into the input ring buffer;
+  uint64_t hbufin_offset, dbufin_offset;
+  uint64_t bufrt1_offset, bufrt2_offset;
+  uint64_t dbufout_offset, hbufout_offset; 
+  uint64_t nsamp1, npol1, ndata1;
+  uint64_t nsamp2, npol2, ndata2;
+  //uint64_t nbufin_rbuf;   // How many input GPU memory buffer can be fitted into the input ring buffer;
   
-  size_t hdrsz, rbufin_size, rbufout_size;
+  uint64_t rbufin_size, rbufout_size;
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   

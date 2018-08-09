@@ -238,10 +238,10 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
       //tile[2][y][x] = __float2int_rz(p2.x) >> 14;
       //tile[3][y][x] = __float2int_rz(p2.y) >> 14;
 
-      tile[0][y][x] = __float2int_rz(p1.x) >> FOLD_SCALE;
-      tile[1][y][x] = __float2int_rz(p1.y) >> FOLD_SCALE;
-      tile[2][y][x] = __float2int_rz(p2.x) >> FOLD_SCALE;
-      tile[3][y][x] = __float2int_rz(p2.y) >> FOLD_SCALE;
+      tile[0][y][x] = __float2int_rz(p1.x) >> SCALE;
+      tile[1][y][x] = __float2int_rz(p1.y) >> SCALE;
+      tile[2][y][x] = __float2int_rz(p2.x) >> SCALE;
+      tile[3][y][x] = __float2int_rz(p2.y) >> SCALE;
     }
 
   __syncthreads(); // sync all threads in the same block;
