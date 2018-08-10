@@ -138,24 +138,22 @@ int main(int argc, char **argv)
   ipcbuf_mark_cleared(hdu_in->header_block);
   fprintf(stdout, "HERE\n");
   
-  /* Loop */ 
-  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
-  clock_gettime(CLOCK_REALTIME, &start);
-  hdu_out->data_block->curbuf = hdu_in->data_block->curbuf;
-  clock_gettime(CLOCK_REALTIME, &stop);
-  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "%E seconds used to copy buffer\n", elapsed_time);
-  exit(1);
+  ///* Loop */ 
+  //ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+  //ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
+  //clock_gettime(CLOCK_REALTIME, &start);
+  ////memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz/10);
+  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, pktsz);
+  //clock_gettime(CLOCK_REALTIME, &stop);
+  //elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+  //fprintf(stdout, "%E seconds used to copy buffer\n", elapsed_time);
   
   while(true)
     {
-      ipcio_close_block_write(hdu_out->data_block, curbufsz);  
-      ipcio_close_block_read(hdu_in->data_block, hdu_in->data_block->curbufsz);
-      
-      if(ipcbuf_eod((ipcbuf_t *)hdu_in->data_block) > 0)
+      //if(ipcbuf_eod((ipcbuf_t *)hdu_in->data_block) > 0)
+      if(ipcbuf_get_nfull((ipcbuf_t *)hdu_in->data_block) <2)
 	{
+	  fprintf(stdout, "HERE EOD\n");
 	  ipcbuf_enable_eod((ipcbuf_t *)hdu_out->data_block);
 	  
 	  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
@@ -166,18 +164,20 @@ int main(int argc, char **argv)
     	  
 	  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
 	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-	  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
-	  hdu_out->data_block->curbuf = hdu_in->data_block->curbuf;
+	  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, pktsz);
 	  
 	  ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, write_blkid, 0);
 	}
       else
 	{
 	  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-	  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
-	  hdu_out->data_block->curbuf = hdu_in->data_block->curbuf;
+	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);	  
+	  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, pktsz);
 	}
+      
+      fprintf(stdout, "HERE\n");
+      ipcio_close_block_write(hdu_out->data_block, curbufsz);  
+      ipcio_close_block_read(hdu_in->data_block, hdu_in->data_block->curbufsz);
     }
 
   return EXIT_SUCCESS;

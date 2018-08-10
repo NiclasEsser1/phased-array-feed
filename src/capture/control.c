@@ -424,7 +424,8 @@ void *capture_control(void *conf)
 	      //fprintf(stdout, "%s\t%s\t%s\n", source, ra, dec);
 	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
 	      //start_byte = (start_byte > ipcio_get_start_minimum (db)) ? start_byte : ipcio_get_start_minimum (db); // To make sure the start bytes is valuable
-	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_byte : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
+	      //start_buf = (start_buf > (ipcbuf_get_sod_minbuf(db) + )) ? start_byte : (ipcbuf_get_sod_minbuf(db)); // To make sure the start bytes is valuable, to get the most recent buffer
+	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_byte : ipcbuf_get_write_count(db); // To make sure the start bytes is valuable, to get the most recent buffer
 
 	      /* To get time stamp for current header */
 	      //sec_offset = (int)(start_byte / captureconf->rbufsz) * captureconf->blk_res + round((start_byte % captureconf->rbufsz) / captureconf->buf_dfsz) * captureconf->df_res;
