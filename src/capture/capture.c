@@ -78,7 +78,8 @@ int init_buf(conf_t *conf)
       return EXIT_FAILURE;    
     }
   
-  if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client 
+  if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client
+    //if(dada_hdu_lock_write_spec(conf->hdu, 'w') < 0) // make ourselves the write client, but does not start valid data at the beginning
     {
       multilog(runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -133,15 +134,15 @@ int init_buf(conf_t *conf)
       pthread_mutex_destroy(&quit_mutex);
       pthread_mutex_destroy(&force_next_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
-	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-	  pthread_mutex_destroy(&transit_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-	}
+  	{
+  	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
+  	  pthread_mutex_destroy(&hdr_current_mutex[i]);
+  	  pthread_mutex_destroy(&transit_mutex[i]);
+  	  pthread_mutex_destroy(&ndf_port_mutex[i]);
+  	}
       
       for(i = 0; i < MCHK_CAPTURE; i++)
-	pthread_mutex_destroy(&ndf_chk_mutex[i]);
+  	pthread_mutex_destroy(&ndf_chk_mutex[i]);
   
       dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;
@@ -386,11 +387,13 @@ int init_capture(conf_t *conf)
     
   /* Get the buffer block ready */
   uint64_t block_id = 0;
+  uint64_t write_blkid;
   cbuf = ipcbuf_get_next_write((ipcbuf_t*)conf->hdu->data_block);
+  //cbuf = ipcio_open_block_write(conf->hdu->data_block, &write_blkid);
   if(cbuf == NULL)
     {	     
-      multilog(runtime_log, LOG_ERR, "open_buffer: ipcbuf_get_next_write failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "open_buffer: ipcbuf_get_next_write failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
 

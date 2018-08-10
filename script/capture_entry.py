@@ -78,7 +78,7 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     
     # Delete PSRDADA buffer
     time.sleep(10)
-    os.system("dada_db -d {:s}".format(key))
+    os.system("dada_db -d -k {:s}".format(key))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data from given beam and given part')    

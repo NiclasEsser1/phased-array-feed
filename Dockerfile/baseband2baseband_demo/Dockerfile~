@@ -11,7 +11,7 @@ MAINTAINER Xinping Deng "xinping.deng@gmail.com"
 # User pulsar
 USER pulsar
 ENV HOME /home/pulsar
-WORKDIR $HOME/xinping/phased-array-feed/pipeline
+WORKDIR $HOME/xinping/phased-array-feed/script
 
 # Entry point
-ENTRYPOINT ["./general.py"]
+ENTRYPOINT ["./capture_beampart.py"]

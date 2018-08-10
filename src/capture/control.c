@@ -100,7 +100,7 @@ void *buf_control(void *conf)
   int i, nchunk = captureconf->nchunk, ntransit;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ifreq, idf;
-  uint64_t block_id = 0;
+  uint64_t write_blkid;
   int force_next_status, quit_status;
   
   pthread_mutex_lock(&quit_mutex);
@@ -125,10 +125,11 @@ void *buf_control(void *conf)
 	{
 	  //fprintf(stdout, "CBUF0\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block));
 	  /* Close current buffer */
-	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
+	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0)
+	    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
-	      multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
-	      fprintf(stderr, "close_buffer: ipcbuf_mark_filled failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
+	      fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
@@ -158,6 +159,7 @@ void *buf_control(void *conf)
 	  pthread_mutex_unlock(&quit_mutex);
 	  if(quit_status == 0)
 	    cbuf = ipcbuf_get_next_write((ipcbuf_t*)captureconf->hdu->data_block);
+	  //cbuf = ipcio_open_block_write(captureconf->hdu->data_block, &write_blkid);
 	  else
 	    {	      
 	      pthread_exit(NULL);
@@ -167,8 +169,8 @@ void *buf_control(void *conf)
 	  
 	  if(cbuf == NULL)
 	    {
-	      multilog(runtime_log, LOG_ERR, "open_buffer: ipcbuf_get_next_write failed, has to abort.\n");
-	      fprintf(stderr, "open_buffer: ipcbuf_get_next_write failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
+	      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
 	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
@@ -251,7 +253,8 @@ void *buf_control(void *conf)
     }
   
   /* Exit */
-  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
+  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0)
+    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
     {
       multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
       fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -400,6 +403,7 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
 	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
 	      ipcbuf_enable_eod(db);
+	      //ipcio_stop(db);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
@@ -419,10 +423,13 @@ void *capture_control(void *conf)
 		}
 	      //fprintf(stdout, "%s\t%s\t%s\n", source, ra, dec);
 	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
-	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_buf : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
+	      //start_byte = (start_byte > ipcio_get_start_minimum (db)) ? start_byte : ipcio_get_start_minimum (db); // To make sure the start bytes is valuable
+	      start_buf = (start_buf > ipcbuf_get_sod_minbuf(db)) ? start_byte : ipcbuf_get_sod_minbuf(db); // To make sure the start bytes is valuable
 
 	      /* To get time stamp for current header */
-	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res; // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
+	      //sec_offset = (int)(start_byte / captureconf->rbufsz) * captureconf->blk_res + round((start_byte % captureconf->rbufsz) / captureconf->buf_dfsz) * captureconf->df_res;
+	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res;
+	      // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
 	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
 	      picoseconds = picoseconds_offset + picoseconds_ref;
 	      sec = sec_ref + sec_offset;
@@ -642,7 +649,9 @@ void *capture_control(void *conf)
 	      	}
 	      
 	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
+	      //fprintf(stdout, "%"PRIu64"\n", start_byte);
 	      ipcbuf_enable_sod(db, start_buf, start_byte);
+	      //ipcio_start(db, start_byte);
 	    }
 	}
 

@@ -21,12 +21,12 @@
 #define DADA_HDRSZ   4096
 // It is a demo to check the sod, eod and start time of baseband2baseband
 // It also helps to understand the control of baseband2baseband
-// gcc -o baseband2baseband baseband2baseband.c -L/usr/local/cuda/lib64 -I/usr/local/include -lpsrdada -lcudart
+// gcc -o baseband2baseband_demo baseband2baseband_demo.c -L/usr/local/cuda/lib64 -I/usr/local/include -lpsrdada -lcudart
 
 void usage ()
 {
   fprintf (stdout,
-	   "baseband2baseband - A demo to pass baseband data from a ring buffer to another ring buffer \n"
+	   "baseband2baseband_demo - A demo to pass baseband data from a ring buffer to another ring buffer \n"
 	   "\n"
 	   "Usage: baseband2baseband_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
   char *hdrbuf_in, *hdrbuf_out;
   
   /* Init */
-  while((arg=getopt(argc,argv,"a:b:c:hd:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:hd:e:")) != -1)
     {
       
       switch(arg)
@@ -112,7 +112,8 @@ int main(int argc, char **argv)
   /* Loop */ 
   ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
   ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
+  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
+  hdu_out->data_block->curbuf = hdu_in->data_block->curbuf;
   while(true)
     {
       ipcio_close_block_write(hdu_out->data_block, curbufsz);  
@@ -130,7 +131,8 @@ int main(int argc, char **argv)
     	  
 	  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
 	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-	  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
+	  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
+	  hdu_out->data_block->curbuf = hdu_in->data_block->curbuf;
 	  
 	  ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, write_blkid, 0);
 	}
@@ -138,7 +140,8 @@ int main(int argc, char **argv)
 	{
 	  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
 	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-	  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
+	  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz);
+	  hdu_out->data_block->curbuf = hdu_in->data_block->curbuf;
 	}
     }
 

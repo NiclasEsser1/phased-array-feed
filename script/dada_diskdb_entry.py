@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-
 import os, parser, argparse, ConfigParser
+# ./baseband2baseband_demo_entry.py -a ../config/system.conf -b ../config/pipeline.conf  -c 0 -d 0 -e 1
 
 def ConfigSectionMap(fname, section):
     # Play with configuration file
@@ -19,7 +19,6 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# ./dada_dbdisk.py -a ../config/pipeline.conf -b 0 -c 0 -d /beegfs/DENG/docker
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -35,9 +34,6 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--byte', type=int, nargs='+',
                         help='Byte to seek into the file')
     
-    uid = 50000
-    gid = 50000
-    
     args          = parser.parse_args()
     pipeline_conf = args.pipeline_conf[0]
     beam          = args.beam[0]
@@ -48,7 +44,6 @@ if __name__ == "__main__":
     
     key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
     nblk          = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nblk'])
-    dvolume       = '{:s}:{:s}'.format(directory, directory)
     fname         = '{:s}/{:s}'.format(directory, fname)
     pktsz         = int(ConfigSectionMap(pipeline_conf, "DISKDB")['pktsz'])
     ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISKDB")['ndf_chk_rbuf'])
@@ -62,13 +57,7 @@ if __name__ == "__main__":
     kfile.writelines("key {:s}\n".format(key))
     kfile.close()
     
-    memsize = blksz * (nblk + 1)  # + 1 to be safe
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
-    
-    diskdb_container_name  = "paf-diskdb.beam{:02d}part{:02d}".format(beam, part)
-        
-    #com_line = "docker run --ipc=shareable --rm -it -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/paf-base dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(dvolume, uid, gid,memsize,  diskdb_container_name, key, fname, byte)
+    print "DADA creat done"
     os.system("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(key, fname, byte))
-
-    os.system(com_line)
-    os.system("dada_db -d {:s}".format(key))
+    os.system("dada_db -d -k {:s}".format(key))
