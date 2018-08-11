@@ -39,13 +39,14 @@ void usage ()
 
 int main(int argc, char **argv)
 {
-  int i, arg, pktsz;
+  int i, arg, pktsz, nchunk;
   key_t key_in, key_out;
-  uint64_t ndf_chk, hdrsz;
+  uint64_t ndf_chk, hdrsz, blksz, read_blksz, write_blksz;
   dada_hdu_t *hdu_in, *hdu_out;
   ipcbuf_t *db;
   uint64_t write_blkid, read_blkid, curbufsz;
   char *hdrbuf_in, *hdrbuf_out;
+  char *buf_in, *buf_out;
   struct timespec start, stop;
   double elapsed_time;
   
@@ -80,10 +81,15 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'd':
+	  sscanf(optarg, "%d", &nchunk);
+	  break;
+	  
+	case 'e':
 	  sscanf(optarg, "%d", &pktsz);
 	  break;
 	}
     }
+  blksz = pktsz * nchunk * ndf_chk;
   
   /* attach to input ring buffer */
   hdu_in = dada_hdu_create(NULL);
@@ -124,11 +130,13 @@ int main(int argc, char **argv)
     }
 
   /* To see if these two buffers are the same size */
-  if(!(ipcbuf_get_bufsz((ipcbuf_t *)hdu_in->data_block) == ipcbuf_get_bufsz((ipcbuf_t *)hdu_out->data_block)))
-    {
-      fprintf(stderr, "Input and output buffer size is not match, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
+  read_blksz = ipcbuf_get_bufsz((ipcbuf_t *)hdu_in->data_block);
+  write_blksz = ipcbuf_get_bufsz((ipcbuf_t *)hdu_out->data_block);
+  //if(!(read_blksz == write_blksz) || !(blksz == write_blksz) || !(read_blksz == blksz) )
+  //  {
+  //    fprintf(stderr, "Input and output buffer size is not match, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
 
   /* Pass the header to next ring buffer */
   hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
@@ -136,48 +144,91 @@ int main(int argc, char **argv)
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header 
   ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
   ipcbuf_mark_cleared(hdu_in->header_block);
-  fprintf(stdout, "HERE\n");
-  
-  ///* Loop */ 
-  //ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-  //ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-  //clock_gettime(CLOCK_REALTIME, &start);
-  ////memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, curbufsz/10);
-  //memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, pktsz);
-  //clock_gettime(CLOCK_REALTIME, &stop);
-  //elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  //fprintf(stdout, "%E seconds used to copy buffer\n", elapsed_time);
-  
+
+  //ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, 0, 0);
+  //fprintf(stdout, "HERE ENABLE_EOD\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
+  buf_out = ipcbuf_get_next_write((ipcbuf_t*)hdu_out->data_block);
+  buf_in  = ipcbuf_get_next_read((ipcbuf_t*)hdu_in->data_block, &read_blksz);
+  //fprintf(stdout, "HERE %"PRIu64"\t%"PRIu64"\n", blksz, ipcbuf_get_bufsz((ipcbuf_t *)hdu_in->data_block));
   while(true)
     {
+      memcpy(buf_out, buf_in, pktsz);
+      //fprintf(stdout, "HERE BEFORE CLEAR\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
+      ipcbuf_mark_cleared((ipcbuf_t *)hdu_in->data_block);
+      //fprintf(stdout, "HERE AFTER CLEAR1\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
+      //ipcbuf_mark_filled((ipcbuf_t *)hdu_out->data_block, blksz);
+      ipcbuf_mark_filled((ipcbuf_t *)hdu_out->data_block, pktsz);
+      //fprintf(stdout, "HERE AFTER CLEAR2\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
       //if(ipcbuf_eod((ipcbuf_t *)hdu_in->data_block) > 0)
-      if(ipcbuf_get_nfull((ipcbuf_t *)hdu_in->data_block) <2)
+      //fprintf(stdout, "SOD IPCBUF\t%d\n", (ipcbuf_sod((ipcbuf_t *)hdu_in->data_block)));
+      if(!(ipcbuf_sod((ipcbuf_t *)hdu_in->data_block)))
 	{
-	  fprintf(stdout, "HERE EOD\n");
-	  ipcbuf_enable_eod((ipcbuf_t *)hdu_out->data_block);
+	  fprintf(stdout, "HERE EOD\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
+	  if(ipcbuf_enable_eod((ipcbuf_t *)hdu_out->data_block))
+	    return EXIT_FAILURE;
+	  ipcbuf_disable_sod((ipcbuf_t *)hdu_out->data_block);
 	  
 	  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
 	  hdrbuf_out = ipcbuf_get_next_write(hdu_out->header_block);
-	  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header 
+	  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
+	  
+	  if(hdrbuf_out == NULL)
+	    return EXIT_FAILURE;
+	  if (hdrbuf_in == NULL)
+	    return EXIT_FAILURE;
 	  ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
 	  ipcbuf_mark_cleared(hdu_in->header_block);
-    	  
-	  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);
-	  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, pktsz);
+	  fprintf(stdout, "HERE AFTER HDR\n");
 	  
-	  ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, write_blkid, 0);
+	  //ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, ipcbuf_get_write_count((ipcbuf_t *)hdu_out->data_block), 0);
+	  fprintf(stdout, "HERE AFTER ENABLE_SOD\n");
+
+	  buf_in  = ipcbuf_get_next_read((ipcbuf_t*)hdu_in->data_block, &blksz);
+	  if(buf_out == NULL)
+	    {
+	      fprintf(stdout, "HERE AFTER IN OPEN\n");
+	      return EXIT_FAILURE;
+	    }
+	  //fprintf(stdout, "HERE AFTER IN OPEN\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)hdu_out->data_block));
+	  fprintf(stdout, "HERE AFTER IN OPEN\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\n", ipcbuf_get_nfull((ipcbuf_t*)hdu_out->data_block), ((ipcbuf_t*)hdu_out->data_block)->sync->w_buf, ((ipcbuf_t*)hdu_out->data_block)->sync->nbufs, ((ipcbuf_t*)hdu_out->data_block)->count[(((ipcbuf_t*)hdu_out->data_block)->sync->w_buf)%(((ipcbuf_t*)hdu_out->data_block)->sync->nbufs)]);
+	  //return EXIT_FAILURE;
+	  
+	  buf_out = ipcbuf_get_next_write((ipcbuf_t*)hdu_out->data_block);
+	  if(ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, ipcbuf_get_write_count((ipcbuf_t *)hdu_out->data_block), 0))
+	    {
+	      fprintf(stdout, "HERE SOD INSIDE\n");
+	      return EXIT_FAILURE;
+	    }
+	  
+	  fprintf(stdout, "HERE after get_next_write\n");
+	  //return EXIT_FAILURE;
+	  
+	  if(buf_out == NULL)
+	    {
+	      fprintf(stdout, "HERE AFTER OUT OPEN\n");
+	      return EXIT_FAILURE;
+	    }
+	  fprintf(stdout, "HERE AFTER OUT OPEN\n");
+	  
+	  //if((buf_out == NULL) || (buf_in == NULL))
+	  //  {
+	  //    //fprintf(stdout, "HERE AFTER OUT OPEN\n");
+	  //    return EXIT_FAILURE;
+	  //  }
 	}
       else
 	{
-	  ipcio_open_block_write(hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  ipcio_open_block_read(hdu_in->data_block, &curbufsz, &read_blkid);	  
-	  memcpy(hdu_out->data_block->curbuf, hdu_in->data_block->curbuf, pktsz);
-	}
-      
-      fprintf(stdout, "HERE\n");
-      ipcio_close_block_write(hdu_out->data_block, curbufsz);  
-      ipcio_close_block_read(hdu_in->data_block, hdu_in->data_block->curbufsz);
+	  fprintf(stdout, "HERE BEFORE OPEN\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
+	  buf_out = ipcbuf_get_next_write((ipcbuf_t*)hdu_out->data_block);
+	  buf_in  = ipcbuf_get_next_read((ipcbuf_t*)hdu_in->data_block, &blksz);
+	  if(buf_out == NULL) 
+	    return EXIT_FAILURE;
+	  if(buf_in == NULL)
+	    return EXIT_FAILURE;
+	  
+	  //fprintf(stdout, "HERE AFTER OPEN\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
+	}      
+      //fprintf(stdout, "HERE\n");      
     }
 
   return EXIT_SUCCESS;

@@ -125,6 +125,7 @@ void *buf_control(void *conf)
 	{
 	  //fprintf(stdout, "CBUF0\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block));
 	  /* Close current buffer */
+	  fprintf(stdout, "HERE BEFORE FILLED\t%d\n", ((ipcbuf_t *)(captureconf->hdu->data_block))->state);
 	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0)
 	    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
@@ -138,7 +139,8 @@ void *buf_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
-	  
+	  fprintf(stdout, "HERE AFTER FILLED\t%d\n", ((ipcbuf_t *)(captureconf->hdu->data_block))->state);
+	    
 	  //fprintf(stdout, "CBUF0\t%"PRIu64"\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block), ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block));
 	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) > (ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block) - 2)) // If we have a reader, there will be at least one buffer which is not full
 	    {	     
@@ -403,6 +405,7 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
 	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
 	      ipcbuf_enable_eod(db);
+	      ipcbuf_disable_sod(db);
 	      //ipcio_stop(db);
 	    }
 	  
