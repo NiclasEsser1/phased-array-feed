@@ -89,6 +89,7 @@ int threads(conf_t *conf)
     }
   
   for(i = 0; i < nport_active + 2; i++)   // Join threads and unbind cpus
+    //for(i = 0; i < nport_active + 1; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
 
   return EXIT_SUCCESS;
@@ -97,11 +98,17 @@ int threads(conf_t *conf)
 void *buf_control(void *conf)
 {
   conf_t *captureconf = (conf_t *)conf;
-  int i, nchunk = captureconf->nchunk, ntransit;
+  int i, nchk = captureconf->nchk, ntransit;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ifreq, idf;
   uint64_t write_blkid;
   int force_next_status, quit_status;
+  ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
+  hdr_t hdr;
+  uint64_t ndf_port_expect[MPORT_CAPTURE];
+  uint64_t ndf_port_actual[MPORT_CAPTURE];
+  uint64_t ndf_chk_actual[MCHK_CAPTURE];
+  uint64_t ndf_chk_expect[MCHK_CAPTURE];
   
   pthread_mutex_lock(&quit_mutex);
   quit_status = quit;
@@ -121,12 +128,34 @@ void *buf_control(void *conf)
       pthread_mutex_lock(&force_next_mutex);
       force_next_status = force_next;
       pthread_mutex_unlock(&force_next_mutex);
-      if((ntransit > nchunk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
-	{
-	  //fprintf(stdout, "CBUF0\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block));
+      if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
+	{	  
+	  for(i = 0; i < captureconf->nport_active; i++)
+	    {
+	      pthread_mutex_lock(&hdr_current_mutex[i]);
+	      hdr = hdr_current[i];
+	      pthread_mutex_unlock(&hdr_current_mutex[i]);
+	      
+	      ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      pthread_mutex_lock(&ndf_port_mutex[i]);
+	      ndf_port_actual[i] = ndf_port[i];
+	      pthread_mutex_unlock(&ndf_port_mutex[i]);
+	      
+	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      pthread_mutex_lock(&ndf_chk_mutex[i + 20]);
+	      ndf_chk_actual[i] = ndf_chk[i + 20];
+	      pthread_mutex_unlock(&ndf_chk_mutex[i + 20]);
+	      
+	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr_ref[i].sec, hdr_ref[i].idf);
+	    }
+	  fprintf(stdout, "\n");
+	  	  
+	  //fprintf(stdout, "IPCBUF_SOD, BUF_CONTROL:\t%d\n", ipcbuf_sod(db));
+	  
 	  /* Close current buffer */
-	  fprintf(stdout, "HERE BEFORE FILLED\t%d\n", ((ipcbuf_t *)(captureconf->hdu->data_block))->state);
-	  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0)
+	  //fprintf(stdout, "HERE BEFORE FILLED\t%d\n", db->state);
+	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
 	    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
 	      multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
@@ -139,10 +168,10 @@ void *buf_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
-	  fprintf(stdout, "HERE AFTER FILLED\t%d\n", ((ipcbuf_t *)(captureconf->hdu->data_block))->state);
+	  //fprintf(stdout, "HERE AFTER FILLED\t%d\n", db->state);
 	    
 	  //fprintf(stdout, "CBUF0\t%"PRIu64"\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block), ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block));
-	  if(ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block) > (ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block) - 2)) // If we have a reader, there will be at least one buffer which is not full
+	  if(ipcbuf_get_nfull(db) > (ipcbuf_get_nbufs(db) - 2)) // If we have a reader, there will be at least one buffer which is not full
 	    {	     
 	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
 	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
@@ -160,7 +189,7 @@ void *buf_control(void *conf)
 	  quit_status = quit;
 	  pthread_mutex_unlock(&quit_mutex);
 	  if(quit_status == 0)
-	    cbuf = ipcbuf_get_next_write((ipcbuf_t*)captureconf->hdu->data_block);
+	    cbuf = ipcbuf_get_next_write(db);
 	  //cbuf = ipcio_open_block_write(captureconf->hdu->data_block, &write_blkid);
 	  else
 	    {	      
@@ -231,8 +260,8 @@ void *buf_control(void *conf)
 	      tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
 	      if(tbuf[tbuf_loc] == 'Y')
 		{		  
-		  //idf = (int)(i / nchunk);
-		  //ifreq = i - idf * nchunk;
+		  //idf = (int)(i / nchk);
+		  //ifreq = i - idf * nchk;
 		  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
 		  //cbuf_loc = (uint64_t)(ifreq * captureconf-> captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
 
@@ -255,7 +284,7 @@ void *buf_control(void *conf)
     }
   
   /* Exit */
-  if(ipcbuf_mark_filled((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0)
+  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
     //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
     {
       multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
@@ -281,7 +310,7 @@ void *capture_control(void *conf)
   char command_line[MSTR_LEN], command[MSTR_LEN];
   int quit_status;
   uint64_t start_byte, start_buf;
-  ipcbuf_t *db = NULL;
+  ipcbuf_t *db = (ipcbuf_t *)captureconf->hdu->data_block;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
   uint64_t ndf_port_actual[MPORT_CAPTURE];
   uint64_t ndf_chk_actual[MCHK_CAPTURE];
@@ -344,7 +373,7 @@ void *capture_control(void *conf)
     {
       if(recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
-	  db = (ipcbuf_t *)captureconf->hdu->data_block;
+	  //db = (ipcbuf_t *)captureconf->hdu->data_block;
 	  if(strstr(command_line, "END-OF-CAPTURE") != NULL)
 	    {	      
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
@@ -356,15 +385,15 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  pthread_mutex_lock(&ndf_chk_mutex[i]);
-		  ndf_chk_actual[i] = ndf_chk[i];
-		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
+		  pthread_mutex_lock(&ndf_chk_mutex[i + 20]);
+		  ndf_chk_actual[i] = ndf_chk[i + 20];
+		  pthread_mutex_unlock(&ndf_chk_mutex[i + 20]);
 		  
 		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
@@ -386,17 +415,18 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchunk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  pthread_mutex_lock(&ndf_chk_mutex[i]);
-		  ndf_chk_actual[i] = ndf_chk[i];
-		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
+		  pthread_mutex_lock(&ndf_chk_mutex[i + 20]);
+		  ndf_chk_actual[i] = ndf_chk[i + 20];
+		  pthread_mutex_unlock(&ndf_chk_mutex[i + 20]);
 		  
 		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+		  //fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\n", ndf_port[i], ndf_chk[i + 20]);
 		}
 	      fprintf(stdout, "\n");
 	    }	  
@@ -404,34 +434,26 @@ void *capture_control(void *conf)
 	    {
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
 	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
+
 	      ipcbuf_enable_eod(db);
+	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	      ipcbuf_disable_sod(db);
-	      //ipcio_stop(db);
+	      fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db));
+	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
 	    {
+	      fprintf(stdout, "IPCBUF_SOD, START-OF-DATA:\t%d\n", ipcbuf_sod(db));
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
-	      //fprintf(stdout, "%s\n", command_line);
 	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64":%"SCNu64"", command, source, ra, dec, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
-	      //fprintf(stdout, "%s\t%s\t%s\n", source, ra, dec);
-	      for(i = 0; i < MSTR_LEN; i++)
-		{
-		  if(ra[i] == ' ')
-		    ra[i] = ':';
-		  if(dec[i] == ' ')
-		    dec[i] = ':';
-		}
-	      //fprintf(stdout, "%s\t%s\t%s\n", source, ra, dec);
-	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
-	      //start_byte = (start_byte > ipcio_get_start_minimum (db)) ? start_byte : ipcio_get_start_minimum (db); // To make sure the start bytes is valuable
-	      //start_buf = (start_buf > (ipcbuf_get_sod_minbuf(db) + )) ? start_byte : (ipcbuf_get_sod_minbuf(db)); // To make sure the start bytes is valuable, to get the most recent buffer
 	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_byte : ipcbuf_get_write_count(db); // To make sure the start bytes is valuable, to get the most recent buffer
 
+	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
+
 	      /* To get time stamp for current header */
-	      //sec_offset = (int)(start_byte / captureconf->rbufsz) * captureconf->blk_res + round((start_byte % captureconf->rbufsz) / captureconf->buf_dfsz) * captureconf->df_res;
 	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res;
 	      // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
 	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
@@ -444,6 +466,13 @@ void *capture_control(void *conf)
 	      	}
 	      strftime (utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&sec)); // String start time without fraction second 
 	      mjd_start = sec / SECDAY + MJD1970;                         // Float MJD start time without fraction second
+	      for(i = 0; i < MSTR_LEN; i++)
+		{
+		  if(ra[i] == ' ')
+		    ra[i] = ':';
+		  if(dec[i] == ' ')
+		    dec[i] = ':';
+		}
 	      
 	      /* Register header */
 	      hdrbuf = ipcbuf_get_next_write(captureconf->hdu->header_block);
@@ -651,11 +680,7 @@ void *capture_control(void *conf)
 	      	  pthread_exit(NULL);
 	      	  return NULL;
 	      	}
-	      
-	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
-	      //fprintf(stdout, "%"PRIu64"\n", start_byte);
 	      ipcbuf_enable_sod(db, start_buf, start_byte);
-	      //ipcio_start(db, start_byte);
 	    }
 	}
 

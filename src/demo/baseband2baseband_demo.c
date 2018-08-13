@@ -23,6 +23,7 @@
 // It also helps to understand the control of baseband2baseband
 // gcc -o baseband2baseband_demo baseband2baseband_demo.c -L/usr/local/cuda/lib64 -I/usr/local/include -lpsrdada -lcudart
 
+#define MSTR_LEN   1024
 void usage ()
 {
   fprintf (stdout,
@@ -43,12 +44,13 @@ int main(int argc, char **argv)
   key_t key_in, key_out;
   uint64_t ndf_chk, hdrsz, blksz, read_blksz, write_blksz;
   dada_hdu_t *hdu_in, *hdu_out;
-  ipcbuf_t *db;
+  ipcbuf_t *db_in, *db_out;
   uint64_t write_blkid, read_blkid, curbufsz;
   char *hdrbuf_in, *hdrbuf_out;
   char *buf_in, *buf_out;
   struct timespec start, stop;
   double elapsed_time;
+  multilog_t *runtime_log;
   
   /* Init */
   while((arg=getopt(argc,argv,"a:b:c:hd:e:")) != -1)
@@ -89,10 +91,22 @@ int main(int argc, char **argv)
 	  break;
 	}
     }
-  blksz = pktsz * nchunk * ndf_chk;
   
+  char fname_log[MSTR_LEN];
+  FILE *fp_log = NULL;
+  sprintf(fname_log, "/beegfs/DENG/docker/baseband2baseband_demo.log");
+  fp_log = fopen(fname_log, "ab+"); 
+  if(fp_log == NULL)
+    {
+      fprintf(stderr, "Can not open log file %s\n", fname_log);
+      return EXIT_FAILURE;
+    }
+  runtime_log = multilog_open("baseband2baseband_demo", 1);
+  multilog_add(runtime_log, fp_log);
+  multilog(runtime_log, LOG_INFO, "BASEBAND2BASEBAND_DEMO START\n");
+    
   /* attach to input ring buffer */
-  hdu_in = dada_hdu_create(NULL);
+  hdu_in = dada_hdu_create(runtime_log);
   if(hdu_in == NULL)
     {
       fprintf(stdout, "HERE DADA_HDU_CREATE\n");
@@ -111,7 +125,7 @@ int main(int argc, char **argv)
     }
   
   /* Prepare output ring buffer */
-  hdu_out = dada_hdu_create(NULL);
+  hdu_out = dada_hdu_create(runtime_log);
   if(hdu_out == NULL)    
     {
       fprintf(stdout, "HERE DADA_HDU_CREATE\n");
@@ -130,13 +144,10 @@ int main(int argc, char **argv)
     }
 
   /* To see if these two buffers are the same size */
-  read_blksz = ipcbuf_get_bufsz((ipcbuf_t *)hdu_in->data_block);
-  write_blksz = ipcbuf_get_bufsz((ipcbuf_t *)hdu_out->data_block);
-  //if(!(read_blksz == write_blksz) || !(blksz == write_blksz) || !(read_blksz == blksz) )
-  //  {
-  //    fprintf(stderr, "Input and output buffer size is not match, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
+  db_in  = (ipcbuf_t *)hdu_in->data_block;
+  db_out = (ipcbuf_t *)hdu_out->data_block;
+  fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
+  fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
 
   /* Pass the header to next ring buffer */
   hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
@@ -145,91 +156,73 @@ int main(int argc, char **argv)
   ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
   ipcbuf_mark_cleared(hdu_in->header_block);
 
-  //ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, 0, 0);
-  //fprintf(stdout, "HERE ENABLE_EOD\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-  buf_out = ipcbuf_get_next_write((ipcbuf_t*)hdu_out->data_block);
-  buf_in  = ipcbuf_get_next_read((ipcbuf_t*)hdu_in->data_block, &read_blksz);
-  //fprintf(stdout, "HERE %"PRIu64"\t%"PRIu64"\n", blksz, ipcbuf_get_bufsz((ipcbuf_t *)hdu_in->data_block));
+  buf_out = ipcbuf_get_next_write(db_out);
+  read_blksz = 0;
+  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz);
   while(true)
     {
       memcpy(buf_out, buf_in, pktsz);
-      //fprintf(stdout, "HERE BEFORE CLEAR\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-      ipcbuf_mark_cleared((ipcbuf_t *)hdu_in->data_block);
-      //fprintf(stdout, "HERE AFTER CLEAR1\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-      //ipcbuf_mark_filled((ipcbuf_t *)hdu_out->data_block, blksz);
-      ipcbuf_mark_filled((ipcbuf_t *)hdu_out->data_block, pktsz);
-      //fprintf(stdout, "HERE AFTER CLEAR2\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-      //if(ipcbuf_eod((ipcbuf_t *)hdu_in->data_block) > 0)
-      //fprintf(stdout, "SOD IPCBUF\t%d\n", (ipcbuf_sod((ipcbuf_t *)hdu_in->data_block)));
-      if(!(ipcbuf_sod((ipcbuf_t *)hdu_in->data_block)))
+      ipcbuf_mark_cleared(db_in);
+      ipcbuf_mark_filled(db_out, pktsz);
+      fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
+      fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
+      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db_in->state);
+      
+      if(!ipcbuf_sod(db_in))
 	{
-	  fprintf(stdout, "HERE EOD\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-	  if(ipcbuf_enable_eod((ipcbuf_t *)hdu_out->data_block))
-	    return EXIT_FAILURE;
-	  ipcbuf_disable_sod((ipcbuf_t *)hdu_out->data_block);
+	  fprintf(stdout, "HERE EOD\t%d\n\n", (db_out->state));
+	  if(ipcbuf_enable_eod(db_out))
+	    break;
+	  ipcbuf_disable_sod(db_out);
 	  
 	  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
 	  hdrbuf_out = ipcbuf_get_next_write(hdu_out->header_block);
 	  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
 	  
-	  if(hdrbuf_out == NULL)
-	    return EXIT_FAILURE;
-	  if (hdrbuf_in == NULL)
-	    return EXIT_FAILURE;
+	  if(hdrbuf_out == NULL || hdrbuf_in == NULL)
+	    break;
 	  ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
 	  ipcbuf_mark_cleared(hdu_in->header_block);
-	  fprintf(stdout, "HERE AFTER HDR\n");
 	  
-	  //ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, ipcbuf_get_write_count((ipcbuf_t *)hdu_out->data_block), 0);
-	  fprintf(stdout, "HERE AFTER ENABLE_SOD\n");
-
-	  buf_in  = ipcbuf_get_next_read((ipcbuf_t*)hdu_in->data_block, &blksz);
-	  if(buf_out == NULL)
-	    {
-	      fprintf(stdout, "HERE AFTER IN OPEN\n");
-	      return EXIT_FAILURE;
-	    }
-	  //fprintf(stdout, "HERE AFTER IN OPEN\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)hdu_out->data_block));
-	  fprintf(stdout, "HERE AFTER IN OPEN\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\n", ipcbuf_get_nfull((ipcbuf_t*)hdu_out->data_block), ((ipcbuf_t*)hdu_out->data_block)->sync->w_buf, ((ipcbuf_t*)hdu_out->data_block)->sync->nbufs, ((ipcbuf_t*)hdu_out->data_block)->count[(((ipcbuf_t*)hdu_out->data_block)->sync->w_buf)%(((ipcbuf_t*)hdu_out->data_block)->sync->nbufs)]);
-	  //return EXIT_FAILURE;
-	  
-	  buf_out = ipcbuf_get_next_write((ipcbuf_t*)hdu_out->data_block);
-	  if(ipcbuf_enable_sod((ipcbuf_t *)hdu_out->data_block, ipcbuf_get_write_count((ipcbuf_t *)hdu_out->data_block), 0))
+	  read_blksz = 0;
+	  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz); // Why here is NULL?
+	  buf_out = ipcbuf_get_next_write(db_out);
+	  if(ipcbuf_enable_sod(db_out, ipcbuf_get_write_count(db_out), 0))
 	    {
 	      fprintf(stdout, "HERE SOD INSIDE\n");
-	      return EXIT_FAILURE;
+	      break;
 	    }
 	  
-	  fprintf(stdout, "HERE after get_next_write\n");
-	  //return EXIT_FAILURE;
-	  
-	  if(buf_out == NULL)
+	  if(buf_out == NULL || buf_in == NULL)
 	    {
 	      fprintf(stdout, "HERE AFTER OUT OPEN\n");
-	      return EXIT_FAILURE;
+	      break;
 	    }
 	  fprintf(stdout, "HERE AFTER OUT OPEN\n");
-	  
-	  //if((buf_out == NULL) || (buf_in == NULL))
-	  //  {
-	  //    //fprintf(stdout, "HERE AFTER OUT OPEN\n");
-	  //    return EXIT_FAILURE;
-	  //  }
 	}
       else
 	{
-	  fprintf(stdout, "HERE BEFORE OPEN\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-	  buf_out = ipcbuf_get_next_write((ipcbuf_t*)hdu_out->data_block);
-	  buf_in  = ipcbuf_get_next_read((ipcbuf_t*)hdu_in->data_block, &blksz);
-	  if(buf_out == NULL) 
-	    return EXIT_FAILURE;
-	  if(buf_in == NULL)
-	    return EXIT_FAILURE;
-	  
-	  //fprintf(stdout, "HERE AFTER OPEN\t%d\n", ((ipcbuf_t *)(hdu_out->data_block))->state);
-	}      
-      //fprintf(stdout, "HERE\n");      
-    }
+	  fprintf(stdout, "HERE BEFORE OPEN\t%d\n", (db_out->state));
+	  buf_out = ipcbuf_get_next_write(db_out);
 
+	  read_blksz = 0;
+	  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz);
+	  
+	  if(buf_out == NULL || buf_in == NULL)
+	    break;
+	}      
+    }
+  
+  dada_hdu_unlock_write(hdu_out);    
+  dada_hdu_disconnect(hdu_out);
+  dada_hdu_destroy(hdu_out);
+  
+  dada_hdu_unlock_read(hdu_in);
+  dada_hdu_disconnect(hdu_in);
+  dada_hdu_destroy(hdu_in);
+
+  fclose(fp_log);
+  multilog(runtime_log, LOG_INFO, "BASEBAND2BASEBAND_DEMO END\n");
+  
   return EXIT_SUCCESS;
 }

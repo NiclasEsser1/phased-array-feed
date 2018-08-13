@@ -33,23 +33,24 @@ typedef struct conf_t
   char ip_active[MPORT_CAPTURE][MSTR_LEN];
   int port_active[MPORT_CAPTURE];
   int nport_active;
-  int nchunk_active_expect[MPORT_CAPTURE];  
-  int nchunk_active_actual[MPORT_CAPTURE];  
+  int nchk_active_expect[MPORT_CAPTURE];  
+  int nchk_active_actual[MPORT_CAPTURE];  
 
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
   int nport_dead;
-  int nchunk_dead[MPORT_CAPTURE];
+  int nchk_dead[MPORT_CAPTURE];
 
   char instrument[MSTR_LEN];
   double center_freq;
   int nchan;
+  int nchan_chk;
 
   char hfname[MSTR_LEN];
   uint64_t sec_ref, idf_ref; // Reference seconds and idf, from BMF when we start the capture 
   double epoch_ref;
 
-  int nchunk;    // Frequency chunks of current capture, including all alive chunks and dead chunks
+  int nchk;    // Frequency chunks of current capture, including all alive chunks and dead chunks
   int sec_prd;
   char ctrl_addr[MSTR_LEN];
   char dir[MSTR_LEN];
@@ -75,8 +76,10 @@ typedef struct hdr_t
 
 int init_capture(conf_t *conf);
 void *capture(void *conf);
-int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf);
-int acquire_ichk(hdr_t hdr, conf_t conf, int *ifreq);
+//int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf);
+//int acquire_ichk(hdr_t hdr, conf_t conf, int *ifreq);
+int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, int sec_prd, uint64_t ndf_chk_prd, int64_t *idf_buf);
+int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *ichk);
 int init_buf(conf_t *conf);
 int destroy_capture(conf_t conf);
 

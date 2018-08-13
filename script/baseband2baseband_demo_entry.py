@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
     # Create PSRDADA buffer
     blksz = pktsz
-    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
+    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
 
     baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d} -d {:d} -e {:d}".format(key_capture, key_b2b, ndf_chk_rbuf_b2b, nchunk, pktsz)
     print baseband2baseband_demo_command

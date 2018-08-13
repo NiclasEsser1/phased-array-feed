@@ -8,6 +8,8 @@
 #include "capture.h"
 
 multilog_t *runtime_log;
+extern uint64_t ndf_port[MPORT_CAPTURE];
+extern uint64_t ndf_chk[MCHK_CAPTURE];
 
 void usage()
 {
@@ -77,12 +79,12 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'd':
-	  sscanf(optarg, "%[^:]:%d:%d:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchunk_active_expect[conf.nport_active], &conf.nchunk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
+	  sscanf(optarg, "%[^:]:%d:%d:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchk_active_expect[conf.nport_active], &conf.nchk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
 	  conf.nport_active++;
 	  break;
 	  
 	case 'e':
-	  sscanf(optarg, "%[^:]:%d:%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchunk_dead[conf.nport_dead]);
+	  sscanf(optarg, "%[^:]:%d:%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchk_dead[conf.nport_dead]);
 	  conf.nport_dead++;
 	  break;
 	  
@@ -119,7 +121,7 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'o':
-	  sscanf(optarg, "%d", &conf.nchunk);
+	  sscanf(optarg, "%d", &conf.nchk);
 	  break;
 	  
 	case 'p':
@@ -205,5 +207,9 @@ int main(int argc, char **argv)
   multilog_close(runtime_log);
   fclose(fp_log);
 
+  //for(i = 0; i < 6; i++)
+  //  fprintf(stdout, "%"PRIu64"\t", ndf_port[i]);
+  //fprintf(stdout, "\n");
+  
   return EXIT_SUCCESS;
 }

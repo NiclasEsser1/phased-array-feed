@@ -16,6 +16,9 @@
 #include "capture.h"
 #include "multilog.h"
 
+#define CHK_BW 7
+#define NCHK_NIC 48
+
 extern multilog_t *runtime_log;
 
 char *cbuf = NULL;
@@ -52,7 +55,9 @@ int init_buf(conf_t *conf)
 
   /* Create HDU and check the size of buffer bolck */
   conf->required_pktsz = conf->pktsz - conf->pktoff;
-  conf->rbufsz = conf->nchunk * conf->required_pktsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
+  //fprintf(stdout, "%d\t%d\t%d\n", conf->pktsz, conf->pktoff, conf->required_pktsz);
+  
+  conf->rbufsz = conf->nchk * conf->required_pktsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
   conf->hdu = dada_hdu_create(runtime_log);
   dada_hdu_set_key(conf->hdu, conf->key);
   if(dada_hdu_connect(conf->hdu) < 0)
@@ -147,7 +152,7 @@ int init_buf(conf_t *conf)
       dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;
     }
-  conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchunk;
+  conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
   tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
   
   return EXIT_SUCCESS;
@@ -165,6 +170,8 @@ void *capture(void *conf)
   uint64_t tbuf_loc, cbuf_loc;
   hdr_t hdr;
   int quit_status;
+  double elapsed_time;
+  struct timespec start, stop;
   
   pktsz          = captureconf->pktsz;
   pktoff         = captureconf->pktoff;
@@ -204,7 +211,8 @@ void *capture(void *conf)
   pthread_mutex_unlock(&quit_mutex);
   
   while(quit_status == 0)
-    {      
+    //while(quit == 0)
+    {
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
 	{
 	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -221,32 +229,44 @@ void *capture(void *conf)
 	  return NULL;
 	}      
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-            
+
       pthread_mutex_lock(&hdr_current_mutex[ithread]);
       hdr_current[ithread] = hdr;
       pthread_mutex_unlock(&hdr_current_mutex[ithread]);
-      
+
+      clock_gettime(CLOCK_REALTIME, &start);
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
+      //acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
+      acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->sec_prd, captureconf->ndf_chk_prd, &idf);
+	
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-
-      if(acquire_ichk(hdr, *captureconf, &ichk))
-	{	  
-	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	  fprintf(stderr, "Frequency chunk index < 0, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-	  /* Force to quit if we have time out */
-	  pthread_mutex_lock(&quit_mutex);
-	  quit = 1;
-	  pthread_mutex_unlock(&quit_mutex);
-
-	  free(df);
-	  conf = (void *)captureconf;
-	  pthread_exit(NULL);
-	  return NULL;
-	}
+      clock_gettime(CLOCK_REALTIME, &stop);
+      elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+      //fprintf(stdout, "%e seconds used for memcpy\n", elapsed_time);
+      
+      //if(acquire_ichk(hdr, *captureconf, &ichk))
+      if(acquire_ichk(hdr.freq, captureconf->center_freq, captureconf->nchan_chk, captureconf->nchk, &ichk))
+      	{	  
+      	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
+      	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
+      
+      	  /* Force to quit if we have time out */
+      	  pthread_mutex_lock(&quit_mutex);
+      	  quit = 1;
+      	  pthread_mutex_unlock(&quit_mutex);
+      
+      	  free(df);
+      	  conf = (void *)captureconf;
+      	  pthread_exit(NULL);
+      	  return NULL;
+      	}
+      //acquire_ichk(hdr, *captureconf, &ichk);
+      
+      //ichk = 0;
             
-      if(!(idf < 0))
+      if(idf < 0)
+	continue;
+      else
       	{
 	  // Drop data frams which are behind time;
 	  if(idf >= captureconf->rbuf_ndf_chk)
@@ -310,7 +330,7 @@ void *capture(void *conf)
 		}
 	      else  // Put data in to temp buffer
 		{
-		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchunk + ichk); // This is in TFTFP order
+		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchk + ichk); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
 		  
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
@@ -322,9 +342,9 @@ void *capture(void *conf)
 		  ndf_port[ithread]++;
 		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 
-		  pthread_mutex_lock(&ndf_chk_mutex[ithread]);
+		  pthread_mutex_lock(&ndf_chk_mutex[ichk]);
 		  ndf_chk[ichk]++;
-		  pthread_mutex_unlock(&ndf_chk_mutex[ithread]);
+		  pthread_mutex_unlock(&ndf_chk_mutex[ichk]);
 		}
 	    }
 	  else
@@ -334,17 +354,17 @@ void *capture(void *conf)
 	      pthread_mutex_unlock(&transit_mutex[ithread]);
 	      
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
-	      cbuf_loc = (uint64_t)((idf * captureconf->nchunk + ichk) * required_pktsz); // This is in TFTFP order
+	      cbuf_loc = (uint64_t)((idf * captureconf->nchk + ichk) * required_pktsz); // This is in TFTFP order
 	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
-
+	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
 	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 	      
-	      pthread_mutex_lock(&ndf_chk_mutex[ithread]);
+	      pthread_mutex_lock(&ndf_chk_mutex[ichk]);
 	      ndf_chk[ichk]++;
-	      pthread_mutex_unlock(&ndf_chk_mutex[ithread]);
+	      pthread_mutex_unlock(&ndf_chk_mutex[ichk]);
 	    }
 	}
       
@@ -369,7 +389,7 @@ int init_capture(conf_t *conf)
   init_buf(conf);  // Initi ring buffer
 
   ithread_extern = 0;
-  for(i = 0; i < conf->nchunk; i++) // Setup the counter for each frequency
+  for(i = 0; i < conf->nchk; i++) // Setup the counter for each frequency
     ndf_chk[i] = 0;
   
   /* Init status */
@@ -399,24 +419,30 @@ int init_capture(conf_t *conf)
 
   conf->df_res   = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
   conf->blk_res  = conf->df_res * (double)conf->rbuf_ndf_chk;
-  conf->buf_dfsz = conf->required_pktsz * (double)conf->nchunk;
+  conf->buf_dfsz = conf->required_pktsz * (double)conf->nchk;
+
+  conf->nchan_chk = conf->nchan/conf->nchk;
+  //fprintf(stdout, "%d\n", conf->nchan_chk);
+  //exit(1);
   
   return EXIT_SUCCESS;
 }
 
-int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
-{  
-  *ichk = (int)((hdr.freq - conf.center_freq + 0.5)/((double)conf.nchan/(double)conf.nchunk) + (double)conf.nchunk/2.0);
+//int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
+int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *ichk)
+{
+  *ichk = (int)((freq - center_freq + 0.5)/nchan_chk + nchk/2);
 
-  if (*ichk < 0)
+  if ((*ichk < 0) || (*ichk >= MCHK_CAPTURE))
     return EXIT_FAILURE;
   
   return EXIT_SUCCESS;
 }
 
-int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf)
+//int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf)
+int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, int sec_prd, uint64_t ndf_chk_prd, int64_t *idf_buf)
 {
-  *idf = (int64_t)hdr.idf + (int64_t)(hdr.sec - hdr_ref.sec) / conf.sec_prd * conf.ndf_chk_prd - (int64_t)hdr_ref.idf;
+  *idf_buf = (int64_t)(idf - idf_ref) + (int64_t)(sec - sec_ref) / sec_prd * ndf_chk_prd;
   return EXIT_SUCCESS;
 }
 

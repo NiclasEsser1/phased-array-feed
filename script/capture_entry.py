@@ -77,7 +77,7 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     os.system(capture_command)
     
     # Delete PSRDADA buffer
-    time.sleep(10)
+    #time.sleep(10)
     os.system("dada_db -d -k {:s}".format(key))
 
 if __name__ == "__main__":
