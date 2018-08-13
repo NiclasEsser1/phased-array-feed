@@ -142,19 +142,15 @@ void *buf_control(void *conf)
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 	      
 	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-	      pthread_mutex_lock(&ndf_chk_mutex[i + 20]);
-	      ndf_chk_actual[i] = ndf_chk[i + 20];
-	      pthread_mutex_unlock(&ndf_chk_mutex[i + 20]);
+	      //pthread_mutex_lock(&ndf_chk_mutex[i]);
+	      //ndf_chk_actual[i] = ndf_chk[i];
+	      //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 	      
-	      fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
-	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr_ref[i].sec, hdr_ref[i].idf);
+	      fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 	    }
 	  fprintf(stdout, "\n");
 	  	  
-	  //fprintf(stdout, "IPCBUF_SOD, BUF_CONTROL:\t%d\n", ipcbuf_sod(db));
-	  
 	  /* Close current buffer */
-	  //fprintf(stdout, "HERE BEFORE FILLED\t%d\n", db->state);
 	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
 	    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
@@ -168,9 +164,6 @@ void *buf_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
-	  //fprintf(stdout, "HERE AFTER FILLED\t%d\n", db->state);
-	    
-	  //fprintf(stdout, "CBUF0\t%"PRIu64"\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block), ipcbuf_get_nbufs((ipcbuf_t*)captureconf->hdu->data_block));
 	  if(ipcbuf_get_nfull(db) > (ipcbuf_get_nbufs(db) - 2)) // If we have a reader, there will be at least one buffer which is not full
 	    {	     
 	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
@@ -184,7 +177,6 @@ void *buf_control(void *conf)
 	      return NULL;
 	    }
 	  
-	  //fprintf(stdout, "CBUF0\t%"PRIu64"\n", ipcbuf_get_nfull((ipcbuf_t*)captureconf->hdu->data_block));
 	  pthread_mutex_lock(&quit_mutex);   // Need to check quit status before get new buffer block, otherwise it will stuck here
 	  quit_status = quit;
 	  pthread_mutex_unlock(&quit_mutex);
@@ -196,7 +188,6 @@ void *buf_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL; 
 	    }
-	  //fprintf(stdout, "CBUF1\n");
 	  
 	  if(cbuf == NULL)
 	    {
@@ -251,9 +242,9 @@ void *buf_control(void *conf)
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    ntail = (tail[i] > ntail) ? tail[i] : ntail;
 	 	  
-	  //#ifdef DEBUG
+#ifdef DEBUG
 	  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
-	  //#endif
+#endif
 	  
 	  for(i = 0; i < ntail; i++)
 	    {
@@ -391,11 +382,11 @@ void *capture_control(void *conf)
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  pthread_mutex_lock(&ndf_chk_mutex[i + 20]);
-		  ndf_chk_actual[i] = ndf_chk[i + 20];
-		  pthread_mutex_unlock(&ndf_chk_mutex[i + 20]);
+		  pthread_mutex_lock(&ndf_chk_mutex[i]);
+		  ndf_chk_actual[i] = ndf_chk[i];
+		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
 		  
-		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
 	      fprintf(stdout, "\n");
 	      
@@ -421,12 +412,11 @@ void *capture_control(void *conf)
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  pthread_mutex_lock(&ndf_chk_mutex[i + 20]);
-		  ndf_chk_actual[i] = ndf_chk[i + 20];
-		  pthread_mutex_unlock(&ndf_chk_mutex[i + 20]);
+		  pthread_mutex_lock(&ndf_chk_mutex[i]);
+		  ndf_chk_actual[i] = ndf_chk[i];
+		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
 		  
-		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
-		  //fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\n", ndf_port[i], ndf_chk[i + 20]);
+		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
 	      fprintf(stdout, "\n");
 	    }	  

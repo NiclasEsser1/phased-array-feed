@@ -55,7 +55,6 @@ int init_buf(conf_t *conf)
 
   /* Create HDU and check the size of buffer bolck */
   conf->required_pktsz = conf->pktsz - conf->pktoff;
-  //fprintf(stdout, "%d\t%d\t%d\n", conf->pktsz, conf->pktoff, conf->required_pktsz);
   
   conf->rbufsz = conf->nchk * conf->required_pktsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
   conf->hdu = dada_hdu_create(runtime_log);
@@ -84,7 +83,6 @@ int init_buf(conf_t *conf)
     }
   
   if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client
-    //if(dada_hdu_lock_write_spec(conf->hdu, 'w') < 0) // make ourselves the write client, but does not start valid data at the beginning
     {
       multilog(runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -172,6 +170,8 @@ void *capture(void *conf)
   int quit_status;
   double elapsed_time;
   struct timespec start, stop;
+
+  init_hdr(&hdr);
   
   pktsz          = captureconf->pktsz;
   pktoff         = captureconf->pktoff;
@@ -211,7 +211,6 @@ void *capture(void *conf)
   pthread_mutex_unlock(&quit_mutex);
   
   while(quit_status == 0)
-    //while(quit == 0)
     {
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
 	{
@@ -227,24 +226,21 @@ void *capture(void *conf)
 	  conf = (void *)captureconf;
 	  pthread_exit(NULL);
 	  return NULL;
-	}      
+	}
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-
+      
+      clock_gettime(CLOCK_REALTIME, &start);
       pthread_mutex_lock(&hdr_current_mutex[ithread]);
       hdr_current[ithread] = hdr;
       pthread_mutex_unlock(&hdr_current_mutex[ithread]);
-
-      clock_gettime(CLOCK_REALTIME, &start);
-      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      //acquire_idf(hdr, hdr_ref[ithread], *captureconf, &idf);  // How many data frames we get after the reference;
-      acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->sec_prd, captureconf->ndf_chk_prd, &idf);
-	
-      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
       clock_gettime(CLOCK_REALTIME, &stop);
       elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-      //fprintf(stdout, "%e seconds used for memcpy\n", elapsed_time);
+      //fprintf(stdout, "%E seconds used for hdr\n", elapsed_time);
       
-      //if(acquire_ichk(hdr, *captureconf, &ichk))
+      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
+      acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->sec_prd, captureconf->ndf_chk_prd, &idf);	
+      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
+      
       if(acquire_ichk(hdr.freq, captureconf->center_freq, captureconf->nchan_chk, captureconf->nchk, &ichk))
       	{	  
       	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
@@ -260,13 +256,8 @@ void *capture(void *conf)
       	  pthread_exit(NULL);
       	  return NULL;
       	}
-      //acquire_ichk(hdr, *captureconf, &ichk);
       
-      //ichk = 0;
-            
-      if(idf < 0)
-	continue;
-      else
+      if(idf >= 0)
       	{
 	  // Drop data frams which are behind time;
 	  if(idf >= captureconf->rbuf_ndf_chk)
@@ -387,7 +378,7 @@ int init_capture(conf_t *conf)
   int i;
 
   init_buf(conf);  // Initi ring buffer
-
+  
   ithread_extern = 0;
   for(i = 0; i < conf->nchk; i++) // Setup the counter for each frequency
     ndf_chk[i] = 0;
@@ -422,13 +413,10 @@ int init_capture(conf_t *conf)
   conf->buf_dfsz = conf->required_pktsz * (double)conf->nchk;
 
   conf->nchan_chk = conf->nchan/conf->nchk;
-  //fprintf(stdout, "%d\n", conf->nchan_chk);
-  //exit(1);
   
   return EXIT_SUCCESS;
 }
 
-//int acquire_ichk(hdr_t hdr, conf_t conf, int *ichk)
 int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *ichk)
 {
   *ichk = (int)((freq - center_freq + 0.5)/nchan_chk + nchk/2);
@@ -439,7 +427,6 @@ int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *
   return EXIT_SUCCESS;
 }
 
-//int acquire_idf(hdr_t hdr, hdr_t hdr_ref, conf_t conf, int64_t *idf)
 int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, int sec_prd, uint64_t ndf_chk_prd, int64_t *idf_buf)
 {
   *idf_buf = (int64_t)(idf - idf_ref) + (int64_t)(sec - sec_ref) / sec_prd * ndf_chk_prd;
