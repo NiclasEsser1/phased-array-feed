@@ -16,9 +16,6 @@
 #include "capture.h"
 #include "multilog.h"
 
-#define CHK_BW 7
-#define NCHK_NIC 48
-
 extern multilog_t *runtime_log;
 
 char *cbuf = NULL;
@@ -211,6 +208,7 @@ void *capture(void *conf)
   pthread_mutex_unlock(&quit_mutex);
   
   while(quit_status == 0)
+  //while(quit == 0)
     {
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
 	{

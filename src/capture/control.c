@@ -142,9 +142,6 @@ void *buf_control(void *conf)
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 	      
 	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-	      //pthread_mutex_lock(&ndf_chk_mutex[i]);
-	      //ndf_chk_actual[i] = ndf_chk[i];
-	      //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 	      
 	      fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 	    }
