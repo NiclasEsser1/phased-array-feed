@@ -9,6 +9,9 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
+#include <sys/socket.h>
+#include <linux/un.h>
+#include <pthread.h>
 
 #include "dada_hdu.h"
 #include "dada_def.h"
@@ -18,12 +21,40 @@
 #include "daemon.h"
 #include "futils.h"
 
+#define MSTR_LEN     1024
 #define DADA_HDRSZ   4096
+#define SECDAY       86400.0
+#define MJD1970      40587.0
+
 // It is a demo to check the sod, eod and start time of baseband2baseband
 // It also helps to understand the control of baseband2baseband
-// gcc -o baseband2baseband_demo baseband2baseband_demo.c -L/usr/local/cuda/lib64 -I/usr/local/include -lpsrdada -lcudart
+// gcc -o baseband2baseband_demo baseband2baseband_demo.c -L/usr/local/cuda/lib64 -I/usr/local/include -lpsrdada -lcudart -lm -pthread
 
-#define MSTR_LEN   1024
+multilog_t *runtime_log;
+int quit;
+pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+typedef struct conf_t
+{
+  dada_hdu_t *hdu_in, *hdu_out;
+  key_t key_in, key_out;
+  char *curbuf_in, *curbuf_out;
+  int pktsz;
+  char ctrl_addr[MSTR_LEN];
+  uint64_t curbufsz;
+  double blk_res;
+  int thread_bind;
+  time_t sec_ref;
+  uint64_t picoseconds_ref;
+  int cpus[2];
+  char hdr[DADA_HDRSZ];
+  
+}conf_t;
+
+int threads(conf_t *conf);
+void *baseband2baseband(void *conf);
+void *control(void *conf);
+
 void usage ()
 {
   fprintf (stdout,
@@ -32,28 +63,21 @@ void usage ()
 	   "Usage: baseband2baseband_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
-	   " -c  The number of data frame (per frequency chunk) of each incoming ring buffer block\n"
-	   " -d  The number of chunks\n"
-	   " -e  The packet size\n"
+	   " -c  The packet size\n"
+	   " -d  The address for control socket\n"
+	   " -e  The resolution of output ring buffer block\n"
+	   " -f  Bind thread or not, 1:cpu:cpu, or 0:0:0\n"
 	   " -h  show help\n");
 }
 
 int main(int argc, char **argv)
 {
-  int i, arg, pktsz, nchunk;
-  key_t key_in, key_out;
-  uint64_t ndf_chk, hdrsz, blksz, read_blksz, write_blksz;
-  dada_hdu_t *hdu_in, *hdu_out;
-  ipcbuf_t *db_in, *db_out;
-  uint64_t write_blkid, read_blkid, curbufsz;
-  char *hdrbuf_in, *hdrbuf_out;
-  char *buf_in, *buf_out;
-  struct timespec start, stop;
-  double elapsed_time;
-  multilog_t *runtime_log;
+  conf_t conf;
+  int i, arg, pktsz;
+  uint64_t curbufsz;
   
   /* Init */
-  while((arg=getopt(argc,argv,"a:b:c:hd:e:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:d:e:f:")) != -1)
     {
       
       switch(arg)
@@ -63,7 +87,7 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	  
 	case 'a':	  	  
-	  if(sscanf(optarg, "%x", &key_in) != 1)
+	  if(sscanf(optarg, "%x", &conf.key_in) != 1)
 	    {
 	      fprintf(stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
@@ -71,7 +95,7 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'b':
-	  if (sscanf (optarg, "%x", &key_out) != 1)
+	  if (sscanf (optarg, "%x", &conf.key_out) != 1)
 	    {
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
@@ -79,19 +103,22 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'c':
-	  sscanf(optarg, "%"SCNu64"", &ndf_chk);
+	  sscanf(optarg, "%d", &conf.pktsz);
 	  break;
 	  
 	case 'd':
-	  sscanf(optarg, "%d", &nchunk);
+	  sscanf(optarg, "%s", conf.ctrl_addr);
+	  break;
+
+	case 'e':
+	  sscanf(optarg, "%lf", &conf.blk_res);
 	  break;
 	  
-	case 'e':
-	  sscanf(optarg, "%d", &pktsz);
+	case 'f':
+	  sscanf(optarg, "%d:%d:%d", &conf.thread_bind, &conf.cpus[0], &conf.cpus[1]);
 	  break;
 	}
     }
-  
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;
   sprintf(fname_log, "/beegfs/DENG/docker/baseband2baseband_demo.log");
@@ -104,139 +131,416 @@ int main(int argc, char **argv)
   runtime_log = multilog_open("baseband2baseband_demo", 1);
   multilog_add(runtime_log, fp_log);
   multilog(runtime_log, LOG_INFO, "BASEBAND2BASEBAND_DEMO START\n");
-    
+  
   /* attach to input ring buffer */
-  hdu_in = dada_hdu_create(runtime_log);
-  if(hdu_in == NULL)
+  conf.hdu_in = dada_hdu_create(runtime_log);
+  if(conf.hdu_in == NULL)
     {
       fprintf(stdout, "HERE DADA_HDU_CREATE\n");
       exit(1);
     }
-  dada_hdu_set_key(hdu_in, key_in);
-  if(dada_hdu_connect(hdu_in))    
+  dada_hdu_set_key(conf.hdu_in, conf.key_in);
+  if(dada_hdu_connect(conf.hdu_in))    
     {
       fprintf(stdout, "HERE DADA_HDU_CONNECT\n");
       exit(1);
     }
-  if(dada_hdu_lock_read(hdu_in))
+  if(dada_hdu_lock_read(conf.hdu_in))
     {      
       fprintf(stdout, "HERE DADA_HDU_LOCK_READ\n");
       exit(1);
     }
   
   /* Prepare output ring buffer */
-  hdu_out = dada_hdu_create(runtime_log);
-  if(hdu_out == NULL)    
+  conf.hdu_out = dada_hdu_create(runtime_log);
+  if(conf.hdu_out == NULL)    
     {
       fprintf(stdout, "HERE DADA_HDU_CREATE\n");
       exit(1);
     }
-  dada_hdu_set_key(hdu_out, key_out);
-  if(dada_hdu_connect(hdu_out))      
+  dada_hdu_set_key(conf.hdu_out, conf.key_out);
+  if(dada_hdu_connect(conf.hdu_out))      
     {
       fprintf(stdout, "HERE DADA_HDU_CONNECT\n");
       exit(1);
     }
-  if(dada_hdu_lock_write(hdu_out))
+  if(dada_hdu_lock_write(conf.hdu_out))
     {      
       fprintf(stdout, "HERE DADA_HDU_LOCK_READ\n");
       exit(1);
     }
-
-  /* To see if these two buffers are the same size */
-  db_in  = (ipcbuf_t *)hdu_in->data_block;
-  db_out = (ipcbuf_t *)hdu_out->data_block;
-  fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
-  fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
   
-  ipcbuf_disable_sod(db_out);
+  /* Do the real job */
+  threads(&conf);
   
-  /* Pass the header to next ring buffer */
-  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
-  hdrbuf_out = ipcbuf_get_next_write(hdu_out->header_block);
-  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header 
-  ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
-  ipcbuf_mark_cleared(hdu_in->header_block);
-
-  buf_out = ipcbuf_get_next_write(db_out);
-  read_blksz = 0;
-  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz);
-  while(true)
-    {
-      memcpy(buf_out, buf_in, pktsz);
-      ipcbuf_mark_cleared(db_in);
-      ipcbuf_mark_filled(db_out, pktsz);
-
-      fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
-      fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
-      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db_in->state);
-	
-      if(!ipcbuf_sod(db_in))
-	{
-	  fprintf(stdout, "HERE EOD\t%d\n", (db_in->state));
-	  fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
-	  fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
-	  //if(ipcbuf_enable_eod(db_out))
-	  //break;
-	  //ipcbuf_disable_sod(db_out);
-
-	  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);
-	  hdrbuf_out = ipcbuf_get_next_write(hdu_out->header_block);
-	  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-	  
-	  if((hdrbuf_out == NULL) || (hdrbuf_in == NULL))
-	    break;
-	  ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
-	  ipcbuf_mark_cleared(hdu_in->header_block);
-
-	  fprintf(stdout, "IPCBUF_SOD:\t%d\t%"PRIu64"\n", ipcbuf_sod(db_in), ipcbuf_get_read_count(db_in));
-	  fprintf(stdout, "IPCBUF_EOD:\t%d\t%"PRIu64"\n", ipcbuf_eod(db_in), ipcbuf_get_read_count(db_in));
-	  
-	  if(ipcbuf_enable_sod(db_out, ipcbuf_get_write_count(db_out), 0))
-	    {
-	      fprintf(stdout, "HERE SOD INSIDE\n");
-	      break;
-	    }
-	  fprintf(stdout, "%d\n", ipcbuf_sod(db_in));
-	  
-	  read_blksz = 0;
-	  buf_in  = ipcbuf_get_next_readable(db_in, &read_blksz);
-	  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz); 
-	  buf_out = ipcbuf_get_next_write(db_out);
-	  if(buf_out == NULL)
-	    {
-	      fprintf(stdout, "HERE AFTER OUT OPEN OUT\n");
-	      break;
-	    }
-	  if(buf_in == NULL)
-	    {
-	      fprintf(stdout, "HERE AFTER OUT OPEN IN\n");
-	      break;
-	    }
-	}
-      else
-	{
-	  fprintf(stdout, "HERE BEFORE OPEN\t%d\n", (db_out->state));
-	  buf_out = ipcbuf_get_next_write(db_out);
-
-	  read_blksz = 0;
-	  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz);
-	  
-	  if(buf_out == NULL || buf_in == NULL)
-	    break;
-	}      
-    }
+  /* Destroy */
+  dada_hdu_unlock_write(conf.hdu_out);    
+  dada_hdu_disconnect(conf.hdu_out);
+  dada_hdu_destroy(conf.hdu_out);
   
-  dada_hdu_unlock_write(hdu_out);    
-  dada_hdu_disconnect(hdu_out);
-  dada_hdu_destroy(hdu_out);
-  
-  dada_hdu_unlock_read(hdu_in);
-  dada_hdu_disconnect(hdu_in);
-  dada_hdu_destroy(hdu_in);
+  dada_hdu_unlock_read(conf.hdu_in);
+  dada_hdu_disconnect(conf.hdu_in);
+  dada_hdu_destroy(conf.hdu_in);
 
   fclose(fp_log);
   multilog(runtime_log, LOG_INFO, "BASEBAND2BASEBAND_DEMO END\n");
+  
+  return EXIT_SUCCESS;
+}
+
+void *baseband2baseband(void *conf)
+{
+  conf_t *b2bconf = (conf_t *)conf;
+  ipcbuf_t *db_in = NULL, *db_out = NULL;
+  ipcbuf_t *hdr_in = NULL;
+  int quit_status;
+  uint64_t hdrsz;
+  double mjdstart_ref;
+  char *hdrbuf_in = NULL;
+  
+  /* To see if these two buffers are the same size */
+  db_in  = (ipcbuf_t *)b2bconf->hdu_in->data_block;
+  db_out = (ipcbuf_t *)b2bconf->hdu_out->data_block;
+  hdr_in  = (ipcbuf_t *)b2bconf->hdu_in->header_block;
+
+  ipcbuf_disable_sod(db_out);
+  
+  quit = 0;
+  pthread_mutex_lock(&quit_mutex);
+  quit_status = quit;
+  pthread_mutex_unlock(&quit_mutex);
+  
+  hdrbuf_in = ipcbuf_get_next_read(hdr_in, &hdrsz);
+  fprintf(stdout, "Got HEADER 1\n");
+  if(!hdrbuf_in)
+    {
+      multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+      
+      pthread_exit(NULL);
+      return NULL;
+    }
+  memcpy(b2bconf->hdr, hdrbuf_in, DADA_HDRSZ);  // Get a copy of the header
+  fprintf(stdout, "Got HEADER 2\n");
+  
+  if(ascii_header_get(hdrbuf_in, "MJD_START", "%lf", &mjdstart_ref) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error getting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+      
+      pthread_exit(NULL);
+      return NULL;
+    }
+  b2bconf->sec_ref = (time_t)round(SECDAY * (mjdstart_ref - MJD1970));
+  fprintf(stdout, "Got HEADER 3\n");
+  if(ascii_header_get(hdrbuf_in, "PICOSECONDS", "%"PRIu64, &(b2bconf->picoseconds_ref)) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+      
+      pthread_exit(NULL);
+      return NULL;
+    }    
+  ipcbuf_mark_cleared(hdr_in); // Clear the header block for later use
+
+  fprintf(stdout, "HERE 1\t%d\n", ipcbuf_sod(db_in));
+  
+  b2bconf->curbuf_in  = ipcbuf_get_next_read(db_in, &b2bconf->curbufsz);
+  b2bconf->curbuf_out = ipcbuf_get_next_write(db_out);
+  fprintf(stdout, "HERE 2\n");
+  
+  
+  //while(!ipcbuf_eod(db_in) && (quit_status == 0))
+  while(ipcbuf_sod(db_in) && (quit_status == 0))
+    {
+      memcpy(b2bconf->curbuf_out, b2bconf->curbuf_in, b2bconf->pktsz);
+      
+      ipcbuf_mark_filled(db_out, b2bconf->pktsz);
+      ipcbuf_mark_cleared(db_in);
+      fprintf(stdout, "HERE 3\n");
+            
+      fprintf(stdout, "HERE 1\n");
+      b2bconf->curbuf_in  = ipcbuf_get_next_read(db_in, &b2bconf->curbufsz);
+      b2bconf->curbuf_out = ipcbuf_get_next_write(db_out);
+      fprintf(stdout, "HERE 2\t%d\n", ipcbuf_eod(db_in));
+      fprintf(stdout, "HERE 2\t%d\n", ipcbuf_sod(db_in));
+
+      pthread_mutex_lock(&quit_mutex);
+      quit_status = quit;
+      pthread_mutex_unlock(&quit_mutex);
+    }  
+  
+  pthread_exit(NULL);
+  return NULL;
+}
+
+void *control(void *conf)
+{
+  struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 second;
+  conf_t *b2bconf = (conf_t *)conf;
+  int quit_status;
+  int sock, i;
+  struct sockaddr_un sa, fromsa;
+  uint64_t start_buf;
+  ipcbuf_t *db_out = NULL, *hdr_out = NULL;
+  char command_line[MSTR_LEN], command[MSTR_LEN];
+  socklen_t fromlen;
+  char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
+  time_t sec;
+  double sec_offset;
+  uint64_t picoseconds, picoseconds_offset; 
+  char utc_start[MSTR_LEN];
+  char *hdrbuf_out = NULL;
+  uint64_t hdrsz;
+  char hdr[DADA_HDRSZ];
+  double mjd_start;
+  
+  db_out = (ipcbuf_t *)b2bconf->hdu_out->data_block;
+  hdr_out = (ipcbuf_t *)b2bconf->hdu_out->header_block;
+  
+  /* Do the real job */
+  pthread_mutex_lock(&quit_mutex);
+  quit_status = quit;
+  pthread_mutex_unlock(&quit_mutex);
+
+  /* Create an unix socket for control */
+  if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
+    {
+      multilog(runtime_log, LOG_ERR, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf (stderr, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+
+      pthread_exit(NULL);
+      return NULL;
+    }  
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));
+  memset(&sa, 0, sizeof(struct sockaddr_un));
+  sa.sun_family = AF_UNIX;
+  snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", b2bconf->ctrl_addr);
+  unlink(b2bconf->ctrl_addr);
+  
+  if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
+    {
+      multilog(runtime_log, LOG_ERR, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf (stderr, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+
+      close(sock);
+      pthread_exit(NULL);
+      return NULL;
+    }
+  
+  while(quit_status == 0)
+    {     
+      if(recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
+	{
+	  if(strstr(command_line, "END-OF-DATA") != NULL)
+	    {
+	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
+	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
+
+	      ipcbuf_enable_eod(db_out);
+	      ipcbuf_disable_sod(db_out);
+	    }
+	  
+	  if(strstr(command_line, "START-OF-DATA") != NULL)
+	    {
+	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
+	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
+
+	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, source, ra, dec, &start_buf); 
+	      start_buf = (start_buf > ipcbuf_get_write_count(db_out)) ? start_buf : ipcbuf_get_write_count(db_out);
+	      fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db_out));
+	      fprintf(stdout, "%"PRIu64"\n", start_buf);
+
+	      ipcbuf_enable_sod(db_out, start_buf, 0);
+	      
+	      /* To get time stamp for current header */
+	      sec_offset = start_buf * b2bconf->blk_res;
+	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
+	      picoseconds = picoseconds_offset + b2bconf->picoseconds_ref;
+	      sec = b2bconf->sec_ref + sec_offset;
+	      if(!(picoseconds < 1E12))
+	      	{
+	      	  sec += 1;
+	      	  picoseconds -= 1E12;
+	      	}
+	      strftime (utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&sec)); // String start time without fraction second 
+	      mjd_start = sec / SECDAY + MJD1970;                         // Float MJD start time without fraction second
+	      for(i = 0; i < MSTR_LEN; i++)
+		{
+		  if(ra[i] == ' ')
+		    ra[i] = ':';
+		  if(dec[i] == ' ')
+		    dec[i] = ':';
+		}
+	      
+	      /* Register header */
+	      hdrbuf_out = ipcbuf_get_next_write(hdr_out);
+	      memcpy(hdrbuf_out, b2bconf->hdr, DADA_HDRSZ);  // Get a copy of the header
+	      
+	      if(!hdrbuf_out)
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      /* Setup DADA header with given values */
+	      if(ascii_header_set(hdrbuf_out, "UTC_START", "%s", utc_start) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf_out, "RA", "%s", ra) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf_out, "DEC", "%s", dec) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      
+	      if(ascii_header_set(hdrbuf_out, "SOURCE", "%s", source) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      	      
+	      if(ascii_header_set(hdrbuf_out, "PICOSECONDS", "%"PRIu64, picoseconds) < 0)  
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}    
+	      if(ascii_header_set(hdrbuf_out, "MJD_START", "%.10lf", mjd_start) < 0)
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	      /* donot set header parameters anymore - acqn. doesn't start */
+	      if(ipcbuf_mark_filled(hdr_out, DADA_HDRSZ) < 0)
+	      	{
+	      	  multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      	  
+	      	  pthread_mutex_lock(&quit_mutex);
+	      	  quit = 1;
+	      	  pthread_mutex_unlock(&quit_mutex);
+	      	  
+	      	  close(sock);
+	      	  pthread_exit(NULL);
+	      	  return NULL;
+	      	}
+	    }
+	} 
+    }
+  pthread_exit(NULL);
+  return NULL;
+}
+
+int threads(conf_t *conf)
+{
+  int i, ret[2];
+  pthread_t thread[2];
+  pthread_attr_t attr;
+  cpu_set_t cpus;
+  
+  if(!(conf->thread_bind == 0))
+    {
+      pthread_attr_init(&attr);  
+      CPU_ZERO(&cpus);      
+      CPU_SET(conf->cpus[0], &cpus);
+      pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+      ret[0] = pthread_create(&thread[0], &attr, baseband2baseband, (void *)conf);
+      pthread_attr_destroy(&attr);
+      
+      pthread_attr_init(&attr);  
+      CPU_ZERO(&cpus);
+      CPU_SET(conf->cpus[1], &cpus);
+      pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+      ret[1] = pthread_create(&thread[1], &attr, control, (void *)conf);
+      pthread_attr_destroy(&attr);
+    }
+  
+  for(i = 0; i < 2; i++)   // Join threads and unbind cpus
+    pthread_join(thread[i], NULL);
   
   return EXIT_SUCCESS;
 }

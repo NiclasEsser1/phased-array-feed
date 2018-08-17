@@ -57,7 +57,7 @@ typedef struct conf_t
 
   double df_res;  // time resolution of each data frame, for start time determination;
   double blk_res; // time resolution of each buffer block, for start time determination;
-  uint64_t buf_dfsz; // data fram size in buf, TFTFP order, and here is the size of each T, which is the size of each FTP. It is for the time determination with start_byte, it should be multiple of buf_size;
+  //uint64_t buf_dfsz; // data fram size in buf, TFTFP order, and here is the size of each T, which is the size of each FTP. It is for the time determination with start_byte, it should be multiple of buf_size;
   
   uint64_t rbufsz, tbufsz;
   

@@ -64,18 +64,23 @@ if __name__ == "__main__":
     nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
     df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
     if hdr == 1:
-        pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
+        pktsz    = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
         blksz    = ndf_chk_rbuf_b2b * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
     else:
         pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df
         blksz    = ndf_chk_rbuf_b2b * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
     nchunk = nchan/nchan_chk
 
+    ctrl_socket = "./baseband2baseband-demo.beam{:02d}part{:02d}.socket".format(beam, part)
+    sec_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
+    ndf_chk_prd  = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndf_chk_prd'])
+    blk_res = ndf_chk_rbuf_b2b * sec_prd / float(ndf_chk_prd)
+
     # Create PSRDADA buffer
     blksz = pktsz
     os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
 
-    baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d} -d {:d} -e {:d}".format(key_capture, key_b2b, ndf_chk_rbuf_b2b, nchunk, pktsz)
+    baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d} -d {:s} -e {:f} -f 1:9:10".format(key_capture, key_b2b, pktsz, ctrl_socket, blk_res)
     print baseband2baseband_demo_command
     
     os.system(baseband2baseband_demo_command)

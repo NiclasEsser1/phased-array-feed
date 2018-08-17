@@ -408,7 +408,7 @@ int init_capture(conf_t *conf)
 
   conf->df_res   = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
   conf->blk_res  = conf->df_res * (double)conf->rbuf_ndf_chk;
-  conf->buf_dfsz = conf->required_pktsz * (double)conf->nchk;
+  //conf->buf_dfsz = conf->required_pktsz * (double)conf->nchk;
 
   conf->nchan_chk = conf->nchan/conf->nchk;
   

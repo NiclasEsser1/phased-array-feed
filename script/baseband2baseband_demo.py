@@ -66,16 +66,16 @@ if __name__ == "__main__":
     nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
     nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
     df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
-    pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
+    pktsz    = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if hdr == 1:
         blksz    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
     else:
         blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
-    memsize = blksz * (nblk + 1) * 2  # + 1 to be safe
+    
+    memsize = 2 * blksz * (nblk + 1)  # + 1 to be safe
     nchunk = nchan/nchan_chk
 
     com_line = "docker run --ipc=shareable --ipc=container:{:s} --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d}".format(previous_container_name, dvolume, hvolume, uid, gid, memsize, current_container_name, current_dname, system_conf, pipeline_conf, beam, part, hdr)
-    #com_line = "docker run --ipc=host --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d}".format(dvolume, hvolume, uid, gid, memsize, current_container_name, current_dname, system_conf, pipeline_conf, beam, part, hdr)
     print com_line
 
     os.system(com_line)

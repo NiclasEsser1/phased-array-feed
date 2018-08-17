@@ -81,7 +81,8 @@ if __name__ == "__main__":
     
     #com_line = "docker run --ipc=shareable --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --rm -e DISPLAY --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     
-    #com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
-    com_line = "docker run --ipc=host --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+
+    #com_line = "docker run --ipc=host --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, memsize, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     print com_line
     os.system(com_line)

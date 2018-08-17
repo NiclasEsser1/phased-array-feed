@@ -45,7 +45,7 @@ extern pthread_mutex_t transit_mutex[MPORT_CAPTURE];
 
 int threads(conf_t *conf)
 {
-  int i, ret[MPORT_CAPTURE + 2], node;
+  int i, ret[MPORT_CAPTURE + 2];
   pthread_t thread[MPORT_CAPTURE + 2];
   pthread_attr_t attr;
   cpu_set_t cpus;
@@ -430,6 +430,7 @@ void *capture_control(void *conf)
 	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
 
 	      ipcbuf_enable_eod(db);
+	      ipcbuf_disable_sod(db);
 	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	    }
 	  
@@ -442,17 +443,20 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
-	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64":%"SCNu64"", command, source, ra, dec, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
-	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_byte : ipcbuf_get_write_count(db); // To make sure the start bytes is valuable, to get the most recent buffer
+	      //sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64":%"SCNu64"", command, source, ra, dec, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
+	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, source, ra, dec, &start_buf); // Read the start bytes from socket or get the minimum number from the buffer
+	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_buf : ipcbuf_get_write_count(db); // To make sure the start bytes is valuable, to get the most recent buffer
 	      fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db));
 	      
-	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
+	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
+	      fprintf(stdout, "%"PRIu64"\n", start_buf);
 
-	      ipcbuf_enable_sod(db, start_buf, start_byte);
+	      //ipcbuf_enable_sod(db, start_buf, start_byte);
+	      ipcbuf_enable_sod(db, start_buf, 0);
 	      
 	      /* To get time stamp for current header */
-	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res;
-	      // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
+	      //sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res;
+	      sec_offset = start_buf * captureconf->blk_res; // Only work with buffer number
 	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
 	      picoseconds = picoseconds_offset + picoseconds_ref;
 	      sec = sec_ref + sec_offset;
