@@ -15,13 +15,15 @@
 #include "kernel.cuh"
 
 extern multilog_t *runtime_log;
+int quit;
+pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int init_baseband2baseband(conf_t *conf)
 {
   int i;
   int iembed1, istride1, idist1, oembed1, ostride1, odist1, batch1, nx1;
   int iembed2, istride2, idist2, oembed2, ostride2, odist2, batch2, nx2;
-  ipcbuf_t *db = NULL;
+  ipcbuf_t *db_in = NULL, *db_out = NULL;
   uint64_t hdrsz;
   
   /* Prepare buffer, stream and fft plan for process */
@@ -180,8 +182,8 @@ int init_baseband2baseband(conf_t *conf)
       fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;    
     }  
-  db = (ipcbuf_t *) conf->hdu_in->data_block;
-  conf->rbufin_size = ipcbuf_get_bufsz(db);  
+  db_in = (ipcbuf_t *) conf->hdu_in->data_block;
+  conf->rbufin_size = ipcbuf_get_bufsz(db_in);  
   if(conf->rbufin_size % conf->bufin_size != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
@@ -212,8 +214,8 @@ int init_baseband2baseband(conf_t *conf)
       fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;    
     }
-  db = (ipcbuf_t *) conf->hdu_out->data_block;
-  conf->rbufout_size = ipcbuf_get_bufsz(db);
+  db_out = (ipcbuf_t *) conf->hdu_out->data_block;
+  conf->rbufout_size = ipcbuf_get_bufsz(db_out);
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
@@ -233,17 +235,19 @@ int init_baseband2baseband(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if(ipcbuf_disable_sod(db) < 0)
+  if(ipcbuf_disable_sod(db_out) < 0)
     {
       multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+
+  quit = 0;
   
   return EXIT_SUCCESS;
 }
 
-int do_baseband2baseband(conf_t conf)
+void *baseband2baseband(void *conf)
 {
   /*
     The whole procedure for fold mode is :
@@ -253,224 +257,87 @@ int do_baseband2baseband(conf_t conf)
     4. Inverse FFT the data to get PTFT order data;
     5. Transpose the data to get TFP data and scale it;    
   */
+  conf_t *b2bconf = (conf_t *)conf;
   uint64_t i, j;
   uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
   dim3 gridsize_transpose_float, blocksize_transpose_float;
-  uint64_t read_blkid, write_blkid;
   uint64_t curbufsz;
+  int quit_status;
   ipcbuf_t *db_in = NULL, *db_out = NULL;
-  db_in = (ipcbuf_t *)conf.hdu_in->data_block;
-  db_out = (ipcbuf_t *)conf.hdu_out->data_block;
   
-  gridsize_unpack                      = conf.gridsize_unpack;
-  blocksize_unpack                     = conf.blocksize_unpack;
-  gridsize_swap_select_transpose_swap  = conf.gridsize_swap_select_transpose_swap;   
-  blocksize_swap_select_transpose_swap = conf.blocksize_swap_select_transpose_swap;  
-  gridsize_transpose_scale             = conf.gridsize_transpose_scale;
-  blocksize_transpose_scale            = conf.blocksize_transpose_scale;
-  gridsize_transpose_float             = conf.gridsize_transpose_float;
-  blocksize_transpose_float            = conf.blocksize_transpose_float;
+  db_in  = (ipcbuf_t *)b2bconf->hdu_in->data_block;
+  db_out = (ipcbuf_t *)b2bconf->hdu_out->data_block;
   
-  /* Register header */
-  if(register_header(&conf))
-    {
-      multilog(runtime_log, LOG_ERR, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
+  gridsize_unpack                      = b2bconf->gridsize_unpack;
+  blocksize_unpack                     = b2bconf->blocksize_unpack;
+  gridsize_swap_select_transpose_swap  = b2bconf->gridsize_swap_select_transpose_swap;   
+  blocksize_swap_select_transpose_swap = b2bconf->blocksize_swap_select_transpose_swap;  
+  gridsize_transpose_scale             = b2bconf->gridsize_transpose_scale;
+  blocksize_transpose_scale            = b2bconf->blocksize_transpose_scale;
+  gridsize_transpose_float             = b2bconf->gridsize_transpose_float;
+  blocksize_transpose_float            = b2bconf->blocksize_transpose_float;
 
-  /* Start the first */
-  conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-  //ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-  //ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-    
-  /* Get scale of data */
-  dat_offs_scl(conf);
+  
+  pthread_mutex_lock(&quit_mutex);
+  quit_status = quit;
+  pthread_mutex_unlock(&quit_mutex);
   
   /* Do the real job */  
-  while(true)
+  while(!ipcbuf_eod(db_in) && (quit_status == 0))
     // The first time we open a block at the scale calculation, we need to make sure that the input ring buffer block is bigger than the block needed for scale calculation
     // Otherwise we have to open couple of blocks to calculate scales and these blocks will dropped after that
-    {
-      for(i = 0; i < conf.nrun_blk; i ++)
+    {      
+      b2bconf->curbuf_in  = ipcbuf_get_next_read(db_in, &curbufsz);
+      b2bconf->curbuf_out = ipcbuf_get_next_write(db_out);
+      
+      for(i = 0; i < b2bconf->nrun_blk; i ++)
 	{
-	  for(j = 0; j < conf.nstream; j++)
+	  for(j = 0; j < b2bconf->nstream; j++)
 	    {
-	      hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
-	      dbufin_offset = j * conf.dbufin_offset; 
-	      bufrt1_offset = j * conf.bufrt1_offset;
-	      bufrt2_offset = j * conf.bufrt2_offset;
+	      hbufin_offset = j * b2bconf->hbufin_offset + i * b2bconf->bufin_size;
+	      dbufin_offset = j * b2bconf->dbufin_offset; 
+	      bufrt1_offset = j * b2bconf->bufrt1_offset;
+	      bufrt2_offset = j * b2bconf->bufrt2_offset;
 
-	      dbufout_offset = j * conf.dbufout_offset;
-	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
+	      dbufout_offset = j * b2bconf->dbufout_offset;
+	      hbufout_offset = j * b2bconf->hbufout_offset + i * b2bconf->bufout_size;
 	      
-	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.hdu_in->data_block->curbuf[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
+	      CudaSafeCall(cudaMemcpyAsync(&b2bconf->dbuf_in[dbufin_offset], &b2bconf->curbuf_in[hbufin_offset], b2bconf->sbufin_size, cudaMemcpyHostToDevice, b2bconf->streams[j]));
 	      
 	      /* Unpack raw data into cufftComplex array */
-	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
+	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, b2bconf->streams[j]>>>(&b2bconf->dbuf_in[dbufin_offset], &b2bconf->buf_rt1[bufrt1_offset], b2bconf->nsamp1);
 	      
 	      /* Do forward FFT */
-	      CufftSafeCall(cufftExecC2C(conf.fft_plans1[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
+	      CufftSafeCall(cufftExecC2C(b2bconf->fft_plans1[j], &b2bconf->buf_rt1[bufrt1_offset], &b2bconf->buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 
 	      /* Prepare for inverse FFT */
-	      swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 
+	      swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, b2bconf->streams[j]>>>(&b2bconf->buf_rt1[bufrt1_offset], &b2bconf->buf_rt2[bufrt2_offset], b2bconf->nsamp1, b2bconf->nsamp2); 
 	      /* Do inverse FFT */
-	      CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
+	      CufftSafeCall(cufftExecC2C(b2bconf->fft_plans2[j], &b2bconf->buf_rt2[bufrt2_offset], &b2bconf->buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 	      /* Get final output */
-	      transpose_scale_kernel<<<gridsize_transpose_scale, blocksize_transpose_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);   
+	      transpose_scale_kernel<<<gridsize_transpose_scale, blocksize_transpose_scale, 0, b2bconf->streams[j]>>>(&b2bconf->buf_rt2[bufrt2_offset], &b2bconf->dbuf_out[dbufout_offset], b2bconf->nsamp2, b2bconf->ddat_offs, b2bconf->ddat_scl);   
 	      /* Copy the final output to host */
-	      CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out->data_block->curbuf[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
+	      CudaSafeCall(cudaMemcpyAsync(&b2bconf->curbuf_out[hbufout_offset], &b2bconf->dbuf_out[dbufout_offset], b2bconf->sbufout_size, cudaMemcpyDeviceToHost, b2bconf->streams[j]));
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	}
       	  
       /* Close current buffer */
-      ipcio_close_block_write(conf.hdu_out->data_block, conf.rbufout_size);
-      ipcio_close_block_read(conf.hdu_in->data_block, conf.hdu_in->data_block->curbufsz);
-
-      if(ipcbuf_eod(db_in) > 0)
-	{
-	  ipcbuf_enable_eod(db_out);
-
-	  if(register_header(&conf))
-	    {
-	      multilog(runtime_log, LOG_ERR, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	  
-	  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-
-	  //ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  //ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-	  //ipcbuf_enable_sod((ipcbuf_t *)conf.hdu_out->data_block, write_blkid, 0);
-	  //dat_offs_scl(conf);
-	}
-      else
-	{
-	  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-	  //ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  //ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-	}
+      ipcbuf_mark_filled(db_out, curbufsz);
+      ipcbuf_mark_cleared(db_in);
+      
+      pthread_mutex_lock(&quit_mutex);
+      quit_status = quit;
+      pthread_mutex_unlock(&quit_mutex);
     }
-
-  ipcio_close_block_write(conf.hdu_out->data_block, conf.rbufout_size);
-  ipcio_close_block_read(conf.hdu_in->data_block, conf.hdu_in->data_block->curbufsz);
   
-  return EXIT_SUCCESS;
-}
-
-int dat_offs_scl(conf_t conf)
-{
-  /*
-    The procedure for fold mode is:
-    1. Get PTFT data as we did at process;
-    2. Pad the data;
-    3. Add the padded data in time;
-    4. Get the mean of the added data;
-    5. Get the scale with the mean;
-  */
-  uint64_t i, j;
-  dim3 gridsize_unpack, blocksize_unpack;
-  dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
-  dim3 gridsize_mean, blocksize_mean;
-  dim3 gridsize_sum1, blocksize_sum1;
-  dim3 gridsize_sum2, blocksize_sum2;
-  dim3 gridsize_scale, blocksize_scale;
-  dim3 gridsize_transpose_pad, blocksize_transpose_pad;
-  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset;
-    
-  char fname[MSTR_LEN];
-  FILE *fp=NULL;
+  pthread_exit(NULL);
+  ipcbuf_enable_eod(db_out);
   
-  gridsize_unpack                      = conf.gridsize_unpack;
-  blocksize_unpack                     = conf.blocksize_unpack;
-  gridsize_swap_select_transpose_swap  = conf.gridsize_swap_select_transpose_swap;   
-  blocksize_swap_select_transpose_swap = conf.blocksize_swap_select_transpose_swap; 
-  gridsize_transpose_pad               = conf.gridsize_transpose_pad;
-  blocksize_transpose_pad              = conf.blocksize_transpose_pad;
-  	         	               						       
-  gridsize_sum1              = conf.gridsize_sum1;	       
-  blocksize_sum1             = conf.blocksize_sum1;
-  gridsize_sum2              = conf.gridsize_sum2;	       
-  blocksize_sum2             = conf.blocksize_sum2;
-  gridsize_mean              = conf.gridsize_mean;	       
-  blocksize_mean             = conf.blocksize_mean;
-  gridsize_scale              = conf.gridsize_scale;	       
-  blocksize_scale             = conf.blocksize_scale;
-  
-  if(conf.hdu_in->data_block->curbuf == NULL)
-    {
-      multilog (runtime_log, LOG_ERR, "Can not get buffer block from input ring buffer, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "Can not get buffer block from input ring buffer, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-    
-  for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
-    {
-      for (j = 0; j < conf.nstream; j++)
-	{
-	  hbufin_offset = j * conf.hbufin_offset + i;
-	  dbufin_offset = j * conf.dbufin_offset; 
-	  bufrt1_offset = j * conf.bufrt1_offset;
-	  bufrt2_offset = j * conf.bufrt2_offset;
-	  
-	  /* Copy data into device */
-	  CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.hdu_in->data_block->curbuf[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
-
-	  /* Unpack raw data into cufftComplex array */
-	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-
-	  /* Do forward FFT */
-	  CufftSafeCall(cufftExecC2C(conf.fft_plans1[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
-
-	  /* Prepare for inverse FFT */
-	  swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 
-	  
-	  /* Do inverse FFT */
-	  CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
-	  
-	  /* Transpose the data from PTFT to FTP for later calculation */
-	  transpose_pad_kernel<<<gridsize_transpose_pad, blocksize_transpose_pad, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
-	  
-	  /* Get the sum of samples and square of samples */
-	  sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
-	  sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset]);
-	}
-      CudaSynchronizeCall(); // Sync here is for multiple streams
-
-      mean_kernel<<<gridsize_mean, blocksize_mean>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim);
-    }
-  /* Get the scale of each chanel */
-  scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
-  CudaSynchronizeCall();
-  
-  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN, cudaMemcpyDeviceToHost));
- 
-  for (i = 0; i< NCHAN; i++)
-    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
-  /* Record scale into file */
-  sprintf(fname, "%s/%s_scale.txt", conf.dir, conf.utc_start);
-  fp = fopen(fname, "w");
-  if(fp == NULL)
-    {
-      multilog (runtime_log, LOG_ERR, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-
-  for (i = 0; i< NCHAN; i++)
-    fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
-  fclose(fp);
-  return EXIT_SUCCESS;
+  return NULL;
 }
 
 int destroy_baseband2baseband(conf_t conf)

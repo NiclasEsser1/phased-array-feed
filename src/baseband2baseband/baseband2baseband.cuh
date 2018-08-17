@@ -59,7 +59,7 @@ typedef struct conf_t
   
   key_t key_out, key_in;
   dada_hdu_t *hdu_out, *hdu_in;
-  
+  char *curbuf_in, *curbuf_out;
   int64_t *dbuf_in;
   int8_t *dbuf_out;
   
@@ -95,10 +95,12 @@ typedef struct conf_t
   
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
   dim3 gridsize_transpose_float, blocksize_transpose_float;
+
+  char ctrl_addr[MSTR_LEN];
 }conf_t; 
 
 int init_baseband2baseband(conf_t *conf);
-int do_baseband2baseband(conf_t conf);
+void *baseband2baseband(void *conf);
 int dat_offs_scl(conf_t conf);
 int register_header(conf_t *conf);
 
