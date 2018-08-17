@@ -129,7 +129,10 @@ void *buf_control(void *conf)
       force_next_status = force_next;
       pthread_mutex_unlock(&force_next_mutex);
       if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
-	{	  
+	{
+	  //fprintf(stdout, "IPCBUF_SOD BUF CHANGE:\t%d\n", ipcbuf_sod(db));
+	  fprintf(stdout, "IPCBUF_IS_WRITING, BUF_CHANGE:\t%d\n", ipcbuf_is_writing(db));
+	  fprintf(stdout, "IPCBUF_IS_WRITER, BUF_CHANGE:\t%d\n", ipcbuf_is_writer(db));
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
 	      pthread_mutex_lock(&hdr_current_mutex[i]);
@@ -142,6 +145,9 @@ void *buf_control(void *conf)
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 	      
 	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      //pthread_mutex_lock(&ndf_chk_mutex[i]);
+	      //ndf_chk_actual[i] = ndf_chk[i];
+	      //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 	      
 	      fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 	    }
@@ -379,9 +385,9 @@ void *capture_control(void *conf)
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  pthread_mutex_lock(&ndf_chk_mutex[i]);
-		  ndf_chk_actual[i] = ndf_chk[i];
-		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
+		  //pthread_mutex_lock(&ndf_chk_mutex[i]);
+		  //ndf_chk_actual[i] = ndf_chk[i];
+		  //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 		  
 		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
@@ -409,9 +415,9 @@ void *capture_control(void *conf)
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  pthread_mutex_lock(&ndf_chk_mutex[i]);
-		  ndf_chk_actual[i] = ndf_chk[i];
-		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
+		  //pthread_mutex_lock(&ndf_chk_mutex[i]);
+		  //ndf_chk_actual[i] = ndf_chk[i];
+		  //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 		  
 		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
@@ -424,22 +430,25 @@ void *capture_control(void *conf)
 
 	      ipcbuf_enable_eod(db);
 	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
-	      ipcbuf_disable_sod(db);
-	      fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db));
-	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
 	    {
-	      fprintf(stdout, "IPCBUF_SOD, START-OF-DATA:\t%d\n", ipcbuf_sod(db));
+	      //fprintf(stdout, "IPCBUF_SOD, START-OF-DATA:\t%d\n", ipcbuf_sod(db));
+	      fprintf(stdout, "IPCBUF_IS_WRITING, START-OF-DATA:\t%d\n", ipcbuf_is_writing(db));
+	      fprintf(stdout, "IPCBUF_IS_WRITER, START-OF-DATA:\t%d\n", ipcbuf_is_writer(db));
+	      
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
 	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64":%"SCNu64"", command, source, ra, dec, &start_buf, &start_byte); // Read the start bytes from socket or get the minimum number from the buffer
 	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_byte : ipcbuf_get_write_count(db); // To make sure the start bytes is valuable, to get the most recent buffer
-
+	      fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db));
+	      
 	      fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", start_buf, start_byte);
 
+	      ipcbuf_enable_sod(db, start_buf, start_byte);
+	      
 	      /* To get time stamp for current header */
 	      sec_offset = start_buf * captureconf->blk_res + round(start_byte / captureconf->buf_dfsz) * captureconf->df_res;
 	      // Be careful here, may need to check in future, we have to put data in TFTFP order and to set start_byte to times of buf_dfsz to make this precise
@@ -667,7 +676,7 @@ void *capture_control(void *conf)
 	      	  pthread_exit(NULL);
 	      	  return NULL;
 	      	}
-	      ipcbuf_enable_sod(db, start_buf, start_byte);
+	      //ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}
 

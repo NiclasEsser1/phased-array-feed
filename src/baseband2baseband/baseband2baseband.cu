@@ -233,14 +233,13 @@ int init_baseband2baseband(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  //if(ipcbuf_disable_sod((ipcbuf_t *)conf->hdu_out->data_block) < 0)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
-  //
-
+  if(ipcbuf_disable_sod(db) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
   return EXIT_SUCCESS;
 }
 
@@ -262,6 +261,9 @@ int do_baseband2baseband(conf_t conf)
   dim3 gridsize_transpose_float, blocksize_transpose_float;
   uint64_t read_blkid, write_blkid;
   uint64_t curbufsz;
+  ipcbuf_t *db_in = NULL, *db_out = NULL;
+  db_in = (ipcbuf_t *)conf.hdu_in->data_block;
+  db_out = (ipcbuf_t *)conf.hdu_out->data_block;
   
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
@@ -281,14 +283,11 @@ int do_baseband2baseband(conf_t conf)
     }
 
   /* Start the first */
-  //start_buf = ipcbuf_get_sod_minbuf((ipcbuf_t *)conf.hdu_out->data_block);
-  //ipcbuf_enable_sod((ipcbuf_t *)conf.hdu_out->data_block, start_buf, 0);// How to set the reference time here?
-  //conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-  //conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-  ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-  ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-  //ipcbuf_enable_sod((ipcbuf_t *)conf.hdu_out->data_block, write_blkid, 0);// How to set the reference time here?
-  
+  conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
+  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+  //ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
+  //ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+    
   /* Get scale of data */
   dat_offs_scl(conf);
   
@@ -333,9 +332,9 @@ int do_baseband2baseband(conf_t conf)
       ipcio_close_block_write(conf.hdu_out->data_block, conf.rbufout_size);
       ipcio_close_block_read(conf.hdu_in->data_block, conf.hdu_in->data_block->curbufsz);
 
-      if(ipcbuf_eod((ipcbuf_t *)conf.hdu_in->data_block) > 0)
+      if(ipcbuf_eod(db_in) > 0)
 	{
-	  ipcbuf_enable_eod((ipcbuf_t *)conf.hdu_out->data_block);
+	  ipcbuf_enable_eod(db_out);
 
 	  if(register_header(&conf))
 	    {
@@ -344,19 +343,20 @@ int do_baseband2baseband(conf_t conf)
 	      return EXIT_FAILURE;
 	    }
 	  
-	  //conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  //conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-	  ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-	  ipcbuf_enable_sod((ipcbuf_t *)conf.hdu_out->data_block, write_blkid, 0);
-	  dat_offs_scl(conf);
+	  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+	  conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
+
+	  //ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+	  //ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
+	  //ipcbuf_enable_sod((ipcbuf_t *)conf.hdu_out->data_block, write_blkid, 0);
+	  //dat_offs_scl(conf);
 	}
       else
 	{
-	  //conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  //conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
-	  ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
-	  ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
+	  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+	  conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
+	  //ipcio_open_block_write(conf.hdu_out->data_block, &write_blkid);   /* Open buffer to write */
+	  //ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &read_blkid);
 	}
     }
 

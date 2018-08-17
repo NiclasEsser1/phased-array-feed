@@ -148,7 +148,9 @@ int main(int argc, char **argv)
   db_out = (ipcbuf_t *)hdu_out->data_block;
   fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
   fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
-
+  
+  ipcbuf_disable_sod(db_out);
+  
   /* Pass the header to next ring buffer */
   hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
   hdrbuf_out = ipcbuf_get_next_write(hdu_out->header_block);
@@ -164,41 +166,53 @@ int main(int argc, char **argv)
       memcpy(buf_out, buf_in, pktsz);
       ipcbuf_mark_cleared(db_in);
       ipcbuf_mark_filled(db_out, pktsz);
+
       fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
       fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
       fprintf(stdout, "IPCBUF_STATE:\t%d\n", db_in->state);
-      
+	
       if(!ipcbuf_sod(db_in))
 	{
-	  fprintf(stdout, "HERE EOD\t%d\n\n", (db_out->state));
-	  if(ipcbuf_enable_eod(db_out))
-	    break;
-	  ipcbuf_disable_sod(db_out);
-	  
-	  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);  
+	  fprintf(stdout, "HERE EOD\t%d\n", (db_in->state));
+	  fprintf(stdout, "IPCBUF_SOD:\t%d\n", ipcbuf_sod(db_in));
+	  fprintf(stdout, "IPCBUF_EOD:\t%d\n", ipcbuf_eod(db_in));
+	  //if(ipcbuf_enable_eod(db_out))
+	  //break;
+	  //ipcbuf_disable_sod(db_out);
+
+	  hdrbuf_in  = ipcbuf_get_next_read(hdu_in->header_block, &hdrsz);
 	  hdrbuf_out = ipcbuf_get_next_write(hdu_out->header_block);
 	  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
 	  
-	  if(hdrbuf_out == NULL || hdrbuf_in == NULL)
+	  if((hdrbuf_out == NULL) || (hdrbuf_in == NULL))
 	    break;
 	  ipcbuf_mark_filled(hdu_out->header_block, DADA_HDRSZ);
 	  ipcbuf_mark_cleared(hdu_in->header_block);
+
+	  fprintf(stdout, "IPCBUF_SOD:\t%d\t%"PRIu64"\n", ipcbuf_sod(db_in), ipcbuf_get_read_count(db_in));
+	  fprintf(stdout, "IPCBUF_EOD:\t%d\t%"PRIu64"\n", ipcbuf_eod(db_in), ipcbuf_get_read_count(db_in));
 	  
-	  read_blksz = 0;
-	  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz); // Why here is NULL?
-	  buf_out = ipcbuf_get_next_write(db_out);
 	  if(ipcbuf_enable_sod(db_out, ipcbuf_get_write_count(db_out), 0))
 	    {
 	      fprintf(stdout, "HERE SOD INSIDE\n");
 	      break;
 	    }
+	  fprintf(stdout, "%d\n", ipcbuf_sod(db_in));
 	  
-	  if(buf_out == NULL || buf_in == NULL)
+	  read_blksz = 0;
+	  buf_in  = ipcbuf_get_next_readable(db_in, &read_blksz);
+	  buf_in  = ipcbuf_get_next_read(db_in, &read_blksz); 
+	  buf_out = ipcbuf_get_next_write(db_out);
+	  if(buf_out == NULL)
 	    {
-	      fprintf(stdout, "HERE AFTER OUT OPEN\n");
+	      fprintf(stdout, "HERE AFTER OUT OPEN OUT\n");
 	      break;
 	    }
-	  fprintf(stdout, "HERE AFTER OUT OPEN\n");
+	  if(buf_in == NULL)
+	    {
+	      fprintf(stdout, "HERE AFTER OUT OPEN IN\n");
+	      break;
+	    }
 	}
       else
 	{

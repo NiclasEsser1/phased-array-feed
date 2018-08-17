@@ -1,5 +1,5 @@
-#ifndef CAPTURE_H
-#define CAPTURE_H
+#ifndef __CAPTURE_H
+#define __CAPTURE_H
 
 #include <netinet/in.h>
 #include <stdint.h>
