@@ -182,8 +182,8 @@ int main(int argc, char **argv)
   dada_hdu_disconnect(conf.hdu_in);
   dada_hdu_destroy(conf.hdu_in);
 
-  fclose(fp_log);
   multilog(runtime_log, LOG_INFO, "BASEBAND2BASEBAND_DEMO END\n");
+  fclose(fp_log);
   
   return EXIT_SUCCESS;
 }
@@ -211,7 +211,6 @@ void *baseband2baseband(void *conf)
   pthread_mutex_unlock(&quit_mutex);
   
   hdrbuf_in = ipcbuf_get_next_read(hdr_in, &hdrsz);
-  fprintf(stdout, "Got HEADER 1\n");
   if(!hdrbuf_in)
     {
       multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -225,7 +224,6 @@ void *baseband2baseband(void *conf)
       return NULL;
     }
   memcpy(b2bconf->hdr, hdrbuf_in, DADA_HDRSZ);  // Get a copy of the header
-  fprintf(stdout, "Got HEADER 2\n");
   
   if(ascii_header_get(hdrbuf_in, "MJD_START", "%lf", &mjdstart_ref) < 0)
     {
@@ -240,7 +238,6 @@ void *baseband2baseband(void *conf)
       return NULL;
     }
   b2bconf->sec_ref = (time_t)round(SECDAY * (mjdstart_ref - MJD1970));
-  fprintf(stdout, "Got HEADER 3\n");
   if(ascii_header_get(hdrbuf_in, "PICOSECONDS", "%"PRIu64, &(b2bconf->picoseconds_ref)) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -269,18 +266,23 @@ void *baseband2baseband(void *conf)
       
       ipcbuf_mark_filled(db_out, b2bconf->pktsz);
       ipcbuf_mark_cleared(db_in);
-      fprintf(stdout, "HERE 3\n");
-            
-      fprintf(stdout, "HERE 1\n");
       b2bconf->curbuf_in  = ipcbuf_get_next_read(db_in, &b2bconf->curbufsz);
       b2bconf->curbuf_out = ipcbuf_get_next_write(db_out);
-      fprintf(stdout, "HERE 2\t%d\n", ipcbuf_eod(db_in));
-      fprintf(stdout, "HERE 2\t%d\n", ipcbuf_sod(db_in));
+      fprintf(stdout, "HERE EOD\t%d\t", ipcbuf_eod(db_in));
+      fprintf(stdout, "HERE SOD\t%d\n", ipcbuf_sod(db_in));
+      fprintf(stdout, "HERE EOD\t%d\t", ipcbuf_eod(db_in));
+      fprintf(stdout, "HERE SOD\t%d\n\n", ipcbuf_sod(db_in));
 
       pthread_mutex_lock(&quit_mutex);
       quit_status = quit;
       pthread_mutex_unlock(&quit_mutex);
-    }  
+    }
+
+  fprintf(stdout, "HERE\n");
+  
+  pthread_mutex_lock(&quit_mutex);
+  quit = 1;
+  pthread_mutex_unlock(&quit_mutex);
   
   pthread_exit(NULL);
   return NULL;
@@ -508,8 +510,12 @@ void *control(void *conf)
 	      	  pthread_exit(NULL);
 	      	  return NULL;
 	      	}
+	      fprintf(stdout, "HERE START-OF-DATA\n");
 	    }
-	} 
+	}
+      pthread_mutex_lock(&quit_mutex);
+      quit_status = quit;
+      pthread_mutex_unlock(&quit_mutex);
     }
   pthread_exit(NULL);
   return NULL;

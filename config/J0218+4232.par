@@ -1,0 +1,77 @@
+PSRJ            J0218+4232               
+NAME            J0218+4232               
+RAJ             02:18:06.358569          4.000e-06 
+DECJ            +42:32:17.37515          8.000e-05 
+ELONG           47.05                    
+ELAT            27.01                    
+DM              61.252                   5.000e-03 
+PEPOCH          55000                    
+F0              430.461054545748         1.500e-11 
+F1              -1.434113E-14            1.300e-19 
+P0              0.00232309053151224      8.000e-17 
+P1              7.73955E-20              7.000e-25 
+DIST_DM         2.93                     
+DIST_DM1        2.67                     
+SURVEY          misc,gbncc               
+PMRA            5.35                     5.000e-02 
+PMDEC           -3.74                    1.200e-01 
+S100            270                      
+S150            432.0                    5.900e+00 
+S400            35                       5.000e+00 
+S600            8                        5.000e+00 
+S1400           0.9                      2.000e-01 
+POSEPOCH        55849.1                  
+DMEPOCH         55000.00                 
+F2              2.8E-26                  8.800e-26 
+BINARY          ELL1                     
+PB              2.02884611561            9.000e-11 
+ECC             6.8E-6                   4.000e-07 
+A1              1.9844344                4.000e-07 
+OM              49                       4.000e-02 
+TASC            49150.6089170            3.000e-07 
+EPS1            5.1E-6                   4.000e-07 
+EPS2            4.5E-6                   4.000e-07 
+DIST_AMN        2.55                     
+DIST_AMX        4.00                     
+DIST_A          3.15                     
+ASSOC           GRS:2FGL_J0218.1+4233[naa
+BINCOMP         He[ker96]                
+AGE             4.76e+08                 
+SPINDX          -2.76                    1.100e-01 
+PX              0.16                     9.000e-02 
+TYPE            HE[khvb98,aaa+09f]       
+FB0             5.7047569971E-6          3.000e-16 
+DATE            1995                     
+DIST            3.15                     
+DIST1           3.15                     
+PMERR_PA        50.815                   
+P1_I            7.66e-20                 
+AGE_I           4.80e+08                 
+BSURF_I         4.27e+08                 
+EDOT_I          2.41e+35                 
+EDOTD2          2.5e+34                  
+R_LUM           347.29                   
+R_LUM14         8.93                     
+PMTOT           6.53                     9.000e-02 
+VTRANS          97.48                    
+BSURF           4.29e+08                 
+B_LC            3.21e+05                 
+SI414           2.92                     
+EDOT            2.4e+35                  
+RAJD            34.52649                 
+DECJD           42.53816                 
+OSURVEY         2000400000               
+MASSFN            0.002038               
+MINMASS           0.167432               
+MEDMASS           0.195730               
+DMSINB          -18.45                   
+GL              139.51                   
+GB              -17.53                   
+XX              1.95                     
+YY              10.78                    
+ZZ              -0.95                    
+PML             6.93                     7.000e-02 
+PMB             -0.57                    1.200e-01 
+UPRMASS           0.423837               
+MINOMDOT            0.0808               
+UNITS           TCB                      
