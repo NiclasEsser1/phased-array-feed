@@ -398,6 +398,7 @@ void *capture_control(void *conf)
 	      pthread_mutex_unlock(&quit_mutex);
 
 	      ipcbuf_enable_eod(db);
+	      ipcbuf_disable_sod(db);
 	      close(sock);
 	      pthread_exit(NULL);
 	      return NULL;

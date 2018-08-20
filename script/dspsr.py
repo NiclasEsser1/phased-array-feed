@@ -44,9 +44,10 @@ if __name__ == "__main__":
     dvolume       = '{:s}:{:s}'.format(directory, directory)
     
     previous_container_name = "paf-baseband2baseband-demo.beam{:02d}part{:02d}".format(beam, part)
-    current_container_name  = "paf-dsspr.beam{:02d}part{:02d}".format(beam, part)
+    current_container_name  = "paf-dspsr.beam{:02d}part{:02d}".format(beam, part)
     kfname_b2b              = "baseband2baseband-demo.beam{:02d}part{:02d}.key".format(beam, part)
-    
-    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base dspsr -E  ../config/J1939+2134.par {:s}".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, kfname_b2b)
+
+    # J1939+2134.par
+    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base dspsr -E  ../config/J0835-4510.par {:s}".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, kfname_b2b)
     print com_line
     os.system(com_line)

@@ -252,15 +252,10 @@ void *baseband2baseband(void *conf)
     }    
   ipcbuf_mark_cleared(hdr_in); // Clear the header block for later use
 
-  fprintf(stdout, "HERE 1\t%d\n", ipcbuf_sod(db_in));
-  
   b2bconf->curbuf_in  = ipcbuf_get_next_read(db_in, &b2bconf->curbufsz);
   b2bconf->curbuf_out = ipcbuf_get_next_write(db_out);
-  fprintf(stdout, "HERE 2\n");
-  
-  
-  //while(!ipcbuf_eod(db_in) && (quit_status == 0))
-  while(ipcbuf_sod(db_in) && (quit_status == 0))
+
+  while(!ipcbuf_eod(db_in) && (quit_status == 0))
     {
       memcpy(b2bconf->curbuf_out, b2bconf->curbuf_in, b2bconf->pktsz);
       
@@ -277,8 +272,6 @@ void *baseband2baseband(void *conf)
       quit_status = quit;
       pthread_mutex_unlock(&quit_mutex);
     }
-
-  fprintf(stdout, "HERE\n");
   
   pthread_mutex_lock(&quit_mutex);
   quit = 1;
