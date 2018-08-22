@@ -114,7 +114,8 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     destination_active, destination_dead = check_all_ports(destination, pktsz, sec_prd, ndf_check)
     print "The active destination \"[IP:PORT:NCHUNK_EXPECT:NCHUNK_ACTUAL]\" are: ", destination_active
     print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
-    
+
+    print(datetime.datetime.now())
     # Create PSRDADA buffer
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 

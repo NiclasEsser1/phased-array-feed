@@ -24,6 +24,8 @@ def ConfigSectionMap(fname, section):
 def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part):
     dir_capture = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
     destination_active, destination_dead, refinfo, key = captureinfo.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
+    print(datetime.datetime.now())
+        
     if (len(destination_active) == 0):
         print "There is no active port for beam {:02d}, part {:02d}, have to abort ...".format(beam, part)
         exit(1)

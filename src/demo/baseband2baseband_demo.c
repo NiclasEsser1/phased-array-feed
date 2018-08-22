@@ -354,6 +354,12 @@ void *control(void *conf)
 
 	      ipcbuf_enable_eod(db_out);
 	      ipcbuf_disable_sod(db_out);
+
+	      ipcbuf_enable_eod(hdr_out);
+	      ipcbuf_disable_sod(hdr_out);
+	      
+	      hdrbuf_out = ipcbuf_get_next_write(hdr_out);
+	      ipcbuf_mark_filled(hdr_out, 0);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
@@ -367,6 +373,7 @@ void *control(void *conf)
 	      fprintf(stdout, "%"PRIu64"\n", start_buf);
 
 	      ipcbuf_enable_sod(db_out, start_buf, 0);
+	      ipcbuf_enable_sod(hdr_out, ipcbuf_get_write_count(hdr_out), 0);
 	      
 	      /* To get time stamp for current header */
 	      sec_offset = start_buf * b2bconf->blk_res;

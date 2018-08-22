@@ -2,6 +2,7 @@
 
 import captureinfo, metadata2streaminfo
 import argparse, ConfigParser, os
+import time
 
 def ConfigSectionMap(fname, section):
     # Play with configuration file
