@@ -29,6 +29,8 @@ extern uint64_t ndf_chk[MCHK_CAPTURE];
 
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
+
+extern hdr_t hdr0[MPORT_CAPTURE];
 extern hdr_t hdr_ref[MPORT_CAPTURE];
 extern hdr_t hdr_current[MPORT_CAPTURE];
 
@@ -139,7 +141,8 @@ void *buf_control(void *conf)
 	      hdr = hdr_current[i];
 	      pthread_mutex_unlock(&hdr_current_mutex[i]);
 	      
-	      ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      //ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
 	      pthread_mutex_lock(&ndf_port_mutex[i]);
 	      ndf_port_actual[i] = ndf_port[i];
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
@@ -379,7 +382,8 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  //ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
@@ -411,7 +415,8 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  //ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);

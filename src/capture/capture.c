@@ -30,6 +30,7 @@ uint64_t ndf_chk[MCHK_CAPTURE];
 
 int transit[MPORT_CAPTURE];
 uint64_t tail[MPORT_CAPTURE];
+hdr_t hdr0[MPORT_CAPTURE]; // It is the reference for packet counter, we do not need mutex lock for this
 hdr_t hdr_ref[MPORT_CAPTURE];
 hdr_t hdr_current[MPORT_CAPTURE];
 
@@ -203,10 +204,27 @@ void *capture(void *conf)
       return NULL;
     }
 
+  if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)  // This is the reference for the counter, which is different from the start of capture
+    {
+      multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      
+      /* Force to quit if we have time out */
+      pthread_mutex_lock(&quit_mutex);
+      quit = 1;
+      pthread_mutex_unlock(&quit_mutex);
+      
+      free(df);
+      conf = (void *)captureconf;
+      pthread_exit(NULL);
+      return NULL;
+    }
+  hdr_keys(df, &hdr0[ithread]);               // Get header information, which will be used to get the location of packets
+
   pthread_mutex_lock(&quit_mutex);
   quit_status = quit;
   pthread_mutex_unlock(&quit_mutex);
-  
+
   while(quit_status == 0)
   //while(quit == 0)
     {
