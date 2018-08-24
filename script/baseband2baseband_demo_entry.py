@@ -77,28 +77,29 @@ if __name__ == "__main__":
     blk_res = ndf_chk_rbuf_b2b * sec_prd / float(ndf_chk_prd)
 
     # Create PSRDADA buffer
-    blksz = pktsz
-    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
+    blksz = pktsz * 100
+    #os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
 
     # Once the buffer is ready, tell CAPTURE part to enable start-of-data
-    address   = "capture.beam{:02d}part{:02d}.socket".format(beam, part)
-    start_buf = 0
-    src_name  = "PSR J1939+2134"# should from telescope metadata
-    ra        = "06 05 56.34"   # should from telescope metadata
-    dec       = "+23 23 40.00"  # should from telescope metadata
-    command_value = "START-OF-DATA:{:s}:{:s}:{:s}:{:d}".format(src_name, ra, dec, start_buf)
-    while True:        
-        if os.path.exists(address):
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            sock.sendto("{:s}\n".format(command_value), address)
-            sock.close()
-            break
+    #address   = "capture.beam{:02d}part{:02d}.socket".format(beam, part)
+    #start_buf = 0
+    #src_name  = "PSR J1939+2134"# should from telescope metadata
+    #ra        = "06 05 56.34"   # should from telescope metadata
+    #dec       = "+23 23 40.00"  # should from telescope metadata
+    #command_value = "START-OF-DATA:{:s}:{:s}:{:s}:{:d}".format(src_name, ra, dec, start_buf)
+    #while True:        
+    #    if os.path.exists(address):
+    #        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    #        sock.sendto("{:s}\n".format(command_value), address)
+    #        sock.close()
+    #        break
             
     # Run the baseband2baseband software
-    baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d}".format(key_capture, key_b2b, pktsz)
+    #baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d}".format(key_capture, key_b2b, pktsz)
+    baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d}".format(key_capture, key_b2b, blksz)
     print baseband2baseband_demo_command
     
     os.system(baseband2baseband_demo_command)
     
     # Delete PSRDADA buffer
-    os.system("dada_db -d -k {:s}".format(key_b2b))
+    #os.system("dada_db -d -k {:s}".format(key_b2b))

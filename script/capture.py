@@ -75,7 +75,8 @@ if __name__ == "__main__":
     else:
         blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
 
-    instrument = "PAF-BEAM{:02d}PART{:02d}".format(beam, part)
+    #instrument = "PAF-BEAM{:02d}PART{:02d}".format(beam, part)
+    instrument = "BEAM{:02d}".format(beam)
     ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
     address_nchk = " ".join(address_nchks[beam][part])
     

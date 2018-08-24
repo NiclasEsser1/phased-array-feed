@@ -48,6 +48,7 @@ if __name__ == "__main__":
     kfname_b2b              = "baseband2baseband-demo.beam{:02d}part{:02d}.key".format(beam, part)
 
     # J1939+2134.par
-    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base dspsr -E  ../config/J0835-4510.par {:s}".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, kfname_b2b)
+    #com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base dspsr -E  ../config/J0835-4510.par {:s}".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, kfname_b2b)
+    com_line = "docker run --rm -it --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name)
     print com_line
     os.system(com_line)

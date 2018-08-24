@@ -78,9 +78,11 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     print capture_command
     os.system(capture_command)
     
-    # Delete PSRDADA buffer 
+    # Delete PSRDADA buffer
+    key_b2b          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
     os.system("dada_db -d -k {:s}".format(key))
-
+    os.system("dada_db -d -k {:s}".format(key_b2b))
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data from given beam and given part')    
     parser.add_argument('-a', '--system_conf', type=str, nargs='+',

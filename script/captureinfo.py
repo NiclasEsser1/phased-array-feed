@@ -119,6 +119,13 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     # Create PSRDADA buffer
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
 
+    # Added for b2b
+    blksz = pktsz * 100    
+    nblk_b2b         = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nblk'])
+    nreader_b2b      = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
+    key_b2b          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
+    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
+        
     # Get reference timestamp of capture
     refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
     print "The reference timestamp \"(DF_SEC, DF_IDF)\"for current capture is: ", refinfo

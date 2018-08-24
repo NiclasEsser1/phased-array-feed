@@ -12,7 +12,7 @@ SECONDARY    unset               # secondary node host name
 FILE_NAME    unset               # full path of the data file
 
 #FILE_SIZE    86016000000         # requested size of data files, it is 27 seconds (if we do not record header of each packet)
-FILE_SIZE    7232         # requested size of data files, it is 27 seconds (if we do not record header of each packet)
+FILE_SIZE    723200         # requested size of data files, it is 27 seconds (if we do not record header of each packet)
 FILE_NUMBER  0                   # number of data file
 
 # time of the rising edge of the first time sample
