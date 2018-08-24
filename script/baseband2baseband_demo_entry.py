@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 import captureinfo, metadata2streaminfo
-import argparse, ConfigParser, os
+import argparse, ConfigParser, os, stat
 import time
+import socket
 
 def ConfigSectionMap(fname, section):
     # Play with configuration file
@@ -21,8 +22,6 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-#def main():
-    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To pass baseband data from a ring buffer into another')    
     parser.add_argument('-a', '--system_conf', type=str, nargs='+',
@@ -81,7 +80,22 @@ if __name__ == "__main__":
     blksz = pktsz
     os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
 
-    baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d} -d {:s} -e {:f} -f 1:9:10".format(key_capture, key_b2b, pktsz, ctrl_socket, blk_res)
+    # Once the buffer is ready, tell CAPTURE part to enable start-of-data
+    address   = "capture.beam{:02d}part{:02d}.socket".format(beam, part)
+    start_buf = 0
+    src_name  = "PSR J1939+2134"# should from telescope metadata
+    ra        = "06 05 56.34"   # should from telescope metadata
+    dec       = "+23 23 40.00"  # should from telescope metadata
+    command_value = "START-OF-DATA:{:s}:{:s}:{:s}:{:d}".format(src_name, ra, dec, start_buf)
+    while True:        
+        if os.path.exists(address):
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            sock.sendto("{:s}\n".format(command_value), address)
+            sock.close()
+            break
+            
+    # Run the baseband2baseband software
+    baseband2baseband_demo_command = "../src/demo/baseband2baseband_demo -a {:s} -b {:s} -c {:d}".format(key_capture, key_b2b, pktsz)
     print baseband2baseband_demo_command
     
     os.system(baseband2baseband_demo_command)
