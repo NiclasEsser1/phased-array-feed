@@ -133,8 +133,8 @@ void *buf_control(void *conf)
       if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
 	{
 	  //fprintf(stdout, "IPCBUF_SOD BUF CHANGE:\t%d\n", ipcbuf_sod(db));
-	  fprintf(stdout, "IPCBUF_IS_WRITING, BUF_CHANGE:\t%d\n", ipcbuf_is_writing(db));
-	  fprintf(stdout, "IPCBUF_IS_WRITER, BUF_CHANGE:\t%d\n", ipcbuf_is_writer(db));
+	  //fprintf(stdout, "IPCBUF_IS_WRITING, BUF_CHANGE:\t%d\n", ipcbuf_is_writing(db));
+	  //fprintf(stdout, "IPCBUF_IS_WRITER, BUF_CHANGE:\t%d\n", ipcbuf_is_writer(db));
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
 	      pthread_mutex_lock(&hdr_current_mutex[i]);
@@ -370,7 +370,6 @@ void *capture_control(void *conf)
     {
       if(recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
-	  //db = (ipcbuf_t *)captureconf->hdu->data_block;
 	  if(strstr(command_line, "END-OF-CAPTURE") != NULL)
 	    {	      
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");

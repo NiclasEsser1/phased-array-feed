@@ -18,4 +18,6 @@ docker run --rm -ti \
        # Enable the X of container, should be used with -v /home:/home
        --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=gpu_id -e NVIDIA_DRIVER_CAPABILITIES=all\
        # To use nvidia feature inside container, set the visible device and the capabilities of it
+       --cap-add=SYS_PTRACE \
+       # To enable GDB inside docker
        image_name

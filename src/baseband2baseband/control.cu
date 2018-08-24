@@ -40,7 +40,7 @@ int dat_offs_scl(conf_t conf)
   dim3 gridsize_scale, blocksize_scale;
   dim3 gridsize_transpose_pad, blocksize_transpose_pad;
   uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset;
-    
+  
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
   gridsize_swap_select_transpose_swap  = conf.gridsize_swap_select_transpose_swap;   

@@ -357,6 +357,9 @@ void *control(void *conf)
 
 	      ipcbuf_enable_eod(hdr_out);
 	      ipcbuf_disable_sod(hdr_out);
+
+	      //ipcbuf_hard_reset(db_out);
+	      //ipcbuf_hard_reset(hdr_out);
 	      
 	      hdrbuf_out = ipcbuf_get_next_write(hdr_out);
 	      ipcbuf_mark_filled(hdr_out, 0);
