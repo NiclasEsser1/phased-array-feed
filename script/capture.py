@@ -54,8 +54,9 @@ if __name__ == "__main__":
     dvolume = '{:s}:{:s}'.format(ddir, ddir)
     hvolume = '{:s}:{:s}'.format(hdir, hdir)
 
-    dname          = "paf-capture"
-    container_name = "{:s}.beam{:02d}part{:02d}".format(dname, beam, part)
+    dname          = "phased-array-feed"
+    container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
+    script_name    = "capture_entry.py"
     
     nodes, address_nchks, freqs, nchans = metadata2streaminfo.metadata2streaminfo(system_conf)
     freq = freqs[beam][part]
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
     address_nchk = " ".join(address_nchks[beam][part])
     
-    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}".format(dvolume, hvolume, uid, gid, container_name, dname, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     
     print com_line
     os.system(com_line)
