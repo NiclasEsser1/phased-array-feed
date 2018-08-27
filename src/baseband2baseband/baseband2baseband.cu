@@ -274,7 +274,6 @@ int baseband2baseband(conf_t conf)
     // The first time we open a block at the scale calculation, we need to make sure that the input ring buffer block is bigger than the block needed for scale calculation
     // Otherwise we have to open couple of blocks to calculate scales and these blocks will dropped after that
     {
-      fprintf(stdout, "EOD:\t%d\n", ipcbuf_eod(conf.db_in));
       conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
       conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
       

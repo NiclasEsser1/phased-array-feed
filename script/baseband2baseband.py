@@ -59,7 +59,7 @@ if __name__ == "__main__":
     key_b2b        = ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']
     nstream        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nstream'])
     ndf_chk_stream = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['ndf_chk_stream'])
-    nrepeat = ndf_chk_rbuf / (ndf_chk_stream * nstream)
+    nrepeat        = ndf_chk_rbuf / (ndf_chk_stream * nstream)
     
     com_line = "docker run --ipc=container:{:s} --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"taskset -c {:d} /home/pulsar/xinping/phased-array-feed/src/baseband2baseband/{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}\"".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, dname, cpu, software_name, key_capture, key_b2b, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, directory)
     
