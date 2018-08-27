@@ -29,8 +29,8 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 
 INCLUDE_DIRS = 
 
-baseband2baseband_main:cudautil.o kernel.o baseband2baseband_main.o baseband2baseband.o control.o
-	$(NVCC) -o baseband2baseband cudautil.o kernel.o baseband2baseband_main.o baseband2baseband.o control.o $(LIB_DIRS) $(LIBS) 
+baseband2baseband_main:cudautil.o kernel.o baseband2baseband_main.o baseband2baseband.o 
+	$(NVCC) -o baseband2baseband_main cudautil.o kernel.o baseband2baseband_main.o baseband2baseband.o $(LIB_DIRS) $(LIBS) 
 
 baseband2baseband_main.o:baseband2baseband_main.cu
 	$(NVCC) -c baseband2baseband_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
@@ -43,9 +43,6 @@ kernel.o:kernel.cu
 
 cudautil.o:cudautil.cu
 	$(NVCC) -c cudautil.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
-
-control.o:control.cu
-	$(NVCC) -c control.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 clean:
 	rm -f *.o *~

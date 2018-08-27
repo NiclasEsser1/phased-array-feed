@@ -11,40 +11,46 @@
 #include "dada_def.h"
 #include "ipcio.h"
 #include "ascii_header.h"
+#include "ipcbuf.h"
 #include "daemon.h"
 #include "futils.h"
 
-#define MSTR_LEN    1024
+#define MSTR_LEN      1024
+#define DADA_HDRSZ    4096
 
-#define DADA_HDRSZ         4096
-#define NCHK_CAPTURE          48   // How many frequency chunks we will receive, we should read the number from metadata
+#define NCHK_BEAM             48   // How many frequency chunks we will receive, we should read the number from metadata
 #define NCHAN_CHK             7
 #define NSAMP_DF              128
 #define NPOL_SAMP             2
 #define NDIM_POL              2
+#define NCHAN_IN              (NCHK_BEAM * NCHAN_CHK)
 
-#define NBYTE_IN              2    // int16_t
-#define NBYTE_OUT             1    // int8_t
+#define NBYTE_IN              2   // 16 bits
+#define NBYTE_OUT             1   // 8 bits
 
-#define OSAMP_RATEI           0.84375
+#define OSAMP_RATEI           0.84375  // 27.0/32.0
 #define CUFFT_RANK1           1
-#define CUFFT_RANK2           1               // Only for fold mode
+#define CUFFT_RANK2           1         
 
 #define CUFFT_NX1             64
 #define CUFFT_MOD1            27              // Set to remove oversampled data
-#define NCHAN_KEEP1           54              // (OSAMP_RATEI * CUFFT_NX1)
-#define CUFFT_NX2             54
-#define CUFFT_MOD2            27              // CUFFT_NX2 / 2
-#define NCHAN_KEEP2           17496            // (CUFFT_NX2 * NCHAN_FOLD) for fold mode
-#define NCHAN_EDGE            324             // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK - NCHAN_KEEP2)/2
-#define TILE_DIM              54              // CUFFT_NX2, only for fold mode
-#define NROWBLOCK_TRANS       18               // a good number which can be devided by CUFFT_NX2 (TILE_DIM), only for fold mode
-#define NCHAN                 324             // Final number of channels for fold mode
-#define NCHAN_RATEI           (28.0/27.0)     // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK)/NCHAN_KEEP2
+#define NCHAN_KEEP1           (CUFFT_NX1 * OSAMP_RATEI)
+#define CUFFT_NX2             54              // We work in seperate raw channels
+#define CUFFT_MOD2            (CUFFT_NX2/2)         
 
-#define SCALE            ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1))
+#define NCHAN_OUT             324             // Final number of channels, multiple times of CUFFT2_NX2
+#define NCHAN_RATEI           (NCHAN_IN/(double)NCHAN_OUT)
 
-#define SCL_INT8              127.0f          // For int8_t, for fold mode
+#define NCHAN_KEEP2           (CUFFT_NX2 * NCHAN_OUT) 
+#define NCHAN_EDGE            ((NCHAN_IN * NCHAN_KEEP1 - NCHAN_KEEP2)/2)
+#define TILE_DIM              54               // CUFFT_NX2
+#define NROWBLOCK_TRANS       18               // Multiple times of TILE_DIM (CUFFT_NX2)
+
+#define SCALE                ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1))
+#define TSAMP                 1.0
+#define NBIT                  8
+
+#define SCL_INT8              127.0f          // int8_t
 #define SCL_NSIG              4.0f            // 4 sigma, 99.993666%
 
 typedef struct conf_t
@@ -79,6 +85,8 @@ typedef struct conf_t
   uint64_t rbufin_size, rbufout_size;
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
+
+  ipcbuf_t *db_in, *db_out;
   
   float *ddat_offs, *dsquare_mean, *ddat_scl;
   float *hdat_offs, *hsquare_mean, *hdat_scl;
@@ -95,12 +103,10 @@ typedef struct conf_t
   
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
   dim3 gridsize_transpose_float, blocksize_transpose_float;
-
-  char ctrl_addr[MSTR_LEN];
 }conf_t; 
 
 int init_baseband2baseband(conf_t *conf);
-void *baseband2baseband(void *conf);
+int baseband2baseband(conf_t conf);
 int dat_offs_scl(conf_t conf);
 int register_header(conf_t *conf);
 

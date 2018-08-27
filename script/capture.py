@@ -22,7 +22,7 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# ./capture.py -a ../config/system.conf -b ../config/pipeline.conf -c 0 -d 0 -e 1 -f 1
+# ./capture.py -a ../config/system.conf -b ../config/pipeline.conf -c 0 -d 0 -e 0 -f 1
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts) with a docker container')
     
@@ -70,18 +70,13 @@ if __name__ == "__main__":
     nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
     nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
     df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
-    pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
-    if hdr == 1:
-        blksz    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
-    else:
-        blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
-
+    
     #instrument = "PAF-BEAM{:02d}PART{:02d}".format(beam, part)
     instrument = "BEAM{:02d}".format(beam)
     ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
     address_nchk = " ".join(address_nchks[beam][part])
     
-    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, hdr, bind, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     
     print com_line
     os.system(com_line)

@@ -38,6 +38,13 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     kfile.writelines("DADA INFO:\n")
     kfile.writelines("key {:s}\n".format(key))
     kfile.close()
+
+    key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
+    kfname       = "baseband2baseband.beam{:02d}part{:02d}.key".format(beam, part)
+    kfile = open(kfname, "w")
+    kfile.writelines("DADA INFO:\n")
+    kfile.writelines("key {:s}\n".format(key_b2b))
+    kfile.close()
     
     # To set up cpu cores if we decide to bind threads
     ncpu_numa = int(ConfigSectionMap(system_conf, "NUMA")['ncpu_numa'])

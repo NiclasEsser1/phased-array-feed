@@ -22,7 +22,7 @@ void usage ()
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
 	   " -c  The number of data frame (per frequency chunk) of each incoming ring buffer block\n"
-	   " -d  How many times we need to repeat the process and finish each incoming block\n"
+	   " -d  How many times we need to repeat the process to finish one incoming block\n"
 	   " -e  The number of streams \n"
 	   " -f  The number of data frame (per frequency chunk) of each stream\n"
 	   " -g  The directory to put log file\n"	   
@@ -99,12 +99,12 @@ int main(int argc, char *argv[])
 
   init_baseband2baseband(&conf);
   
-  //if(do_baseband2baseband(conf))
-  //  {
-  //    multilog (runtime_log, LOG_ERR, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf(stderr, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    return EXIT_FAILURE;
-  //  }
+  if(baseband2baseband(conf))
+    {
+      multilog (runtime_log, LOG_ERR, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
 
   destroy_baseband2baseband(conf);
 

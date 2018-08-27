@@ -87,47 +87,64 @@ def check_port(ip, port, pktsz, ndf_check):
         active = 0        
 
     return active, nchunk_active
+    
+def capture_db(key_capture, blksz_capture, nblk_capture, nreader_capture):
+    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_capture, blksz_capture, nblk_capture, nreader_capture))
 
+def b2b_db(key_b2b, blksz, nblk_b2b, nreader_b2b):
+    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
+    
 def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     # Get pipeline configuration from configuration file
-    ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
-    ndf_check    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_check'])
-    nblk         = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
-    key          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
-    nreader      = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nreader'])
+    ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
+    ndf_check       = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_check'])
+    nblk_capture    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nblk'])
+    key_capture     = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['key']), 0), 'x')
+    nreader_capture = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['nreader'])
     
     # Get system configuration from configuration file
-    sec_prd      = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
-    nsamp_df     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
-    npol_samp    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
-    ndim_pol     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
-    nbyte_dim    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
-    nchan_chk    = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
-    df_hdrsz     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
-    pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
+    sec_prd       = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
+    nsamp_df      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
+    npol_samp     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
+    ndim_pol      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
+    nbyte_dim     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
+    nchan_chk     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nchan_chk'])
+    df_hdrsz      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_hdrsz'])
+    pktsz_capture = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if hdr == 1:
-        blksz    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
+        blksz_capture    = ndf_chk_rbuf * (nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan + df_hdrsz * nchan / nchan_chk)
     else:
-        blksz    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
+        blksz_capture    = ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan
     
     # Check the connection
-    destination_active, destination_dead = check_all_ports(destination, pktsz, sec_prd, ndf_check)
+    destination_active, destination_dead = check_all_ports(destination, pktsz_capture, sec_prd, ndf_check)
     print "The active destination \"[IP:PORT:NCHUNK_EXPECT:NCHUNK_ACTUAL]\" are: ", destination_active
     print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
 
-    print(datetime.datetime.now())
-    # Create PSRDADA buffer
-    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
+    # Create PSRDADA buffer for baseband2baseband
+    nbyte_in     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_in'])
+    nbyte_out    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_out'])    
+    nchan_in     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_in'])
+    nchan_out    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_out'])
+    osamp_ratei  = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['osamp_ratei'])
+    ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['ndf_chk_rbuf'])
+    
+    blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan * nchan_out * nbyte_out / (nchan_in * nbyte_in) * osamp_ratei)
+    nblk_b2b     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nblk'])
+    nreader_b2b  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
+    key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
 
-    # Added for b2b
-    blksz = pktsz * 100    
-    nblk_b2b         = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nblk'])
-    nreader_b2b      = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
-    key_b2b          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
-    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
-        
+    t_capture_db = threading.Thread(target = capture_db, args=(key_capture, blksz_capture, nblk_capture, nreader_capture, ))
+    t_b2b_db     = threading.Thread(target = b2b_db, args=(key_b2b, blksz_b2b, nblk_b2b, nreader_b2b, ))
+
+    t_capture_db.start()
+    t_b2b_db.start()
+    
+    t_capture_db.join()
+    t_b2b_db.join()
+    
     # Get reference timestamp of capture
-    refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
+    refinfo = capture_refinfo(destination_active[0], pktsz_capture, system_conf)
     print "The reference timestamp \"(DF_SEC, DF_IDF)\"for current capture is: ", refinfo
     
-    return destination_active, destination_dead, refinfo, key
+    return destination_active, destination_dead, refinfo, key_capture

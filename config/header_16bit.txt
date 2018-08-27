@@ -11,8 +11,8 @@ PRIMARY      BMF                 # primary node host name
 SECONDARY    unset               # secondary node host name
 FILE_NAME    unset               # full path of the data file
 
-#FILE_SIZE    86016000000         # requested size of data files, it is 27 seconds (if we do not record header of each packet)
-FILE_SIZE    7232         # requested size of data files, it is 27 seconds (if we do not record header of each packet)
+FILE_SIZE    86016000000         # requested size of data files, it is 27 seconds (if we do not record header of each packet)
+#FILE_SIZE    7232               # requested size of data files, it is 27 seconds (if we do not record header of each packet)
 FILE_NUMBER  0                   # number of data file
 
 # time of the rising edge of the first time sample
@@ -36,7 +36,7 @@ FREQ         unset             # centre frequency in MHz
 BW           336               # bandwidth of in MHz (-ve lower sb)
 TSAMP        0.84375           # sampling interval in microseconds
 
-BYTES_PER_SECOND  3185777777.77778   # 336 channels, 8 bytes/sample, 128 samples in 108us
+BYTES_PER_SECOND  3185777778   # 336 channels, 8 bytes/sample, 128 samples in 108us, round to int
 NBIT         16                 # number of bits per sample
 NDIM         2                 # dimension of samples (2=complex, 1=real)
 NPOL         2                 # number of polarizations observed
