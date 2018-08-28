@@ -41,7 +41,7 @@
 
 #define NCHAN_OUT             324             // Final number of channels, multiple times of CUFFT2_NX2
 #define NCHAN_KEEP_BAND       (int)(CUFFT_NX2 * NCHAN_OUT)
-#define NCHAN_RATEI           (NCHAN_KEEP_CHAN * NCHAN_IN/(double)NCHAN_KEEP_BAND) // ???
+#define NCHAN_RATEI           (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND)
 
 #define NCHAN_EDGE            (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
 #define TILE_DIM              CUFFT_NX2

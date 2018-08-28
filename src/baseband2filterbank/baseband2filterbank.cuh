@@ -38,9 +38,9 @@
 #define NCHAN_OUT            512            // Final number of channels for search mode
 #define NCHAN_KEEP_BAND      16384           // a good number which is divisible by NCHAN_OUT
 #define NCHAN_EDGE           (int)((NCHAN_KEEP_CHAN * NCHAN_IN - NCHAN_KEEP_BAND)/2)
-#define NSAMP_AVE            (int)(NCHAN_KEEP_BAND/NCHAN_OUT)
+#define NSAMP_AVE            (int)(NCHAN_KEEP_BAND / NCHAN_OUT)
 
-#define NCHAN_RATEI          (NCHAN_KEEP_CHAN * NCHAN_IN/(double)NCHAN_KEEP_BAND) // ???
+#define NCHAN_RATEI          (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND) 
 
 #define TSAMP                (CUFFT_NX * OSAMP_RATEI)
 #define BW                   (NCHAN_KEEP_BAND/(double)NCHAN_KEEP_CHAN)

@@ -25,7 +25,7 @@ int init_baseband2baseband(conf_t *conf)
   
   /* Prepare buffer, stream and fft plan for process */
   conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
-  conf->nsamp1  = conf->stream_ndf_chk * NCHK_BEAM * NCHAN_CHK * NSAMP_DF;
+  conf->nsamp1  = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;
   conf->npol1   = conf->nsamp1 * NPOL_SAMP;
   conf->ndata1  = conf->npol1  * NDIM_POL;
 		
@@ -215,6 +215,8 @@ int init_baseband2baseband(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout_size, conf->bufout_size);
+    
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
@@ -235,8 +237,6 @@ int init_baseband2baseband(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  //ipcbuf_disable_sod(conf->db_out);
-  
   return EXIT_SUCCESS;
 }
 

@@ -122,14 +122,16 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     print "The dead destination \"[IP:PORT:NCHUNK_EXPECT]\" are:                 ", destination_dead
 
     # Create PSRDADA buffer for baseband2baseband
-    nbyte_in     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_in'])
-    nbyte_out    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_out'])    
-    nchan_in     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_in'])
-    nchan_out    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_out'])
-    osamp_ratei  = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['osamp_ratei'])
-    ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['ndf_chk_rbuf'])
+    nbyte_in        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_in'])
+    nbyte_out       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_out'])    
+    nchan_in        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_in'])
+    nchan_keep_chan = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_keep_chan'])
+    nchan_keep_band = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_keep_band'])
+    osamp_ratei     = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['osamp_ratei'])
+    ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['ndf_chk_rbuf'])
+    nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
     
-    blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan * nchan_out * nbyte_out / (nchan_in * nbyte_in) * osamp_ratei)
+    blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in))
     nblk_b2b     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nblk'])
     nreader_b2b  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
     key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
