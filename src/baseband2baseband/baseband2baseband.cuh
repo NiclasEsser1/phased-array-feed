@@ -25,6 +25,7 @@
 #define NDIM_POL              2
 #define NCHAN_IN              (NCHK_BEAM * NCHAN_CHK)
 
+#define NBYTE_RT              8
 #define NBYTE_IN              2   // 16 bits
 #define NBYTE_OUT             1   // 8 bits
 
@@ -34,20 +35,20 @@
 
 #define CUFFT_NX1             64
 #define CUFFT_MOD1            27              // Set to remove oversampled data
-#define NCHAN_KEEP1           (CUFFT_NX1 * OSAMP_RATEI)
-#define CUFFT_NX2             54              // We work in seperate raw channels
-#define CUFFT_MOD2            (CUFFT_NX2/2)         
+#define NCHAN_KEEP_CHAN       (int)(CUFFT_NX1 * OSAMP_RATEI)
+#define CUFFT_NX2             (int)(CUFFT_NX1 * OSAMP_RATEI)              // We work in seperate raw channels
+#define CUFFT_MOD2            (int)(CUFFT_NX2/2)         
 
 #define NCHAN_OUT             324             // Final number of channels, multiple times of CUFFT2_NX2
-#define NCHAN_RATEI           (NCHAN_IN/(double)NCHAN_OUT)
+#define NCHAN_KEEP_BAND       (int)(CUFFT_NX2 * NCHAN_OUT)
+#define NCHAN_RATEI           (NCHAN_KEEP_CHAN * NCHAN_IN/(double)NCHAN_KEEP_BAND) // ???
 
-#define NCHAN_KEEP2           (CUFFT_NX2 * NCHAN_OUT) 
-#define NCHAN_EDGE            ((NCHAN_IN * NCHAN_KEEP1 - NCHAN_KEEP2)/2)
-#define TILE_DIM              54               // CUFFT_NX2
+#define NCHAN_EDGE            (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
+#define TILE_DIM              CUFFT_NX2
 #define NROWBLOCK_TRANS       18               // Multiple times of TILE_DIM (CUFFT_NX2)
 
-#define SCALE                ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1))
-#define TSAMP                 1.0
+#define SCALE                 ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1))
+#define TSAMP                 (NCHAN_KEEP_CHAN/(double)CUFFT_NX2)
 #define NBIT                  8
 
 #define SCL_INT8              127.0f          // int8_t

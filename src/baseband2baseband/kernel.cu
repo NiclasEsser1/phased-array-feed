@@ -64,23 +64,19 @@ __global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_rt1, cufftC
   cufftComplex p1, p2;
 
   remainder1 = (threadIdx.x + CUFFT_MOD1)%CUFFT_NX1;
-  if(remainder1 < NCHAN_KEEP1)
+  if(remainder1 < NCHAN_KEEP_CHAN)
     {
-      loc1 = blockIdx.x * NCHAN_KEEP1 + remainder1 - NCHAN_EDGE;
-      if((loc1 >= 0) && (loc1 < NCHAN_KEEP2))
+      loc1 = blockIdx.x * NCHAN_KEEP_CHAN + remainder1 - NCHAN_EDGE;
+      if((loc1 >= 0) && (loc1 < NCHAN_KEEP_BAND))
 	{
 	  loc_rt1 = blockIdx.x * gridDim.y * blockDim.x +
 	    blockIdx.y * blockDim.x +
 	    threadIdx.x;
 
 	  remainder2 = (loc1 + CUFFT_MOD2)%CUFFT_NX2;
-	  //loc2 = remainder2 + CUFFT_NX2 * (int)(loc1 / CUFFT_NX2);
-	  //loc2 = remainder2 + CUFFT_NX2 * (int)(loc1 / CUFFT_NX2);
-	  //loc2 = remainder2 + CUFFT_NX2 * (int)(loc1 / NCHAN_KEEP1);
-	  //loc2 = remainder2 + CUFFT_NX2 * (int)(loc1 / CUFFT_NX2);
-	  loc2 = remainder2 + loc1 - loc1 % CUFFT_NX2;
+	  loc2 = remainder2 + loc1 - loc1%CUFFT_NX2;
 	  
-	  loc_rt2 = blockIdx.y * NCHAN_KEEP2 + loc2;  
+	  loc_rt2 = blockIdx.y * NCHAN_KEEP_BAND + loc2;  
 	  
 	  p1 = dbuf_rt1[loc_rt1];
 	  dbuf_rt2[loc_rt2].x = p1.x;
@@ -201,7 +197,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
   __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 
   int i, x, y;
-  size_t loc, loc_rt2, loc_out, loc_freq;
+  size_t loc, loc_rt2, loc_out;
   cufftComplex p1, p2;
 
   x = threadIdx.x;
@@ -214,29 +210,8 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
       y = threadIdx.y + i;
       loc_rt2 = loc + y * blockDim.x;
 	
-      loc_freq = blockIdx.y * TILE_DIM + y;
-      
       p1 = dbuf_rt2[loc_rt2];
       p2 = dbuf_rt2[loc_rt2 + offset_rt2];
-
-      //if(ddat_scl[loc_freq] == 0)
-      //	{
-      //	  tile[0][y][x] = __float2int_rz(p1.x);
-      //	  tile[1][y][x] = __float2int_rz(p1.y);
-      //	  tile[2][y][x] = __float2int_rz(p2.x);
-      //	  tile[3][y][x] = __float2int_rz(p2.y);
-      //	}
-      //else
-      //	{	  
-      //	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	}
-      //tile[0][y][x] = __float2int_rz(p1.x) >> 14;
-      //tile[1][y][x] = __float2int_rz(p1.y) >> 14;
-      //tile[2][y][x] = __float2int_rz(p2.x) >> 14;
-      //tile[3][y][x] = __float2int_rz(p2.y) >> 14;
 
       tile[0][y][x] = __float2int_rz(p1.x) >> SCALE;
       tile[1][y][x] = __float2int_rz(p1.y) >> SCALE;
