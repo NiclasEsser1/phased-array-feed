@@ -22,7 +22,7 @@ int init_baseband2filterbank(conf_t *conf)
   int iembed, istride, idist, oembed, ostride, odist, batch, nx;
   
   /* Prepare buffer, stream and fft plan for process */
-  conf->nsamp1       = conf->stream_ndf_chk * NCHK_BEAM * NCHAN_CHK * NSAMP_DF;
+  conf->nsamp1       = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;
   conf->npol1        = conf->nsamp1 * NPOL_SAMP;
   conf->ndata1       = conf->npol1  * NDIM_POL;
   
@@ -99,7 +99,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->blocksize_unpack.y = NCHAN_CHK;
   conf->blocksize_unpack.z = 1;
   
-  conf->gridsize_swap_select_transpose.x = NCHK_BEAM * NCHAN_CHK;
+  conf->gridsize_swap_select_transpose.x = NCHAN_IN;
   conf->gridsize_swap_select_transpose.y = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX;
   conf->gridsize_swap_select_transpose.z = 1;  
   conf->blocksize_swap_select_transpose.x = CUFFT_NX;
@@ -290,23 +290,17 @@ int baseband2filterbank(conf_t conf)
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	}
-      	  
-      /* Close current buffer */
-      if(ipcio_close_block_write(conf.hdu_out->data_block, conf.rbufout_size) < 0)
-	{
-	  multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
-	  fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	}
-
+      
       ipcbuf_mark_filled(conf.db_out, curbufsz);
       ipcbuf_mark_cleared(conf.db_in);
       
       conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
       conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);      
     }
+  
   ipcbuf_mark_filled(conf.db_out, curbufsz);
-  ipcbuf_mark_cleared(conf.db_in);
+  if(conf.curbuf_in !=NULL)
+    ipcbuf_mark_cleared(conf.db_in);
   
   return EXIT_SUCCESS;
 }

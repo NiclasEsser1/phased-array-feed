@@ -2,7 +2,7 @@
 
 import ConfigParser, parser, argparse, socket, struct, json, os, subprocess, threading, datetime, time
 import numpy as np
-import captureinfo, metadata2streaminfo
+import metadata2streaminfo
 import datetime
 
 def ConfigSectionMap(fname, section):
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     dname          = "phased-array-feed"
     container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
-    script_name    = "capture_entry.py"
+    script_name    = "capture_entry_fold.py"
     
     nodes, address_nchks, freqs, nchans = metadata2streaminfo.metadata2streaminfo(system_conf)
     freq = freqs[beam][part]

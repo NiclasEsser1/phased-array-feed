@@ -400,8 +400,9 @@ void *capture_control(void *conf)
 	      quit = 1;
 	      pthread_mutex_unlock(&quit_mutex);
 
-	      ipcbuf_enable_eod(db);
-	      ipcbuf_disable_sod(db);
+	      if(ipcbuf_is_writing(db))
+		ipcbuf_enable_eod(db);
+	      
 	      close(sock);
 	      pthread_exit(NULL);
 	      return NULL;
@@ -435,7 +436,6 @@ void *capture_control(void *conf)
 	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
 
 	      ipcbuf_enable_eod(db);
-	      //ipcbuf_disable_sod(db);
 	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	    }
 	  

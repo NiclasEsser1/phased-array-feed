@@ -114,7 +114,7 @@ int init_baseband2baseband(conf_t *conf)
   conf->blocksize_unpack.y = NCHAN_CHK;
   conf->blocksize_unpack.z = 1;
   
-  conf->gridsize_swap_select_transpose_swap.x = NCHK_BEAM * NCHAN_CHK;
+  conf->gridsize_swap_select_transpose_swap.x = NCHAN_IN;
   conf->gridsize_swap_select_transpose_swap.y = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX1;
   conf->gridsize_swap_select_transpose_swap.z = 1;  
   conf->blocksize_swap_select_transpose_swap.x = CUFFT_NX1;
