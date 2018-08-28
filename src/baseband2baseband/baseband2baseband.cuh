@@ -110,6 +110,7 @@ int init_baseband2baseband(conf_t *conf);
 int baseband2baseband(conf_t conf);
 int dat_offs_scl(conf_t conf);
 int register_header(conf_t *conf);
+int dat_offs_scl(conf_t conf);
 
 int destroy_baseband2baseband(conf_t conf);
 

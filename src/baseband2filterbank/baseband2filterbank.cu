@@ -212,14 +212,6 @@ int init_baseband2filterbank(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-        
-  /* Register header */
-  if(register_header(conf))
-    {
-      multilog(runtime_log, LOG_ERR, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
   
   return EXIT_SUCCESS;
 }
@@ -253,7 +245,15 @@ int baseband2filterbank(conf_t conf)
   blocksize_add_detect_scale           = conf.blocksize_add_detect_scale ;
   gridsize_swap_select_transpose       = conf.gridsize_swap_select_transpose;   
   blocksize_swap_select_transpose      = conf.blocksize_swap_select_transpose;  
-
+       
+  /* Register header */
+  if(register_header(&conf))
+    {
+      multilog(runtime_log, LOG_ERR, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
   conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
   conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
 
@@ -501,6 +501,8 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+  fprintf(stdout, "%f\n", TSAMP);
+  
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", TSAMP) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set TSAMP\n");
@@ -510,13 +512,25 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
-      fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NDIM\n");
+      fprintf(stderr, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NPOL\n");
+      fprintf(stderr, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
-      fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
   if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_seconds) < 0)  

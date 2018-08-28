@@ -20,8 +20,8 @@ __global__ void transpose_float_kernel(cufftComplex *dbuf_rt2, float *dbuf_out, 
 
 /* The following 4 kernels are for scale calculation */
 __global__ void transpose_pad_kernel(cufftComplex *dbuf_rt2, size_t offset_rt2, cufftComplex *dbuf_rt1);
-__global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2);  // Share between fold and search mode
-__global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim); // Share between fold and search mode
-__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl); // Share between fold and search mode
+__global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2);  
+__global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim); 
+__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl);
 
 #endif

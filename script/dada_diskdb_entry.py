@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-import os, parser, argparse, ConfigParser
-# ./baseband2baseband_demo_entry.py -a ../config/system.conf -b ../config/pipeline.conf  -c 0 -d 0 -e 1
+import os, parser, argparse, ConfigParser, time
 
 def ConfigSectionMap(fname, section):
     # Play with configuration file
@@ -22,42 +21,89 @@ def ConfigSectionMap(fname, section):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
-                        help='The configuration of pipeline')    
-    parser.add_argument('-b', '--beam', type=int, nargs='+',
-                        help='The beam id from 0')
-    parser.add_argument('-c', '--part', type=int, nargs='+',
-                        help='The part id from 0')
-    parser.add_argument('-d', '--directory', type=str, nargs='+',
-                        help='Directory to put the data')
-    parser.add_argument('-e', '--fname', type=str, nargs='+',
-                        help='The name of DADA file')
-    parser.add_argument('-f', '--byte', type=int, nargs='+',
+                        help='The configuration of pipeline')
+    parser.add_argument('-b', '--system_conf', type=str, nargs='+',
+                        help='The configuration of system')  
+    parser.add_argument('-c', '--fname', type=str, nargs='+',
+                        help='file name with directory')
+    parser.add_argument('-d', '--byte', type=int, nargs='+',
                         help='Byte to seek into the file')
     
     args          = parser.parse_args()
     pipeline_conf = args.pipeline_conf[0]
-    beam          = args.beam[0]
-    part          = args.part[0]
-    directory     = args.directory[0]
+    system_conf = args.system_conf[0]
     fname         = args.fname[0]
     byte          = args.byte[0]
     
     key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
     nblk          = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nblk'])
-    fname         = '{:s}/{:s}'.format(directory, fname)
     pktsz         = int(ConfigSectionMap(pipeline_conf, "DISKDB")['pktsz'])
     ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISKDB")['ndf_chk_rbuf'])
     nreader       = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nreader'])
     nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nchk_beam'])
     blksz         = pktsz * ndf_chk_rbuf * nchk_beam
 
-    kfname       = "diskdb.beam{:02d}part{:02d}.key".format(beam, part)
+    kfname       = "diskdb.key"
     kfile = open(kfname, "w")
     kfile.writelines("DADA INFO:\n")
     kfile.writelines("key {:s}\n".format(key))
     kfile.close()
-    
+
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
     print "DADA creat done"
+    
+    nbyte_in        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_in'])
+    nbyte_out       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_out'])    
+    nchan_in        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_in'])
+    nchan_keep_chan = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_keep_chan'])
+    nchan_keep_band = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_keep_band'])
+    osamp_ratei     = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['osamp_ratei'])
+    ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['ndf_chk_rbuf'])
+    nblk_b2b     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nblk'])
+    nreader_b2b  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
+    key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
+    
+    nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
+    nchan = 336
+    nsamp_df      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
+    npol_samp     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
+    ndim_pol      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
+    nbyte_dim     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
+    blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in))
+    kfname       = "baseband2baseband.beam00part00.key"
+    kfile = open(kfname, "w")
+    kfile.writelines("DADA INFO:\n")
+    kfile.writelines("key {:s}\n".format(key_b2b))
+    kfile.close()
+    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz_b2b, nblk_b2b, nreader_b2b))
+    
+    #nbyte_in        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nbyte_in'])
+    #nbyte_out       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nbyte_out'])    
+    #nchan_in        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_in'])
+    #nchan_keep_chan = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_chan'])
+    #nchan_keep_band = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_band'])
+    #osamp_ratei     = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['osamp_ratei'])
+    #ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['ndf_chk_rbuf'])
+    #nsamp_ave       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nsamp_ave'])
+    #nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
+    #
+    #blksz_b2f    = int(ndf_chk_rbuf * nsamp_df * nbyte_dim * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in * nsamp_ave))
+    #
+    #nblk_b2f     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nblk'])
+    #nreader_b2f  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nreader'])
+    #key_b2f      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
+    #kfname       = "baseband2filterbank.beam00part00.key"
+    #kfile = open(kfname, "w")
+    #kfile.writelines("DADA INFO:\n")
+    #kfile.writelines("key {:s}\n".format(key_b2f))
+    #kfile.close()
+    #
+    #os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2f, blksz_b2f, nblk_b2f, nreader_b2f))    
+    
     os.system("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(key, fname, byte))
+
+    time.sleep(10)
     os.system("dada_db -d -k {:s}".format(key))
+    os.system("dada_db -d -k {:s}".format(key_b2b))
+    #os.system("dada_db -d -k {:s}".format(key_b2f))
+    

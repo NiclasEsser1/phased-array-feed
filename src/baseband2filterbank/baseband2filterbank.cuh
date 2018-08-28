@@ -45,7 +45,8 @@
 #define TSAMP                (CUFFT_NX * OSAMP_RATEI)
 #define BW                   (NCHAN_KEEP_BAND/(double)NCHAN_KEEP_CHAN)
 #define NBIT                 8
-
+#define NDIM                 1
+#define NPOL                 1
 #define SCL_UINT8            255.0f          // For uint8_t, for search mode
 #define SCL_NSIG             4.0f            // 4 sigma, 99.993666%  
 typedef struct conf_t

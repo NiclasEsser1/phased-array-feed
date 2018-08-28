@@ -269,12 +269,17 @@ int baseband2baseband(conf_t conf)
 
   register_header(&conf); // To register header, pass here means the start-of-data is enabled from capture software;
   
+  conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
+  conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
+
+  /* Get scale of data */
+  dat_offs_scl(conf);
+  for(i = 0; i < NCHAN_OUT; i++)
+    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+  
   /* Do the real job */  
   while(!ipcbuf_eod(conf.db_in))
     {
-      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
-      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
-      
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
 	  for(j = 0; j < conf.nstream; j++)
@@ -306,12 +311,18 @@ int baseband2baseband(conf_t conf)
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	}
-      	  
+
       /* Close current buffer */
       ipcbuf_mark_filled(conf.db_out, curbufsz);
       ipcbuf_mark_cleared(conf.db_in);
       
+      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
+      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
     }
+  
+  ipcbuf_mark_filled(conf.db_out, curbufsz);
+  if(conf.curbuf_in !=NULL)
+    ipcbuf_mark_cleared(conf.db_in);
   
   return EXIT_SUCCESS;
 }
@@ -449,5 +460,114 @@ int register_header(conf_t *conf)
       return EXIT_FAILURE;
     }    
 
+  return EXIT_SUCCESS;
+}
+
+int dat_offs_scl(conf_t conf)
+{
+  /*
+    The procedure for fold mode is:
+    1. Get PTFT data as we did at process;
+    2. Pad the data;
+    3. Add the padded data in time;
+    4. Get the mean of the added data;
+    5. Get the scale with the mean;
+
+    The procedure for search mode is:
+    1. Get PTF data as we did at process;
+    2. Add the data in frequency to get NCHAN_SEARCH channels, detect the added data and pad it;
+    3. Add the padded data in time;    
+    4. Get the mean of the added data;
+    5. Get the scale with the mean;
+  */
+  size_t i, j;
+  dim3 gridsize_unpack, blocksize_unpack;
+  dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
+  dim3 gridsize_scale, blocksize_scale;  
+  dim3 gridsize_mean, blocksize_mean;
+  dim3 gridsize_sum1, blocksize_sum1;
+  dim3 gridsize_sum2, blocksize_sum2;
+  dim3 gridsize_transpose_pad, blocksize_transpose_pad;
+
+  size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset;
+    
+  gridsize_unpack                      = conf.gridsize_unpack;
+  blocksize_unpack                     = conf.blocksize_unpack;
+  gridsize_swap_select_transpose_swap  = conf.gridsize_swap_select_transpose_swap;   
+  blocksize_swap_select_transpose_swap = conf.blocksize_swap_select_transpose_swap; 
+  gridsize_transpose_pad               = conf.gridsize_transpose_pad;
+  blocksize_transpose_pad              = conf.blocksize_transpose_pad;
+  	         	               						       
+  gridsize_sum1              = conf.gridsize_sum1;	       
+  blocksize_sum1             = conf.blocksize_sum1;
+  gridsize_sum2              = conf.gridsize_sum2;	       
+  blocksize_sum2             = conf.blocksize_sum2;
+  gridsize_scale             = conf.gridsize_scale;	       
+  blocksize_scale            = conf.blocksize_scale;	         					    
+  gridsize_mean              = conf.gridsize_mean;	       
+  blocksize_mean             = conf.blocksize_mean;
+
+  for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
+    {
+      for (j = 0; j < conf.nstream; j++)
+	{
+	  hbufin_offset = j * conf.hbufin_offset + i;
+	  dbufin_offset = j * conf.dbufin_offset; 
+	  bufrt1_offset = j * conf.bufrt1_offset;
+	  bufrt2_offset = j * conf.bufrt2_offset;
+	  
+	  /* Copy data into device */
+	  CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
+
+	  /* Unpack raw data into cufftComplex array */
+	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
+
+	  /* Do forward FFT */
+	  CufftSafeCall(cufftExecC2C(conf.fft_plans1[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
+
+	  /* Prepare for inverse FFT */
+	  swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 
+	  
+	  /* Do inverse FFT */
+	  CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
+	  
+	  /* Transpose the data from PTFT to FTP for later calculation */
+	  transpose_pad_kernel<<<gridsize_transpose_pad, blocksize_transpose_pad, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
+	  
+	  /* Get the sum of samples and square of samples */
+	  sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
+	  sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset]);
+	}
+      CudaSynchronizeCall(); // Sync here is for multiple streams
+
+      mean_kernel<<<gridsize_mean, blocksize_mean>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim);
+    }
+  /* Get the scale of each chanel */
+  scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
+  CudaSynchronizeCall();
+  
+  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
+
+  for (i = 0; i< NCHAN_OUT; i++)
+    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+
+  /* Record scale into file */
+  char fname[MSTR_LEN];
+  FILE *fp=NULL;
+  sprintf(fname, "%s/%s_scale.txt", conf.dir, conf.utc_start);
+  fp = fopen(fname, "w");
+  if(fp == NULL)
+    {
+      multilog (runtime_log, LOG_ERR, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+
+  for (i = 0; i< NCHAN_OUT; i++)
+    fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+
+  fclose(fp);
   return EXIT_SUCCESS;
 }

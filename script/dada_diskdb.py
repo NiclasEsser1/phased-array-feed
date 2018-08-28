@@ -19,34 +19,32 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# ./dada_dbdisk.py -a ../config/pipeline.conf -b 0 -c 0 -d /beegfs/DENG/docker
+# ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG -e 2018-04-17-19\:18\:16.638548_0000000000000000.000000.dada -e 0
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
-                        help='The configuration of pipeline')    
-    parser.add_argument('-b', '--beam', type=int, nargs='+',
-                        help='The beam id from 0')
-    parser.add_argument('-c', '--part', type=int, nargs='+',
-                        help='The part id from 0')
-    parser.add_argument('-d', '--directory', type=str, nargs='+',
-                        help='Directory to put the data')
-    parser.add_argument('-e', '--fname', type=str, nargs='+',
-                        help='The name of DADA file')
-    parser.add_argument('-f', '--byte', type=int, nargs='+',
+                        help='The configuration of pipeline')
+    parser.add_argument('-b', '--system_conf', type=str, nargs='+',
+                        help='The configuration of system')  
+    parser.add_argument('-c', '--fname', type=str, nargs='+',
+                        help='file name with directory')
+    parser.add_argument('-d', '--byte', type=int, nargs='+',
                         help='Byte to seek into the file')
-    
+    parser.add_argument('-e', '--directory', type=str, nargs='+',
+                        help='The directory of data')
+        
     uid = 50000
     gid = 50000
     
     args          = parser.parse_args()
     pipeline_conf = args.pipeline_conf[0]
-    beam          = int(args.beam[0])
-    part          = int(args.part[0])
-    directory     = args.directory[0]
+    system_conf = args.system_conf[0]
     fname         = args.fname[0]
     byte          = int(args.byte[0])
+    directory     = args.directory[0]
     
-    diskdb_container_name  = "paf-diskdb.beam{:02d}part{:02d}".format(beam, part)
+    diskdb_container_name  = "paf-diskdb"
     nblk          = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nblk'])
     dvolume       = '{:s}:{:s}'.format(directory, directory)
     hvolume       = "/home/pulsar:/home/pulsar"
@@ -55,8 +53,8 @@ if __name__ == "__main__":
     nreader       = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nreader'])
     nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nchk_beam'])
     blksz         = pktsz * ndf_chk_rbuf * nchk_beam
+    script_name   = "/home/pulsar/xinping/phased-array-feed/script/dada_diskdb_entry.py"
 
-    memsize = blksz * (nblk + 1)  # + 1 to be safe
-    com_line = "docker run --ipc=shareable --rm -it -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock={:d} --name {:s} xinpingdeng/paf-general -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:d}".format(dvolume, hvolume, uid, gid, memsize, diskdb_container_name, pipeline_conf, beam, part, directory, fname, byte)
+    com_line = "docker run --ipc=shareable --rm -it -v {:s} -v {:s} -u {:d}:{:d} --ulimit memlock=-1:-1 --name {:s} xinpingdeng/phased-array-feed \"{:s} -a {:s} -b {:s} -c {:s} -d {:d}\"".format(dvolume, hvolume, uid, gid, diskdb_container_name, script_name, pipeline_conf, system_conf, fname, byte)
     print com_line
     os.system(com_line)

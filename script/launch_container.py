@@ -2,9 +2,9 @@
 
 import os
 
-numa    = 1
+numa    = 0
 hdir    = '/home/pulsar/'
-ddir    = '/beegfs/DENG/docker'
+ddir    = '/beegfs/DENG/AUG'
 uid     = 50000
 gid     = 50000
 dname   = 'paf-base'

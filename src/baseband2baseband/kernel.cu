@@ -197,7 +197,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
   __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 
   int i, x, y;
-  size_t loc, loc_rt2, loc_out;
+  size_t loc, loc_rt2, loc_out, loc_freq;
   cufftComplex p1, p2;
 
   x = threadIdx.x;
@@ -213,10 +213,25 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
       p1 = dbuf_rt2[loc_rt2];
       p2 = dbuf_rt2[loc_rt2 + offset_rt2];
 
-      tile[0][y][x] = __float2int_rz(p1.x) >> SCALE;
-      tile[1][y][x] = __float2int_rz(p1.y) >> SCALE;
-      tile[2][y][x] = __float2int_rz(p2.x) >> SCALE;
-      tile[3][y][x] = __float2int_rz(p2.y) >> SCALE;
+      if(ddat_scl[loc_freq] == 0)
+      	{
+      	  tile[0][y][x] = __float2int_rz(p1.x);
+      	  tile[1][y][x] = __float2int_rz(p1.y);
+      	  tile[2][y][x] = __float2int_rz(p2.x);
+      	  tile[3][y][x] = __float2int_rz(p2.y);
+      	}
+      else
+      	{	  
+      	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
+      	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
+      	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
+      	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
+      	}
+      
+      //tile[0][y][x] = __float2int_rz(p1.x) >> SCALE;
+      //tile[1][y][x] = __float2int_rz(p1.y) >> SCALE;
+      //tile[2][y][x] = __float2int_rz(p2.x) >> SCALE;
+      //tile[3][y][x] = __float2int_rz(p2.y) >> SCALE;
     }
 
   __syncthreads(); // sync all threads in the same block;

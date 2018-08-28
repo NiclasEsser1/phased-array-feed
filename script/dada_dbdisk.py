@@ -47,7 +47,7 @@ if __name__ == "__main__":
     previous_container_name  = "paf-baseband2baseband.beam{:02d}part{:02d}".format(beam, part)
     current_container_name  = "paf-dbdisk.beam{:02d}part{:02d}".format(beam, part)
     
-    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/paf-base dada_dbdisk -k {:s} -D {:s}".format(previous_container_name, dvolume, uid, gid, current_container_name, key, directory)
+    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/paf-base dada_dbdisk -k {:s} -D {:s} -s".format(previous_container_name, dvolume, uid, gid, current_container_name, key, directory)
     print com_line
     
     os.system(com_line)

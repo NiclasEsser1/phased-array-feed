@@ -194,7 +194,7 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NCHAN_KEEP_BAND / NCHAN_OUT)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NCHAN_KEEP_BAND / NCHAN_OUT);
+      power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
 
       dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
@@ -245,7 +245,7 @@ __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf
   /* write result of this block to global mem */
   if (tid == 0)
     {
-      power = pad_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NCHAN_KEEP_BAND / NCHAN_OUT)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NCHAN_KEEP_BAND / NCHAN_OUT);
+      power = pad_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
       power2 = power * power;
 
       dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].x = power;
