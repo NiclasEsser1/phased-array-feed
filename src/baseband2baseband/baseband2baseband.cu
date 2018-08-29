@@ -257,7 +257,7 @@ int baseband2baseband(conf_t conf)
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
   dim3 gridsize_transpose_float, blocksize_transpose_float;
   uint64_t curbufsz;
-  
+  int first = 1;
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
   gridsize_swap_select_transpose_swap  = conf.gridsize_swap_select_transpose_swap;   
@@ -269,17 +269,20 @@ int baseband2baseband(conf_t conf)
 
   register_header(&conf); // To register header, pass here means the start-of-data is enabled from capture software;
   
-  conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
-  conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
-
-  /* Get scale of data */
-  dat_offs_scl(conf);
-  for(i = 0; i < NCHAN_OUT; i++)
-    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
-  
   /* Do the real job */  
   while(!ipcbuf_eod(conf.db_in))
     {
+      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
+      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
+      
+      /* Get scale of data */
+      if(first)
+	{
+	  first = 0;
+	  dat_offs_scl(conf);
+	  for(i = 0; i < NCHAN_OUT; i++)
+	    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+	}
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
 	  for(j = 0; j < conf.nstream; j++)
@@ -313,17 +316,9 @@ int baseband2baseband(conf_t conf)
 	}
 
       /* Close current buffer */
-      ipcbuf_mark_filled(conf.db_out, curbufsz);
-      ipcbuf_mark_cleared(conf.db_in);
-      
-      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
-      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
+      ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * SCL_DTSZ));
+      ipcbuf_mark_cleared(conf.db_in);      
     }
-  
-  ipcbuf_mark_filled(conf.db_out, curbufsz);
-  if(conf.curbuf_in !=NULL)
-    ipcbuf_mark_cleared(conf.db_in);
-  
   return EXIT_SUCCESS;
 }
 
@@ -371,7 +366,7 @@ int register_header(conf_t *conf)
   uint64_t hdrsz;
   char *hdrbuf_in, *hdrbuf_out;
   uint64_t file_size, bytes_per_seconds;
-  double scale;
+  //double scale;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -405,10 +400,16 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+  if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
+      fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header 
-  scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * (double)NBYTE_IN);
-  file_size = (uint64_t)(file_size * scale);
-  bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
+  //scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * (double)NBYTE_IN);
+  file_size = (uint64_t)(file_size * SCL_DTSZ);
+  bytes_per_seconds = (uint64_t)(bytes_per_seconds * SCL_DTSZ);
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", NCHAN_OUT) < 0)  
     {

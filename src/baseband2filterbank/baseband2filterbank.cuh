@@ -42,6 +42,7 @@
 
 #define NCHAN_RATEI          (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND) 
 
+#define SCL_DTSZ             (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_SAMP * NDIM_POL * (double)NBYTE_IN))
 #define TSAMP                (CUFFT_NX * OSAMP_RATEI)
 #define BW                   (NCHAN_KEEP_BAND/(double)NCHAN_KEEP_CHAN)
 #define NBIT                 8

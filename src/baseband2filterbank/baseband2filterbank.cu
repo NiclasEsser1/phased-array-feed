@@ -59,7 +59,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->sbufin_size  = conf->ndata1 * NBYTE_IN;
   conf->sbufout_size = conf->ndata3 * NBYTE_OUT;
   
-  conf->bufin_size          = conf->nstream * conf->sbufin_size;
+  conf->bufin_size   = conf->nstream * conf->sbufin_size;
   conf->bufout_size  = conf->nstream * conf->sbufout_size;
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
@@ -153,7 +153,8 @@ int init_baseband2filterbank(conf_t *conf)
       return EXIT_FAILURE;    
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
-  conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);  
+  conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
+  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufin_size, conf->bufin_size);
   if(conf->rbufin_size % conf->bufin_size != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
@@ -191,6 +192,9 @@ int init_baseband2filterbank(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+  
+  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout_size, conf->bufout_size);
+  
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
@@ -238,6 +242,7 @@ int baseband2filterbank(conf_t conf)
   dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
   dim3 gridsize_add_detect_scale, blocksize_add_detect_scale;
   uint64_t curbufsz;
+  int first = 1;
   
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
@@ -254,16 +259,20 @@ int baseband2filterbank(conf_t conf)
       return EXIT_FAILURE;
     }
   
-  conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
-  conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
-
-  /* Get scale of data */
-  dat_offs_scl(conf);
-  for(i = 0; i < NCHAN_OUT; i++)
-    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
-  
   while(!ipcbuf_eod(conf.db_in))
-    {
+    {      
+      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
+      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
+      
+      /* Get scale of data */
+      if(first)
+	{
+	  first = 0;
+	  dat_offs_scl(conf);
+	  for(i = 0; i < NCHAN_OUT; i++)
+	    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+	}
+      
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
 	  for(j = 0; j < conf.nstream; j++)
@@ -291,16 +300,9 @@ int baseband2filterbank(conf_t conf)
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	}
       
-      ipcbuf_mark_filled(conf.db_out, curbufsz);
-      ipcbuf_mark_cleared(conf.db_in);
-      
-      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
-      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);      
+      ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * SCL_DTSZ));
+      ipcbuf_mark_cleared(conf.db_in);       
     }
-  
-  ipcbuf_mark_filled(conf.db_out, curbufsz);
-  if(conf.curbuf_in !=NULL)
-    ipcbuf_mark_cleared(conf.db_in);
   
   return EXIT_SUCCESS;
 }
@@ -440,7 +442,6 @@ int register_header(conf_t *conf)
   uint64_t hdrsz;
   char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
   uint64_t file_size, bytes_per_seconds;
-  double scale;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -483,11 +484,13 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+  //fprintf(stdout, "%s\n", conf->utc_start);
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-  scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_SAMP * NDIM_POL * (double)NBYTE_IN); // Update here;
+  //scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_SAMP * NDIM_POL * (double)NBYTE_IN); 
+  //fprintf(stdout, "%.10f\n", scale);
   
-  file_size = (uint64_t)(file_size * scale);
-  bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
+  file_size = (uint64_t)(file_size * SCL_DTSZ);
+  bytes_per_seconds = (uint64_t)(bytes_per_seconds * SCL_DTSZ);
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", NCHAN_OUT) < 0)  
     {
@@ -501,8 +504,6 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  fprintf(stdout, "%f\n", TSAMP);
-  
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", TSAMP) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set TSAMP\n");
@@ -529,7 +530,7 @@ int register_header(conf_t *conf)
     }
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
-      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set FILE_SIZE\n");
       fprintf(stderr, "Error setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }

@@ -50,8 +50,7 @@ if __name__ == "__main__":
     kfile.close()
 
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key, blksz, nblk, nreader))
-    print "DADA creat done"
-    
+       
     nbyte_in        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_in'])
     nbyte_out       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nbyte_out'])    
     nchan_in        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nchan_in'])
@@ -63,47 +62,49 @@ if __name__ == "__main__":
     nreader_b2b  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
     key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
     
-    nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
-    nchan = 336
+    #nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
     nsamp_df      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
     npol_samp     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['npol_samp'])
     ndim_pol      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndim_pol'])
     nbyte_dim     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nbyte_dim'])
-    blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in))
-    kfname       = "baseband2baseband.beam00part00.key"
-    kfile = open(kfname, "w")
-    kfile.writelines("DADA INFO:\n")
-    kfile.writelines("key {:s}\n".format(key_b2b))
-    kfile.close()
-    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz_b2b, nblk_b2b, nreader_b2b))
-    
-    #nbyte_in        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nbyte_in'])
-    #nbyte_out       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nbyte_out'])    
-    #nchan_in        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_in'])
-    #nchan_keep_chan = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_chan'])
-    #nchan_keep_band = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_band'])
-    #osamp_ratei     = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['osamp_ratei'])
-    #ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['ndf_chk_rbuf'])
-    #nsamp_ave       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nsamp_ave'])
-    #nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
-    #
-    #blksz_b2f    = int(ndf_chk_rbuf * nsamp_df * nbyte_dim * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in * nsamp_ave))
-    #
-    #nblk_b2f     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nblk'])
-    #nreader_b2f  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nreader'])
-    #key_b2f      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
-    #kfname       = "baseband2filterbank.beam00part00.key"
+    #blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan_in * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in))
+    #kfname       = "baseband2baseband.beam00part00.key"
     #kfile = open(kfname, "w")
     #kfile.writelines("DADA INFO:\n")
-    #kfile.writelines("key {:s}\n".format(key_b2f))
+    #kfile.writelines("key {:s}\n".format(key_b2b))
     #kfile.close()
-    #
-    #os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2f, blksz_b2f, nblk_b2f, nreader_b2f))    
+    #os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz_b2b, nblk_b2b, nreader_b2b))
+    
+    nbyte_in        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nbyte_in'])
+    nbyte_out       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nbyte_out'])
+    nchan_in        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_in'])
+    nchan_out        = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_out'])
+    nchan_keep_chan = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_chan'])
+    nchan_keep_band = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_band'])
+    osamp_ratei     = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['osamp_ratei'])
+    ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['ndf_chk_rbuf'])
+    nsamp_ave       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nsamp_ave'])
+    nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
+    
+    #blksz_b2f    = int(ndf_chk_rbuf * nsamp_df * nchan * nbyte_dim * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in * nsamp_ave))
+    
+    blksz_b2f    = int(ndf_chk_rbuf * nchan_in * nsamp_df * osamp_ratei / nchan_ratei * nchan_out / nchan_keep_band * nbyte_out)
+    
+    nblk_b2f     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nblk'])
+    nreader_b2f  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nreader'])
+    key_b2f      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
+    kfname       = "baseband2filterbank.beam00part00.key"
+    kfile = open(kfname, "w")
+    kfile.writelines("DADA INFO:\n")
+    kfile.writelines("key {:s}\n".format(key_b2f))
+    kfile.close()
+    
+    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2f, blksz_b2f, nblk_b2f, nreader_b2f))    
     
     os.system("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(key, fname, byte))
 
     time.sleep(10)
     os.system("dada_db -d -k {:s}".format(key))
-    os.system("dada_db -d -k {:s}".format(key_b2b))
-    #os.system("dada_db -d -k {:s}".format(key_b2f))
+    #os.system("dada_db -d -k {:s}".format(key_b2b))
+    os.system("dada_db -d -k {:s}".format(key_b2f))
     

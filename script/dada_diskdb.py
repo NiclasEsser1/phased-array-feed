@@ -19,7 +19,7 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG -e 2018-04-17-19\:18\:16.638548_0000000000000000.000000.dada -e 0
+# ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG -e 22:06 2016-04-14-13:27:30_0000001792000000.000000.dada.fake -e 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')

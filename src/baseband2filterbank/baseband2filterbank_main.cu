@@ -104,7 +104,8 @@ int main(int argc, char *argv[])
   double elapsed_time;
   clock_gettime(CLOCK_REALTIME, &start);
 #endif
-  init_baseband2filterbank(&conf);
+  if(init_baseband2filterbank(&conf))
+    return EXIT_FAILURE;
 #ifdef DEBUG
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
