@@ -178,13 +178,35 @@ __global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *dda
   dsquare_mean[loc_freq] += square_mean;
 }
 
+///*
+//  This kernel is used to calculate the scale of data based on the mean calculate by mean_kernel
+//*/
+//__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl)
+//{
+//  size_t loc_freq = threadIdx.x;
+//  ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_INT8;
+//}
+
 /*
   This kernel is used to calculate the scale of data based on the mean calculate by mean_kernel
+  It sums all frequency channels
 */
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl)
 {
-  size_t loc_freq = threadIdx.x;
-  ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_INT8;
+  int i;
+  float  mean, offs;
+
+  mean = 0;
+  offs = 0;
+  
+  for (i = 0; i < NCHAN_OUT; i++)
+    {
+      mean += dsquare_mean[i];
+      offs += ddat_offs[i];
+    }
+  
+  ddat_scl[0] = SCL_NSIG * sqrtf(mean - offs * offs) / SCL_INT8;
+  ddat_offs[0] = offs;  
 }
 
 /* 
@@ -197,7 +219,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
   __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 
   int i, x, y;
-  size_t loc, loc_rt2, loc_out, loc_freq;
+  size_t loc, loc_rt2, loc_out;//, loc_freq;
   cufftComplex p1, p2;
 
   x = threadIdx.x;
@@ -209,29 +231,31 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
     {
       y = threadIdx.y + i;
       loc_rt2 = loc + y * blockDim.x;
-	
+
+      //loc_freq = blockIdx.y * TILE_DIM + y;
+
       p1 = dbuf_rt2[loc_rt2];
       p2 = dbuf_rt2[loc_rt2 + offset_rt2];
 
-      //if(ddat_scl[loc_freq] == 0)
-      //	{
-      //	  tile[0][y][x] = __float2int_rz(p1.x);
-      //	  tile[1][y][x] = __float2int_rz(p1.y);
-      //	  tile[2][y][x] = __float2int_rz(p2.x);
-      //	  tile[3][y][x] = __float2int_rz(p2.y);
-      //	}
-      //else
-      //	{	  
-      //	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      //	}
-      //
-      tile[0][y][x] = __float2int_rz(p1.x) >> SCL_SIG;
-      tile[1][y][x] = __float2int_rz(p1.y) >> SCL_SIG;
-      tile[2][y][x] = __float2int_rz(p2.x) >> SCL_SIG;
-      tile[3][y][x] = __float2int_rz(p2.y) >> SCL_SIG;
+      if(ddat_scl[0] == 0)
+      	{
+      	  tile[0][y][x] = __float2int_rz(p1.x);
+      	  tile[1][y][x] = __float2int_rz(p1.y);
+      	  tile[2][y][x] = __float2int_rz(p2.x);
+      	  tile[3][y][x] = __float2int_rz(p2.y);
+      	}
+      else
+      	{	  
+      	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[0]) / ddat_scl[0]);
+      	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[0]) / ddat_scl[0]);
+      	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[0]) / ddat_scl[0]);
+      	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[0]) / ddat_scl[0]);
+      	}
+      
+      //tile[0][y][x] = __float2int_rz(p1.x) >> SCL_SIG;
+      //tile[1][y][x] = __float2int_rz(p1.y) >> SCL_SIG;
+      //tile[2][y][x] = __float2int_rz(p2.x) >> SCL_SIG;
+      //tile[3][y][x] = __float2int_rz(p2.y) >> SCL_SIG;
     }
 
   __syncthreads(); // sync all threads in the same block;

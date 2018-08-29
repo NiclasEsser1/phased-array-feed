@@ -133,8 +133,8 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
     
     blksz_b2f    = int(ndf_chk_rbuf * nsamp_df * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nsamp_ave))
-    print blksz_b2f
-    exit()
+    #print blksz_b2f
+    #exit()
     
     nblk_b2f     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nblk'])
     nreader_b2f  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nreader'])

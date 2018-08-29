@@ -32,8 +32,8 @@ def baseband2filterbank(args):
     hdir = "/home/pulsar"
     
     dname                   = "phased-array-feed"
-    #previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
-    previous_container_name = "paf-diskdb"
+    previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
+    #previous_container_name = "paf-diskdb"
     current_container_name  = "paf-baseband2filterbank.beam{:02d}part{:02d}".format(beam, part)
     software_name           = "baseband2filterbank_main"
     
@@ -62,22 +62,22 @@ def dspsr(args):
     beam          = args.beam[0]
     part          = args.part[0]
     cpu           = args.cpu[1]
-        
+    par_fname     = args.par_fname[0]
+    
     ddir          = "/home/pulsar/xinping/phased-array-feed/script"
     hvolume       = '{:s}:{:s}'.format(hdir, hdir)
 
-    #previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
-    previous_container_name = "paf-diskdb"
+    previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
+    #previous_container_name = "paf-diskdb"
     current_container_name  = "paf-dspsr.beam{:02d}part{:02d}".format(beam, part)
     kfname_b2b              = "baseband2filterbank.beam{:02d}part{:02d}.key".format(beam, part)
 
-    #com_line = "docker run --rm -it --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --workdir={:s} --ipc=container:{:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base taskset -c {:d} dspsr -L 1 -A -E /home/pulsar/xinping/phased-array-feed/config/J0835-4510.par /home/pulsar/xinping/phased-array-feed/script/{:s}".format(ddir, previous_container_name, hvolume, uid, gid, current_container_name, cpu, kfname_b2b)
-    #com_line = "docker run --rm -it --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --workdir={:s} --ipc=container:{:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base taskset -c {:d} dspsr -L 1 -A -E /home/pulsar/xinping/phased-array-feed/config/J0332+5434.par /home/pulsar/xinping/phased-array-feed/script/{:s}".format(ddir, previous_container_name, hvolume, uid, gid, current_container_name, cpu, kfname_b2b)
-    com_line = "docker run --rm -it --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --workdir={:s} --ipc=container:{:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base taskset -c {:d} dspsr -L 1 -A -E /home/pulsar/xinping/phased-array-feed/config/J0332+5434.par /home/pulsar/xinping/phased-array-feed/script/{:s}".format(ddir, previous_container_name, hvolume, uid, gid, current_container_name, cpu, kfname_b2b)
+    com_line = "docker run --rm -it --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --workdir={:s} --ipc=container:{:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base taskset -c {:d} dspsr -L 1 -A -E /home/pulsar/xinping/phased-array-feed/config/{:s} /home/pulsar/xinping/phased-array-feed/script/{:s}".format(ddir, previous_container_name, hvolume, uid, gid, current_container_name, cpu, par_fname, kfname_b2b)
     
     print com_line
     os.system(com_line)
-
+    
+# ./baseband2filterbank_dspsr.py -a ../config/pipeline.conf -b 0 -c 0 -d 8 9 -e J1939+2134.par
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -88,6 +88,8 @@ if __name__ == "__main__":
                         help='The part id from 0')
     parser.add_argument('-d', '--cpu', type=int, nargs='+',
                         help='Bind threads to cpu')
+    parser.add_argument('-e', '--par_fname', type=str, nargs='+',
+                        help='The pulsar par file name')
 
     args          = parser.parse_args()
     
