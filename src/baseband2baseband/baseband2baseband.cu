@@ -282,8 +282,6 @@ int baseband2baseband(conf_t conf)
 	{
 	  first = 0;
 	  dat_offs_scl(conf);
-	  //for(i = 0; i < NCHAN_OUT; i++)
-	  fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
 	}
       for(i = 0; i < conf.nrun_blk; i ++)
 	{

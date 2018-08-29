@@ -102,3 +102,7 @@ if __name__ == "__main__":
 
     t_dspsr.join()
     t_baseband2baseband.join()
+
+    pipeline_conf = args.pipeline_conf[0]
+    ddir = ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['dir']
+    os.system("mv *.ar {:s}".format(ddir))
