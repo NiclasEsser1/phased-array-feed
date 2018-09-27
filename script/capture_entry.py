@@ -2,7 +2,7 @@
 
 import ConfigParser, parser, argparse, socket, struct, json, os, subprocess, threading, datetime, time
 import numpy as np
-import captureinfo_fold, metadata2streaminfo
+import captureinfo, metadata2streaminfo
 
 def ConfigSectionMap(fname, section):
     # Play with configuration file
@@ -23,7 +23,7 @@ def ConfigSectionMap(fname, section):
 
 def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part):
     dir_capture = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
-    destination_active, destination_dead, refinfo, key = captureinfo_fold.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
+    destination_active, destination_dead, refinfo, key = captureinfo.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
     print(datetime.datetime.now())
         
     if (len(destination_active) == 0):
@@ -37,13 +37,6 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     kfile = open(kfname, "w")
     kfile.writelines("DADA INFO:\n")
     kfile.writelines("key {:s}\n".format(key))
-    kfile.close()
-
-    key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
-    kfname       = "baseband2baseband.beam{:02d}part{:02d}.key".format(beam, part)
-    kfile = open(kfname, "w")
-    kfile.writelines("DADA INFO:\n")
-    kfile.writelines("key {:s}\n".format(key_b2b))
     kfile.close()
     
     # To set up cpu cores if we decide to bind threads
@@ -86,9 +79,7 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     os.system(capture_command)
     
     # Delete PSRDADA buffer
-    key_b2b          = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
     os.system("dada_db -d -k {:s}".format(key))
-    os.system("dada_db -d -k {:s}".format(key_b2b))
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data from given beam and given part')    

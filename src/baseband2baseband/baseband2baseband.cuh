@@ -48,7 +48,7 @@
 #define NROWBLOCK_TRANS       18               // Multiple times of TILE_DIM (CUFFT_NX2)
 
 #define SCL_DTSZ              (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * (double)NBYTE_IN))
-#define SCL_SIG               ((NBYTE_IN - NBYTE_OUT) * 8 + (int)__log2f(CUFFT_NX1)) // Not exact
+#define SCL_SIG               ((NBYTE_IN - NBYTE_OUT) * 8 - (int)__log2f(CUFFT_NX1)) // Not exact
 #define TSAMP                 (NCHAN_KEEP_CHAN/(double)CUFFT_NX2)
 #define NBIT                  8
 

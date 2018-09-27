@@ -3,6 +3,7 @@
 import ConfigParser, parser, argparse, socket, struct, json, os, subprocess, threading, datetime, time
 import numpy as np
 import captureinfo_search, metadata2streaminfo
+import logging
 
 def ConfigSectionMap(fname, section):
     # Play with configuration file
@@ -22,6 +23,10 @@ def ConfigSectionMap(fname, section):
     return dict_conf
 
 def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part):
+    #logging.basicConfig(filename='../log/capture.log',level=logging.DEBUG)
+    #logging.basicConfig(format='%(asctime)s %(message)s')
+    logging.basicConfig(filename='../log/capture.log',level=logging.DEBUG, format='%(asctime)s %(message)s')
+    
     dir_capture = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
     destination_active, destination_dead, refinfo, key = captureinfo_search.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
     print(datetime.datetime.now())
@@ -81,7 +86,8 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
         capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_active), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 2)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
     else:
         capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 2)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
-    
+        
+    logging.info(capture_command)
     print capture_command
     os.system(capture_command)
     

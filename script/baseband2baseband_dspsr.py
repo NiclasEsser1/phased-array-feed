@@ -32,8 +32,8 @@ def baseband2baseband(args):
     hdir = "/home/pulsar"
     
     dname                   = "phased-array-feed"
-    previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
-    #previous_container_name = "paf-diskdb"
+    #previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
+    previous_container_name = "paf-diskdb"
     current_container_name  = "paf-baseband2baseband.beam{:02d}part{:02d}".format(beam, part)
     software_name           = "baseband2baseband_main"
     
@@ -67,8 +67,8 @@ def dspsr(args):
     ddir          = "/home/pulsar/xinping/phased-array-feed/script"
     hvolume       = '{:s}:{:s}'.format(hdir, hdir)
 
-    previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
-    #previous_container_name = "paf-diskdb"
+    #previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
+    previous_container_name = "paf-diskdb"
     current_container_name  = "paf-dspsr.beam{:02d}part{:02d}".format(beam, part)
     kfname_b2b              = "baseband2baseband.beam{:02d}part{:02d}.key".format(beam, part)
 

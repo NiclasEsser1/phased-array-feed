@@ -109,22 +109,22 @@ if __name__ == "__main__":
     t_b2f_db    = threading.Thread(target = b2f_db, args=(pipeline_conf, system_conf, ))
 
     t_diskdb_db.start()
-    t_b2b_db.start()
-    #t_b2f_db.start()
+    #t_b2b_db.start()
+    t_b2f_db.start()
 
     t_diskdb_db.join()
-    t_b2b_db.join()
-    #t_b2f_db.join()
+    #t_b2b_db.join()
+    t_b2f_db.join()
 
     key_diskdb = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
-    key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
-    key_b2f      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
+    #key_b2b    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
+    key_b2f    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
     
     os.system("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(key_diskdb, fname, byte))
 
     time.sleep(10)
     
     os.system("dada_db -d -k {:s}".format(key_diskdb))    
-    os.system("dada_db -d -k {:s}".format(key_b2b))
-    #os.system("dada_db -d -k {:s}".format(key_b2f))
+    #os.system("dada_db -d -k {:s}".format(key_b2b))
+    os.system("dada_db -d -k {:s}".format(key_b2f))
     

@@ -153,7 +153,7 @@ int main(int argc, char **argv)
   /* Setup log interface */
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;
-  sprintf(fname_log, "%s/capture.log", conf.dir);
+  sprintf(fname_log, "%s/capture-%s.log", conf.dir, conf.ip_active[0]);
   fp_log = fopen(fname_log, "ab+"); 
   if(fp_log == NULL)
     {

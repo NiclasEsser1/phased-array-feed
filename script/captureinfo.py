@@ -88,12 +88,6 @@ def check_port(ip, port, pktsz, ndf_check):
 
     return active, nchunk_active
     
-def capture_db(key_capture, blksz_capture, nblk_capture, nreader_capture):
-    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_capture, blksz_capture, nblk_capture, nreader_capture))
-
-def b2b_db(key_b2b, blksz, nblk_b2b, nreader_b2b):
-    os.system("dada_db -l p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_b2b, blksz, nblk_b2b, nreader_b2b))
-    
 def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     # Get pipeline configuration from configuration file
     ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
@@ -131,20 +125,9 @@ def captureinfo(pipeline_conf, system_conf, destination, nchan, hdr):
     ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['ndf_chk_rbuf'])
     nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
     
-    blksz_b2b    = int(ndf_chk_rbuf * nsamp_df * npol_samp * ndim_pol * nbyte_dim * nchan * nbyte_out * osamp_ratei / (nchan_ratei * nbyte_in))
-    nblk_b2b     = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nblk'])
-    nreader_b2b  = int(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['nreader'])
-    key_b2b      = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
 
-    t_capture_db = threading.Thread(target = capture_db, args=(key_capture, blksz_capture, nblk_capture, nreader_capture, ))
-    t_b2b_db     = threading.Thread(target = b2b_db, args=(key_b2b, blksz_b2b, nblk_b2b, nreader_b2b, ))
-
-    t_capture_db.start()
-    t_b2b_db.start()
-    
-    t_capture_db.join()
-    t_b2b_db.join()
-    
+    os.system("dada_db -l -p -k {:s} -b {:d} -n {:d} -r {:d}".format(key_capture, blksz_capture, nblk_capture, nreader_capture))
+        
     # Get reference timestamp of capture
     refinfo = capture_refinfo(destination_active[0], pktsz_capture, system_conf)
     print "The reference timestamp \"(DF_SEC, DF_IDF)\"for current capture is: ", refinfo

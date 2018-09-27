@@ -2,7 +2,7 @@
 
 import ConfigParser, parser, argparse, socket, struct, json, os, subprocess, threading, datetime, time
 import numpy as np
-import captureinfo_fold, metadata2streaminfo
+import metadata2streaminfo
 import datetime
 
 def ConfigSectionMap(fname, section):

@@ -237,25 +237,25 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
       p1 = dbuf_rt2[loc_rt2];
       p2 = dbuf_rt2[loc_rt2 + offset_rt2];
 
-      if(ddat_scl[0] == 0)
-      	{
-      	  tile[0][y][x] = __float2int_rz(p1.x);
-      	  tile[1][y][x] = __float2int_rz(p1.y);
-      	  tile[2][y][x] = __float2int_rz(p2.x);
-      	  tile[3][y][x] = __float2int_rz(p2.y);
-      	}
-      else
-      	{	  
-      	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[0]) / ddat_scl[0]);
-      	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[0]) / ddat_scl[0]);
-      	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[0]) / ddat_scl[0]);
-      	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[0]) / ddat_scl[0]);
-      	}
+      //if(ddat_scl[0] == 0)
+      //	{
+      //	  tile[0][y][x] = __float2int_rz(p1.x);
+      //	  tile[1][y][x] = __float2int_rz(p1.y);
+      //	  tile[2][y][x] = __float2int_rz(p2.x);
+      //	  tile[3][y][x] = __float2int_rz(p2.y);
+      //	}
+      //else
+      //	{	  
+      //	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[0]) / ddat_scl[0]);
+      //	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[0]) / ddat_scl[0]);
+      //	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[0]) / ddat_scl[0]);
+      //	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[0]) / ddat_scl[0]);
+      //	}
       
-      //tile[0][y][x] = __float2int_rz(p1.x) >> SCL_SIG;
-      //tile[1][y][x] = __float2int_rz(p1.y) >> SCL_SIG;
-      //tile[2][y][x] = __float2int_rz(p2.x) >> SCL_SIG;
-      //tile[3][y][x] = __float2int_rz(p2.y) >> SCL_SIG;
+      tile[0][y][x] = __float2int_rz(p1.x) >> SCL_SIG;
+      tile[1][y][x] = __float2int_rz(p1.y) >> SCL_SIG;
+      tile[2][y][x] = __float2int_rz(p2.x) >> SCL_SIG;
+      tile[3][y][x] = __float2int_rz(p2.y) >> SCL_SIG;
     }
 
   __syncthreads(); // sync all threads in the same block;

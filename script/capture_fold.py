@@ -38,7 +38,7 @@ if __name__ == "__main__":
                         help='Record packet header or not')
     parser.add_argument('-f', '--bind', type=int, nargs='+',
                         help='Bind threads to cpu or not')
-    
+
     args          = parser.parse_args()
     system_conf   = args.system_conf[0]
     pipeline_conf = args.pipeline_conf[0]

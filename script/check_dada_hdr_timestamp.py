@@ -62,7 +62,14 @@ fname       = "/beegfs/DENG/docker/2018-08-24-12:33:20_0000000000000000.000000.d
 fname       = "/beegfs/DENG/docker/2018-08-24-12:35:17_0000000000000000.000000.dada"
 fname       = "/beegfs/DENG/docker/2018-08-24-18:07:38_0000000000000000.000000.dada"
 fname       = "/beegfs/DENG/docker/2018-08-24-18:10:02_0000000000000000.000000.dada"
-fname       = "/beegfs/DENG/docker/2018-08-24-18:11:37_0000000000000000.000000.dada"
+#fname       = "/beegfs/DENG/docker/2018-08-24-18:11:37_0000000000000000.000000.dada"
+#fname       = "/beegfs/DENG/AUG/baseband/J1939+2134/0/append0.dada"
+#fname       = "/beegfs/DENG/AUG/baseband/J0332+5434/1/J0332+5434-baseband1.dada"
+#fname       = "/beegfs/DENG/AUG/baseband/J0332+5434/3/J0332+5434-baseband3.dada"
+#fname       = "/beegfs/DENG/AUG/baseband/J0332+5434/J0332+5434-baseband.dada"
+fname       = "/beegfs/DENG/AUG/baseband/J1939+2134/J1939+2134-baseband.dada"
+fname       = "/beegfs/DENG/AUG/baseband/J1713+0747/J1713+0747-baseband.dada"
+fname       = "/beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458-baseband.dada"
 
 system_conf = "../config/system.conf"
 

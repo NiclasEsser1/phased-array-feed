@@ -220,13 +220,14 @@ void *capture(void *conf)
       return NULL;
     }
   hdr_keys(df, &hdr0[ithread]);               // Get header information, which will be used to get the location of packets
-
+  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", ithread, hdr0[ithread].sec, hdr0[ithread].idf);
+  
   pthread_mutex_lock(&quit_mutex);
   quit_status = quit;
   pthread_mutex_unlock(&quit_mutex);
 
   while(quit_status == 0)
-  //while(quit == 0)
+  //while(quit== 0)
     {
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
 	{

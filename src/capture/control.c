@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <linux/un.h>
 
+#include "multilog.h"
 #include "ipcbuf.h"
 #include "capture.h"
 
@@ -111,6 +112,8 @@ void *buf_control(void *conf)
   uint64_t ndf_port_actual[MPORT_CAPTURE];
   uint64_t ndf_chk_actual[MCHK_CAPTURE];
   uint64_t ndf_chk_expect[MCHK_CAPTURE];
+  //char loss_rate[MSTR_LEN];
+  double loss_rate;
   
   pthread_mutex_lock(&quit_mutex);
   quit_status = quit;
@@ -132,9 +135,8 @@ void *buf_control(void *conf)
       pthread_mutex_unlock(&force_next_mutex);
       if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
 	{
-	  //fprintf(stdout, "IPCBUF_SOD BUF CHANGE:\t%d\n", ipcbuf_sod(db));
-	  //fprintf(stdout, "IPCBUF_IS_WRITING, BUF_CHANGE:\t%d\n", ipcbuf_is_writing(db));
-	  //fprintf(stdout, "IPCBUF_IS_WRITER, BUF_CHANGE:\t%d\n", ipcbuf_is_writer(db));
+	  loss_rate = 0;
+	  //sprintf(loss_rate, "PACKET LOSS RATE ON %s:\t", captureconf->ip_active[0]);
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    {
 	      pthread_mutex_lock(&hdr_current_mutex[i]);
@@ -147,15 +149,26 @@ void *buf_control(void *conf)
 	      ndf_port_actual[i] = ndf_port[i];
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 	      
-	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      //ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
+	      //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr.sec, hdr.idf);
+	      
 	      //pthread_mutex_lock(&ndf_chk_mutex[i]);
 	      //ndf_chk_actual[i] = ndf_chk[i];
 	      //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 	      
-	      fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+	      fprintf(stdout, "Thread %d:\t\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], 1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i]);
+	      loss_rate += fabs((1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i])/(double)captureconf->nport_active);
+
+	      //sprintf(loss_rate, "%E\t", 1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i]);
+	      //multilog(runtime_log, LOG_INFO, "%E\t", 1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i]);
 	    }
+	  //sprintf(loss_rate, "\n");
+	  //multilog(runtime_log, LOG_INFO, "%E\n");
 	  fprintf(stdout, "\n");
-	  	  
+	  //fprintf(stdout, "%s\n", loss_rate);
+	  multilog(runtime_log, LOG_INFO, "PACKET LOSS RATE ON %s: is %E\n", captureconf->ip_active[0], loss_rate);
+	  
 	  /* Close current buffer */
 	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
 	    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
@@ -387,12 +400,12 @@ void *capture_control(void *conf)
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
-		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
+		  //ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  //pthread_mutex_lock(&ndf_chk_mutex[i]);
 		  //ndf_chk_actual[i] = ndf_chk[i];
 		  //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 		  
-		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
+		  fprintf(stdout, "Thread %d:\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
 	      fprintf(stdout, "\n");
 	      
