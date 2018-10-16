@@ -96,35 +96,47 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--fname', type=str, nargs='+',
                         help='file name with directory')
     parser.add_argument('-d', '--byte', type=int, nargs='+',
-                        help='Byte to seek into the file')
+                        help='Byte to seek into the file')    
+    parser.add_argument('-e', '--baseband', type=int, nargs='+',
+                        help='To fold baseband data or not')
     
     args          = parser.parse_args()
     pipeline_conf = args.pipeline_conf[0]
     system_conf = args.system_conf[0]
     fname         = args.fname[0]
     byte          = args.byte[0]
-
+    baseband      = args.baseband[0]
+    
     t_diskdb_db = threading.Thread(target = diskdb_db, args=(pipeline_conf, system_conf, ))
-    t_b2b_db    = threading.Thread(target = b2b_db, args=(pipeline_conf, system_conf, ))
-    t_b2f_db    = threading.Thread(target = b2f_db, args=(pipeline_conf, system_conf, ))
+    if baseband:
+        t_b2b_db    = threading.Thread(target = b2b_db, args=(pipeline_conf, system_conf, ))
+    else:
+        t_b2f_db    = threading.Thread(target = b2f_db, args=(pipeline_conf, system_conf, ))
 
     t_diskdb_db.start()
-    #t_b2b_db.start()
-    t_b2f_db.start()
+    if baseband:
+        t_b2b_db.start()
+    else:
+        t_b2f_db.start()
 
     t_diskdb_db.join()
-    #t_b2b_db.join()
-    t_b2f_db.join()
+    if baseband:
+        t_b2b_db.join()
+    else:
+        t_b2f_db.join()
 
     key_diskdb = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
-    #key_b2b    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
-    key_b2f    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
+    if baseband:
+        key_b2b    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
+    else:
+        key_b2f    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']), 0), 'x')
     
     os.system("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(key_diskdb, fname, byte))
 
     time.sleep(10)
     
-    os.system("dada_db -d -k {:s}".format(key_diskdb))    
-    #os.system("dada_db -d -k {:s}".format(key_b2b))
-    os.system("dada_db -d -k {:s}".format(key_b2f))
-    
+    os.system("dada_db -d -k {:s}".format(key_diskdb))
+    if baseband:
+        os.system("dada_db -d -k {:s}".format(key_b2b))
+    else:
+        os.system("dada_db -d -k {:s}".format(key_b2f))

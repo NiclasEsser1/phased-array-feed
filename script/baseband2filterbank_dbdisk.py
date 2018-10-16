@@ -53,7 +53,7 @@ def baseband2filterbank(args):
     print com_line
     os.system(com_line)
 
-def dspsr(args):
+def dbdisk(args):
     uid = 50000
     gid = 50000
 
@@ -62,22 +62,20 @@ def dspsr(args):
     beam          = args.beam[0]
     part          = args.part[0]
     cpu           = args.cpu[1]
-    par_fname     = args.par_fname[0]
-    
-    ddir          = "/home/pulsar/xinping/phased-array-feed/script"
-    hvolume       = '{:s}:{:s}'.format(hdir, hdir)
-
     #previous_container_name = "paf-capture.beam{:02d}part{:02d}".format(beam, part)
     previous_container_name = "paf-diskdb"
-    current_container_name  = "paf-dspsr.beam{:02d}part{:02d}".format(beam, part)
+    current_container_name  = "paf-dbdisk"
     kfname_b2f              = "baseband2filterbank.beam{:02d}part{:02d}.key".format(beam, part)
 
-    com_line = "docker run --rm -it --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --workdir={:s} --ipc=container:{:s} -v {:s} -u {:d}:{:d} --name {:s} xinpingdeng/paf-base taskset -c {:d} dspsr -L 10 -A -E /home/pulsar/xinping/phased-array-feed/config/{:s} /home/pulsar/xinping/phased-array-feed/script/{:s}".format(ddir, previous_container_name, hvolume, uid, gid, current_container_name, cpu, par_fname, kfname_b2f)
+    ddir                    = ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['dir']
+    key_b2f                 = ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']
+    dvolume                 = '{:s}:{:s}'.format(ddir, ddir)
     
+    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/paf-base taskset -c {:d} dada_dbdisk -k {:s} -D {:s} -s".format(previous_container_name, dvolume, uid, gid, current_container_name, cpu, key_b2f, ddir)
     print com_line
     os.system(com_line)
     
-# ./baseband2filterbank_dspsr.py -a ../config/pipeline.conf -b 0 -c 0 -d 8 9 -e J1939+2134.par
+# ./baseband2filterbank_dbdisk.py -a ../config/pipeline.conf -b 0 -c 0 -d 8 9 -e J1939+2134.par
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -93,15 +91,14 @@ if __name__ == "__main__":
 
     args          = parser.parse_args()
     
-    t_dspsr             = threading.Thread(target = dspsr, args = (args,))
+    t_dbdisk             = threading.Thread(target = dbdisk, args = (args,))
     t_baseband2filterbank = threading.Thread(target = baseband2filterbank, args = (args,))
 
-    t_dspsr.start()
+    t_dbdisk.start()
     t_baseband2filterbank.start()
 
-    t_dspsr.join()
+    t_dbdisk.join()
     t_baseband2filterbank.join()
 
     pipeline_conf = args.pipeline_conf[0]
     ddir = ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['dir']
-    os.system("mv *.ar {:s}".format(ddir))

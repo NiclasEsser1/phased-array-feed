@@ -20,6 +20,6 @@ __global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *dda
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl); // Share between fold and search mode
 
 /* The following are only for search mode */
-__global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt1, uint8_t *dbuf_out, size_t offset_rt1, float *ddat_offs, float *ddat_scl);
-__global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2, size_t offset_rt1);
+__global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt1, uint8_t *dbuf_out, size_t offset_rt1, float *ddat_offs, float *ddat_scl);
+__global__ void detect_add_pad_transpose_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2, size_t offset_rt1);
 #endif

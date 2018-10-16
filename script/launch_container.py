@@ -2,7 +2,7 @@
 
 import os
 
-numa    = 0
+numa    = 1
 hdir    = '/home/pulsar/'
 ddir    = '/beegfs/DENG/AUG'
 uid     = 50000

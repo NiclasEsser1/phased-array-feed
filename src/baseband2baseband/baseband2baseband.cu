@@ -24,8 +24,8 @@ int init_baseband2baseband(conf_t *conf)
   uint64_t hdrsz;
   
   /* Prepare buffer, stream and fft plan for process */
-  //conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
-  conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL * NCHAN_IN; // Only works when two polarisations has similar power level
+  conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
+  //conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL * NCHAN_IN; // Only works when two polarisations has similar power level
   conf->nsamp1  = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;
   conf->npol1   = conf->nsamp1 * NPOL_SAMP;
   conf->ndata1  = conf->npol1  * NDIM_POL;
@@ -132,8 +132,8 @@ int init_baseband2baseband(conf_t *conf)
   conf->gridsize_scale.x = 1;
   conf->gridsize_scale.y = 1;
   conf->gridsize_scale.z = 1;
-  //conf->blocksize_scale.x = NCHAN_OUT;
-  conf->blocksize_scale.x = 1;
+  conf->blocksize_scale.x = NCHAN_OUT;
+  //conf->blocksize_scale.x = 1;
   conf->blocksize_scale.y = 1;
   conf->blocksize_scale.z = 1;
   
@@ -551,8 +551,9 @@ int dat_offs_scl(conf_t conf)
   CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
   CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
 
-  //for (i = 0; i< NCHAN_OUT; i++)
-  fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
+  for (i = 0; i< NCHAN_OUT; i++)
+    //fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
+    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 
   /* Record scale into file */
   char fname[MSTR_LEN];
@@ -566,8 +567,9 @@ int dat_offs_scl(conf_t conf)
       return EXIT_FAILURE;
     }
 
-  //for (i = 0; i< NCHAN_OUT; i++)
-  fprintf(fp, "%E\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
+  for (i = 0; i< NCHAN_OUT; i++)
+    //fprintf(fp, "%E\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
+    fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 
   fclose(fp);
   return EXIT_SUCCESS;

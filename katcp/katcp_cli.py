@@ -132,9 +132,11 @@ class KatcpCli(Cmd):
             app.stop_client()
 
 
+# ./katcp_cli.py -a 134.104.70.90 -p 17107
 if __name__ == "__main__":
     usage = "usage: %prog [options]"
     parser = OptionParser(usage=usage)
+    parser = OptionParser(add_help_option=False)
     parser.add_option('-a', '--host', dest='host', type="string", default="", metavar='HOST',
                       help='attach to server HOST (default="" - localhost)')
     parser.add_option('-p', '--port', dest='port', type=int, default=17107, metavar='N',

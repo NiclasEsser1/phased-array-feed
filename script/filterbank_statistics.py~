@@ -1,0 +1,18 @@
+#!/usr/bin/env python
+import numpy as np
+
+ddir  = "/beegfs/DENG/AUG"
+fname = "2018-08-30-20:11:41_0000000000000000.000000.dada"
+fname = "{:s}/{:s}".format(ddir, fname)
+
+nchan = 1024
+nsamp = 10000
+
+hdrsz = 4096
+f     = open(fname, "r")
+f.seek(hdrsz)
+
+sample = np.array(np.fromstring(f.read(nchan * nsamp), dtype='uint8'))
+sample = np.reshape(sample, (nsamp, nchan, npol * ndim))
+
+f.close()

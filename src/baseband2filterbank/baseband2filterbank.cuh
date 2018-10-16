@@ -35,9 +35,10 @@
 #define CUFFT_NX             64
 #define CUFFT_MOD            27              // Set to remove oversampled data
 #define NCHAN_KEEP_CHAN      (int)(CUFFT_NX * OSAMP_RATEI)
-#define NCHAN_OUT            512            // Final number of channels for search mode
+//#define NCHAN_OUT            512            // Final number of channels for search mode
+#define NCHAN_OUT            1024            // Final number of channels for search mode
 #define NCHAN_KEEP_BAND      16384           // a good number which is divisible by NCHAN_OUT
-#define NCHAN_EDGE           (int)((NCHAN_KEEP_CHAN * NCHAN_IN - NCHAN_KEEP_BAND)/2)
+#define NCHAN_EDGE           (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
 #define NSAMP_AVE            (int)(NCHAN_KEEP_BAND / NCHAN_OUT)
 
 #define NCHAN_RATEI          (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND) 
@@ -92,8 +93,8 @@ typedef struct conf_t
   
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
-  dim3 gridsize_add_detect_scale, blocksize_add_detect_scale;
-  dim3 gridsize_add_detect_pad, blocksize_add_detect_pad;
+  dim3 gridsize_detect_add_scale, blocksize_detect_add_scale;
+  dim3 gridsize_detect_add_pad_transpose, blocksize_detect_add_pad_transpose;
   dim3 gridsize_sum, blocksize_sum;
   dim3 gridsize_mean, blocksize_mean;
   dim3 gridsize_scale, blocksize_scale;

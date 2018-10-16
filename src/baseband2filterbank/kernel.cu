@@ -53,35 +53,34 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, size_t 
       for 64 points FFT, drop the first and last five points;
    3. drop the edge of passband to give a good number for reverse FFT;
    4. reorder the FFT data from PFTF to PTF;
-   5. we can also easily do de-dispersion here, which is not here yet.
 */
 __global__ void swap_select_transpose_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt, size_t offset_rt1, size_t offset_rt)
 {
-  int mod, loc;
-  size_t loc_rt1, loc_rt;
+  int remainder, loc;
+  size_t loc_rt1, loc_rt2;
   cufftComplex p1, p2;
 
-  mod = (threadIdx.x + CUFFT_MOD)%CUFFT_NX;	
-  if(mod < NCHAN_KEEP_CHAN)
+  remainder = (threadIdx.x + CUFFT_MOD)%CUFFT_NX;	
+  if(remainder < NCHAN_KEEP_CHAN)
     {
-      loc = blockIdx.x * NCHAN_KEEP_CHAN + mod - NCHAN_EDGE;
+      loc = blockIdx.x * NCHAN_KEEP_CHAN + remainder - NCHAN_EDGE;
       if((loc >= 0) && (loc < NCHAN_KEEP_BAND))
 	{
 	  loc_rt1 = blockIdx.x * gridDim.y * blockDim.x +
 	    blockIdx.y * blockDim.x +
 	    threadIdx.x;
 
-	  loc_rt = blockIdx.y * NCHAN_KEEP_BAND + loc;  
+	  loc_rt2 = blockIdx.y * NCHAN_KEEP_BAND + loc;  
 
 	  p1 = dbuf_rt1[loc_rt1];
-	  dbuf_rt[loc_rt].x = p1.x;
-	  dbuf_rt[loc_rt].y = p1.y;
+	  dbuf_rt[loc_rt2].x = p1.x;
+	  dbuf_rt[loc_rt2].y = p1.y;
 
-	  loc_rt = loc_rt + offset_rt;
+	  loc_rt2 = loc_rt2 + offset_rt;
 
 	  p2 = dbuf_rt1[loc_rt1 + offset_rt1];
-	  dbuf_rt[loc_rt].x = p2.x;
-	  dbuf_rt[loc_rt].y = p2.y;
+	  dbuf_rt[loc_rt2].x = p2.x;
+	  dbuf_rt[loc_rt2].y = p2.y;
 	}
     }
 }
@@ -153,30 +152,32 @@ __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_
   This kernel will add data in frequency, detect and scale the added data;
   The detail for the add here is different from the normal sum as we need to put two polarisation togethere here;
  */
-__global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
+__global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
   extern __shared__ float scale_sdata[];
   size_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
   float power;
   
   tid = threadIdx.x;
-
   loc1 = blockIdx.x * gridDim.y * (blockDim.x * 2) +
     blockIdx.y * (blockDim.x * 2) +
     threadIdx.x;
-  loc11 = loc1 + blockDim.x;
-
   loc2 = loc1 + offset_rt2;
+  
+  loc11 = loc1 + blockDim.x;
   loc22 = loc2 + blockDim.x;
   
   /* Put two polarisation into shared memory at the same time */
   scale_sdata[tid] =
     dbuf_rt2[loc1].x * dbuf_rt2[loc1].x +
     dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +
+    
     dbuf_rt2[loc1].y * dbuf_rt2[loc1].y +
     dbuf_rt2[loc11].y * dbuf_rt2[loc11].y +
+    
     dbuf_rt2[loc2].x * dbuf_rt2[loc2].x +
     dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +
+    
     dbuf_rt2[loc2].y * dbuf_rt2[loc2].y +
     dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
 
@@ -194,7 +195,8 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
+      //power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
+      power = scale_sdata[0];
 
       dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
@@ -206,9 +208,9 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
    2. detect the added data;
    3. pad the dbuf_rt1.x with power;
    4. pad the dbuf_rt1.y with the power of power;
-   5. the importtant here is that the order of padded data is in FT;
+   5. the important here is that the order of padded data is in FT;
  */
-__global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, size_t offset_rt2)
+__global__ void detect_add_pad_transpose_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, size_t offset_rt2)
 {
   extern __shared__ float pad_sdata[];
   size_t tid, loc1, loc11, loc2, loc22, s;
@@ -245,7 +247,8 @@ __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf
   /* write result of this block to global mem */
   if (tid == 0)
     {
-      power = pad_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
+      //power = pad_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
+      power = pad_sdata[0];
       power2 = power * power;
 
       dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].x = power;
