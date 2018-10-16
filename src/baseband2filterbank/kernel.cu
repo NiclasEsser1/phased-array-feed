@@ -60,7 +60,7 @@ __global__ void swap_select_transpose_kernel(cufftComplex *dbuf_rt1, cufftComple
   size_t loc_rt1, loc_rt2;
   cufftComplex p1, p2;
 
-  remainder = (threadIdx.x + CUFFT_MOD)%CUFFT_NX;	
+  remainder = (threadIdx.x + CUFFT_MOD)%CUFFT_NX;
   if(remainder < NCHAN_KEEP_CHAN)
     {
       loc = blockIdx.x * NCHAN_KEEP_CHAN + remainder - NCHAN_EDGE;
@@ -170,14 +170,12 @@ __global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   /* Put two polarisation into shared memory at the same time */
   scale_sdata[tid] =
     dbuf_rt2[loc1].x * dbuf_rt2[loc1].x +
-    dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +
-    
+    dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +    
     dbuf_rt2[loc1].y * dbuf_rt2[loc1].y +
     dbuf_rt2[loc11].y * dbuf_rt2[loc11].y +
     
     dbuf_rt2[loc2].x * dbuf_rt2[loc2].x +
-    dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +
-    
+    dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +    
     dbuf_rt2[loc2].y * dbuf_rt2[loc2].y +
     dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
 
@@ -198,7 +196,15 @@ __global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
       //power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
       power = scale_sdata[0];
 
-      dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
+      if(ddat_scl[loc_freq] == 0.0)
+	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
+      else
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - (ddat_offs[loc_freq] - OFFS_UINT8)) / ddat_scl[loc_freq]);
+	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8);
+      //dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power / ddat_scl[loc_freq]);
+
+      //dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power) >> 10;
     }
 }
 
@@ -220,18 +226,20 @@ __global__ void detect_add_pad_transpose_kernel(cufftComplex *dbuf_rt2, cufftCom
   loc1 = blockIdx.x * gridDim.y * (blockDim.x * 2) +
     blockIdx.y * (blockDim.x * 2) +
     threadIdx.x;
-  loc11 = loc1 + blockDim.x;
   loc2 = loc1 + offset_rt2;
+  
+  loc11 = loc1 + blockDim.x;
   loc22 = loc2 + blockDim.x;
   
   /* Put two polarisation into shared memory at the same time */
   pad_sdata[tid] =
     dbuf_rt2[loc1].x * dbuf_rt2[loc1].x +
-    dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +
+    dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +    
     dbuf_rt2[loc1].y * dbuf_rt2[loc1].y +
     dbuf_rt2[loc11].y * dbuf_rt2[loc11].y +
+    
     dbuf_rt2[loc2].x * dbuf_rt2[loc2].x +
-    dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +
+    dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +    
     dbuf_rt2[loc2].y * dbuf_rt2[loc2].y +
     dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
   __syncthreads();

@@ -3,13 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 ddir      = "/beegfs/DENG/AUG"
-fname     = "2018-08-30-20:11:41_0000000000000000.000000.dada"
+fname     = "2018-08-30-20:11:41_0000000000000000.baseband.dada"
 scl_fname = "2018-08-30-20:11:41_scale.txt"
 scale     = np.loadtxt("{:s}/{:s}".format(ddir, scl_fname))
 
 nchan      = 256
-#nsamp_seek = 1000000
-nsamp_seek = 100
+nsamp_seek = 1000000
+#nsamp_seek = 100
 nsamp      = 1000
 hdrsz      = 4096
 ndim       = 2

@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+
+import binascii
+
+ddir       = "/beegfs/DENG/AUG"
+dada_fname = "2018-08-30-20:11:41_0000000000000000.000000.dada"
+hdrsz      = 342
+hdr_fname  = "I_58227.94096685_beam_0_8bit.fil"
+print open("{:s}/{:s}".format(ddir, hdr_fname)).read(hdrsz)
+
+print binascii.unhexlify('%x' %(open("{:s}/{:s}".format(ddir, hdr_fname)).read(hdrsz)))

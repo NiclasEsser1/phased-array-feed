@@ -35,8 +35,8 @@
 #define CUFFT_NX             64
 #define CUFFT_MOD            27              // Set to remove oversampled data
 #define NCHAN_KEEP_CHAN      (int)(CUFFT_NX * OSAMP_RATEI)
-//#define NCHAN_OUT            512            // Final number of channels for search mode
-#define NCHAN_OUT            1024            // Final number of channels for search mode
+#define NCHAN_OUT            512            // Final number of channels for search mode
+//#define NCHAN_OUT            1024            // Final number of channels for search mode
 #define NCHAN_KEEP_BAND      16384           // a good number which is divisible by NCHAN_OUT
 #define NCHAN_EDGE           (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
 #define NSAMP_AVE            (int)(NCHAN_KEEP_BAND / NCHAN_OUT)
@@ -49,8 +49,13 @@
 #define NBIT                 8
 #define NDIM                 1
 #define NPOL                 1
-#define SCL_UINT8            255.0f          // For uint8_t, for search mode
-#define SCL_NSIG             4.0f            // 4 sigma, 99.993666%  
+//#define SCL_UINT8            255.0f          // For uint8_t, for search mode
+//#define SCL_UINT8            127.0f          // For uint8_t, for search mode
+//#define OFFS_UINT8           127.0f
+#define SCL_UINT8            64.0f          // For uint8_t, for search mode
+#define OFFS_UINT8           64.0f
+//#define SCL_NSIG             4.0f            // 4 sigma, 99.993666%
+#define SCL_NSIG             6.0f 
 typedef struct conf_t
 {
   int stream_ndf_chk;

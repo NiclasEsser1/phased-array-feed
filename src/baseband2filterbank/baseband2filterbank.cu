@@ -35,6 +35,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->ndata3         = conf->nsamp3;  
 
   conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF / CUFFT_NX;   // We do not average in time and here we work on detected data;
+  // The number here is too small, we need to get more data to estimate the standard deviation;
   
   nx        = CUFFT_NX;
   batch     = conf->npol1 / CUFFT_NX;
@@ -68,7 +69,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
   conf->hbufin_offset = conf->sbufin_size;
-  conf->dbufin_offset = conf->sbufin_size / sizeof(int64_t);
+  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_SAMP * NDIM_POL);
   conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
   conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
   
@@ -104,8 +105,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->gridsize_swap_select_transpose.z = 1;  
   conf->blocksize_swap_select_transpose.x = CUFFT_NX;
   conf->blocksize_swap_select_transpose.y = 1;
-  conf->blocksize_swap_select_transpose.z = 1;      
-    
+  conf->blocksize_swap_select_transpose.z = 1;          
 
   /* Only for search mode */
   conf->gridsize_detect_add_pad_transpose.x = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX;
@@ -293,8 +293,10 @@ int baseband2filterbank(conf_t conf)
 	      /* Do forward FFT */
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 
-	      swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
+	      swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2);
+	      
 	      detect_add_scale_kernel<<<gridsize_detect_add_scale, blocksize_detect_add_scale, blocksize_detect_add_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);
+	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
@@ -350,7 +352,9 @@ int dat_offs_scl(conf_t conf)
   blocksize_swap_select_transpose = conf.blocksize_swap_select_transpose;
   gridsize_detect_add_pad_transpose         = conf.gridsize_detect_add_pad_transpose ;
   blocksize_detect_add_pad_transpose        = conf.blocksize_detect_add_pad_transpose ;
-  
+
+  //uint64_t temp_out_len = (NCHAN_CHK + 2) * NSAMP_DF * conf.stream_ndf_chk;// * 2 * sizeof(float);
+  //cufftComplex temp_out[temp_out_len];
   for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
     {
       for (j = 0; j < conf.nstream; j++)
@@ -365,17 +369,22 @@ int dat_offs_scl(conf_t conf)
 
 	  /* Unpack raw data into cufftComplex array */
 	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-
+	  //CudaSafeCall(cudaMemcpyAsync(temp_out, &conf.buf_rt1[bufrt1_offset + (NCHAN_CHK - 1) * NSAMP_DF * conf.stream_ndf_chk], temp_out_len * sizeof(cufftComplex), cudaMemcpyDeviceToHost, conf.streams[j]));
+	  
 	  /* Do forward FFT */
 	  CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
-	  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
+	  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2);
+	  
 	  detect_add_pad_transpose_kernel<<<gridsize_detect_add_pad_transpose, blocksize_detect_add_pad_transpose, blocksize_detect_add_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
+	  
 	  sum_kernel<<<gridsize_sum, blocksize_sum, blocksize_sum.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
       mean_kernel<<<gridsize_mean, blocksize_mean>>>(conf.buf_rt2, conf.bufrt2_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim);
     }
+  //for(i = 0; i < temp_out_len; i++)
+  //fprintf(stdout, "%f\t%f\n", temp_out[i].x, temp_out[i].y);
   
   /* Get the scale of each chanel */
   scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
@@ -396,7 +405,7 @@ int dat_offs_scl(conf_t conf)
     }
 
   for (i = 0; i< NCHAN_OUT; i++)
-    fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+    fprintf(fp, "%E\t%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i], conf.hsquare_mean[i]);
       
   fclose(fp);
   return EXIT_SUCCESS;

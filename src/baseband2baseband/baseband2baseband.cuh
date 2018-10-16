@@ -53,7 +53,8 @@
 #define NBIT                  8
 
 #define SCL_INT8              127.0f          // int8_t
-#define SCL_NSIG              4.0f            // 4 sigma, 99.993666%
+#define OFFS_INT8             0.0f
+#define SCL_NSIG              6.0f            // 4 sigma, 99.993666%
 
 typedef struct conf_t
 {

@@ -261,10 +261,14 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
       	}
       else
       	{	  
-      	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-      	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
+      	  //tile[0][y][x] = __float2int_rz((p1.x - (ddat_offs[loc_freq] - OFFS_INT8)) / ddat_scl[loc_freq]);
+      	  //tile[1][y][x] = __float2int_rz((p1.y - (ddat_offs[loc_freq] - OFFS_INT8)) / ddat_scl[loc_freq]);
+      	  //tile[2][y][x] = __float2int_rz((p2.x - (ddat_offs[loc_freq] - OFFS_INT8)) / ddat_scl[loc_freq]);
+      	  //tile[3][y][x] = __float2int_rz((p2.y - (ddat_offs[loc_freq] - OFFS_INT8)) / ddat_scl[loc_freq]);
+	  tile[0][y][x] = __float2int_rz((p1.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_INT8);
+	  tile[1][y][x] = __float2int_rz((p1.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_INT8);
+	  tile[2][y][x] = __float2int_rz((p2.x - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_INT8);	  
+	  tile[3][y][x] = __float2int_rz((p2.y - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_INT8);	  
       	}
       
       //tile[0][y][x] = __float2int_rz(p1.x) >> SCL_SIG;

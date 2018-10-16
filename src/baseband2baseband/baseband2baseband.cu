@@ -25,8 +25,7 @@ int init_baseband2baseband(conf_t *conf)
   
   /* Prepare buffer, stream and fft plan for process */
   conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
-  //conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL * NCHAN_IN; // Only works when two polarisations has similar power level
-  conf->nsamp1  = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;
+  conf->nsamp1  = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;  // For each stream
   conf->npol1   = conf->nsamp1 * NPOL_SAMP;
   conf->ndata1  = conf->npol1  * NDIM_POL;
 		
@@ -75,19 +74,18 @@ int init_baseband2baseband(conf_t *conf)
   conf->bufin_size     = conf->nstream * conf->sbufin_size;
   conf->bufout_size    = conf->nstream * conf->sbufout_size;
   
-  conf->sbufrt1_size = conf->npol1 * sizeof(cufftComplex);
-  conf->sbufrt2_size = conf->npol2 * sizeof(cufftComplex);
+  conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
+  conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
   //conf->hbufin_offset = conf->sbufin_size / sizeof(char);
   conf->hbufin_offset = conf->sbufin_size;
-  conf->dbufin_offset = conf->sbufin_size / sizeof(int64_t);
-  conf->bufrt1_offset = conf->sbufrt1_size / sizeof(cufftComplex);
-  conf->bufrt2_offset = conf->sbufrt2_size / sizeof(cufftComplex);
+  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_SAMP * NDIM_POL);
+  conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
+  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
   
   conf->dbufout_offset   = conf->sbufout_size / NBYTE_OUT;
-  //conf->hbufout_offset   = conf->sbufout_size / sizeof(char);
   conf->hbufout_offset   = conf->sbufout_size;
 
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));
@@ -366,7 +364,6 @@ int register_header(conf_t *conf)
   uint64_t hdrsz;
   char *hdrbuf_in, *hdrbuf_out;
   uint64_t file_size, bytes_per_seconds;
-  //double scale;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -568,7 +565,6 @@ int dat_offs_scl(conf_t conf)
     }
 
   for (i = 0; i< NCHAN_OUT; i++)
-    //fprintf(fp, "%E\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
     fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 
   fclose(fp);

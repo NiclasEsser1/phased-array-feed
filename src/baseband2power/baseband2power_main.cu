@@ -9,23 +9,26 @@
 #include <inttypes.h>
 
 #include "multilog.h"
-#include "baseband2baseband.cuh"
+#include "baseband2power.cuh"
 #include "cudautil.cuh"
-
+#include "kernel.cuh"
 
 void usage ()
 {
   fprintf (stdout,
-	   "baseband2baseband_main - Convert BMF baseband data from 16bits to 8bits and remove the oversampling \n"
+	   "baseband2power_main - To detect baseband data with original channels and average the detected data in given time\n"
 	   "\n"
-	   "Usage: baseband2baseband_main [options]\n"
+	   "Usage: paf_baseband2power [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
-	   " -c  The number of data frames (per frequency chunk) of each incoming ring buffer block\n"
+	   " -c  The number of data frames (per frequency chunk) of input ring buffer\n"
+	   
 	   " -d  How many times we need to repeat the process to finish one incoming block\n"
 	   " -e  The number of streams \n"
 	   " -f  The number of data frames (per frequency chunk) of each stream\n"
-	   " -g  The directory to put log file\n"	   
+
+	   " -g  The name of the directory in which we will record the data\n"
+	   
 	   " -h  show help\n");
 }
 
@@ -34,12 +37,12 @@ multilog_t *runtime_log;
 int main(int argc, char *argv[])
 {
   int arg;
-  conf_t conf;
   FILE *fp_log = NULL;
   char log_fname[MSTR_LEN];
+  conf_t conf;
   
-  /* Initial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:")) != -1)
+  /* configuration from command line */
+  while((arg=getopt(argc,argv,"a:b:c:d:he:f:g:")) != -1)
     {
       switch(arg)
 	{
@@ -47,15 +50,15 @@ int main(int argc, char *argv[])
 	  usage();
 	  return EXIT_FAILURE;
 	  
-	case 'a':	  
+	case 'a':	  	  
 	  if (sscanf (optarg, "%x", &conf.key_in) != 1)
 	    {
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
 	  break;
-	  
-	case 'b':
+	  	
+	case 'b':	  	  
 	  if (sscanf (optarg, "%x", &conf.key_out) != 1)
 	    {
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
@@ -78,38 +81,34 @@ int main(int argc, char *argv[])
 	case 'f':
 	  sscanf(optarg, "%d", &conf.stream_ndf_chk);
 	  break;
-	  	
+	  
 	case 'g':
 	  sscanf(optarg, "%s", conf.dir);
 	  break;
 	}
     }
-
+  
   /* Setup log interface */
-  sprintf(log_fname, "%s/baseband2baseband.log", conf.dir);
+  sprintf(log_fname, "%s/paf_baseband2power.log", conf.dir);
   fp_log = fopen(log_fname, "ab+");
   if(fp_log == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
-  runtime_log = multilog_open("baseband2baseband", 1);
+  runtime_log = multilog_open("baseband2power_main", 1);
   multilog_add(runtime_log, fp_log);
-  multilog(runtime_log, LOG_INFO, "START BASEBAND2BASEBAND\n");
+  multilog(runtime_log, LOG_INFO, "START BASEBAND2POWER_MAIN\n");
 
-  init_baseband2baseband(&conf);
+  /* Init process */
+  init_baseband2power(&conf);
   
-  if(baseband2baseband(conf))
-    {
-      multilog (runtime_log, LOG_ERR, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "Can not finish the process, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
+  /* Do process */
+  baseband2power(conf);
 
-  destroy_baseband2baseband(conf);
-
-  /* Destory log interface */
-  multilog(runtime_log, LOG_INFO, "FINISH BASEBAND2BASEBAND\n\n");
+  destroy_baseband2power(conf);
+  
+  multilog(runtime_log, LOG_INFO, "FINISH BASEBAND2POWER\n\n");
   multilog_close(runtime_log);
   fclose(fp_log);
   
