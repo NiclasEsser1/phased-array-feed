@@ -353,7 +353,7 @@ int register_header(conf_t *conf)
     }
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
   
-  scale = (double)NBYTE_OUT/(conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN) * OSAMP_RATEI;
+  scale = (double)NBYTE_OUT * CUFFT_NX/(conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN) * OSAMP_RATEI;
   file_size = (uint64_t)(file_size * scale);
   bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
   

@@ -20,33 +20,39 @@ int init_baseband2power(conf_t *conf)
 {
   int i;
   conf->nsamp_in     = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF; // For each stream, here one stream will produce one final output
-  conf->nsamp_rt     = conf->nsamp_in;
-  conf->nsamp_out    = NCHAN_IN;
+  conf->ndata_in     = conf->nsamp_in * NPOL_IN * NDIM_IN;
+  
+  conf->nsamp_rt1     = conf->nsamp_in / (2 * SUM1_BLKSZ);
+  conf->ndata_rt1     = conf->nsamp_rt1;
 
-  conf->ndata_in     = conf->nsamp_in * NPOL_SAMP * NDIM_POL;
-  conf->ndata_rt     = conf->nsamp_rt;
-  conf->ndata_out    = conf->nsamp_out;
+  conf->nsamp_rt2     = NCHAN_OUT;
+  conf->ndata_rt2     = conf->nsamp_rt2 * NPOL_OUT * NDIM_OUT;
+  
+  conf->nsamp_out    = NCHAN_OUT;
+  conf->ndata_out    = conf->nsamp_out * NPOL_OUT * NDIM_OUT;
 
   conf->sbufin_size  = conf->ndata_in * NBYTE_IN;
-  conf->sbufrt_size  = conf->ndata_rt * NBYTE_RT; 
+  conf->sbufrt1_size  = conf->ndata_rt1 * NBYTE_RT;
+  conf->sbufrt2_size  = conf->ndata_rt2 * NBYTE_RT; 
   conf->sbufout_size = conf->ndata_out * NBYTE_OUT; 
   
   conf->bufin_size  = conf->nstream * conf->sbufin_size;
-  conf->bufrt_size  = conf->nstream * conf->sbufrt_size;
+  conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
+  conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
   conf->bufout_size = conf->nstream * conf->sbufout_size;
   
   conf->hbufin_offset = conf->sbufin_size;
-  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_SAMP * NDIM_POL);
-  conf->bufrt1_offset = conf->sbufrt_size / NBYTE_RT;
-  conf->bufrt2_offset = conf->sbufrt_size / NBYTE_RT;
+  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_IN * NDIM_IN);
+  conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
+  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
   
   conf->dbufout_offset   = conf->sbufout_size / NBYTE_OUT;
   conf->hbufout_offset   = conf->sbufout_size;
   
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
   
   conf->streams = (cudaStream_t *)malloc(conf->nstream * sizeof(cudaStream_t));  
   for(i = 0; i < conf->nstream; i ++)
@@ -60,14 +66,14 @@ int init_baseband2power(conf_t *conf)
   conf->blocksize_unpack_detect.y = NCHAN_CHK;
   conf->blocksize_unpack_detect.z = 1;
 
-  conf->gridsize_sum1.x = NCHAN_IN;
+  conf->gridsize_sum1.x = NCHAN_OUT;
   conf->gridsize_sum1.y = conf->stream_ndf_chk * NSAMP_DF / (2 * SUM1_BLKSZ);
   conf->gridsize_sum1.z = 1;
   conf->blocksize_sum1.x = SUM1_BLKSZ;
   conf->blocksize_sum1.y = 1;
   conf->blocksize_sum1.z = 1;
 
-  conf->gridsize_sum2.x = NCHAN_IN;
+  conf->gridsize_sum2.x = NCHAN_OUT;
   conf->gridsize_sum2.y = 1;
   conf->gridsize_sum2.z = 1;
   conf->blocksize_sum2.x = conf->stream_ndf_chk * NSAMP_DF / (4 * SUM1_BLKSZ);
@@ -270,7 +276,7 @@ int register_header(conf_t *conf)
     }
   
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-  scale = (double)NBYTE_OUT/(conf->stream_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL * NBYTE_IN);
+  scale = (double)NBYTE_OUT * NPOL_OUT * NDIM_OUT / (conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN);
   file_size = (uint64_t)(file_size * scale);
   bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
   
@@ -280,10 +286,22 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_OUT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
       fprintf(stderr, "Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_OUT) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NDIM\n");
+      fprintf(stderr, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_OUT) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NPOL\n");
+      fprintf(stderr, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  

@@ -17,8 +17,8 @@
 #define MSTR_LEN      1024
 #define DADA_HDRSZ    4096
 #define NSAMP_DF      128
-#define NPOL_SAMP     2
-#define NDIM_POL      2
+#define NPOL_IN     2
+#define NDIM_IN      2
 #define NCHK_BEAM     48
 #define NCHAN_CHK     7
 #define NCHAN_IN      (NCHK_BEAM * NCHAN_CHK)
@@ -27,7 +27,10 @@
 #define NBYTE_RT      4 // float
 #define NBYTE_IN      2 // int16_t
 #define NBYTE_OUT     4 // float
-#define NBIT          (8 * NBYTE_OUT)
+#define NPOL_OUT      1
+#define NDIM_OUT      1
+#define NBIT_OUT      (8 * NBYTE_OUT)
+#define NCHAN_OUT     (NCHAN_IN)
 
 typedef struct conf_t
 {
@@ -42,10 +45,10 @@ typedef struct conf_t
   dada_hdu_t *hdu_in, *hdu_out;
   char *hdrbuf_in, *hdrbuf_out;
   
-  uint64_t bufin_size, bufrt_size, bufout_size;
-  uint64_t sbufin_size, sbufrt_size, sbufout_size;
-  uint64_t nsamp_in, nsamp_rt, nsamp_out;
-  uint64_t ndata_in, ndata_rt, ndata_out;
+  uint64_t bufin_size, bufrt1_size, bufrt2_size, bufout_size;
+  uint64_t sbufin_size, sbufrt1_size, sbufrt2_size, sbufout_size;
+  uint64_t nsamp_in, nsamp_rt1, nsamp_rt2, nsamp_out;
+  uint64_t ndata_in, ndata_rt1, ndata_rt2, ndata_out;
   uint64_t hdrsz;
   uint64_t picoseconds;
   double mjd_start;
