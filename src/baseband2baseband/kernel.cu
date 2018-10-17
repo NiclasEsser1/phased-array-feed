@@ -10,9 +10,9 @@
   This kernel is used to :
   1. unpack the incoming data reading from ring buffer and reorder the order from TFTFP to PFT;
 */
-__global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, size_t offset_rt1)
+__global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, uint64_t offset_rt1)
 {
-  size_t loc_in, loc_rt1;
+  uint64_t loc_in, loc_rt1;
   int64_t tmp;
   
   /* 
@@ -57,10 +57,10 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, size_t 
    6. we can also easily do de-dispersion here, which is not here yet;
    7. if we do de-dispersion here, we need to use loc1 to locate chirp, not the loc2 because loc2 is the swapped index.
 */
-__global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2, size_t offset_rt1, size_t offset_rt2)
+__global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2, uint64_t offset_rt1, uint64_t offset_rt2)
 {
   int remainder1, remainder2, loc1, loc2;
-  size_t loc_rt1, loc_rt2;
+  uint64_t loc_rt1, loc_rt2;
   cufftComplex p1, p2;
 
   remainder1 = (threadIdx.x + CUFFT_MOD1)%CUFFT_NX1;
@@ -97,9 +97,9 @@ __global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_rt1, cufftC
    2. pad the dbuf_rt1.x with the sum of dbuf_rt2.x + dbuf_rt2.y (after transpose);
    3. pad the dbuf_rt1.y with the sum of dbuf_rt2.x ** 2 + dbuf_rt2.y ** 2 (after transpose);
 */
-__global__ void transpose_pad_kernel(cufftComplex *dbuf_rt2, size_t offset_rt2, cufftComplex *dbuf_rt1)
+__global__ void transpose_pad_kernel(cufftComplex *dbuf_rt2, uint64_t offset_rt2, cufftComplex *dbuf_rt1)
 {
-  size_t loc_rt2, loc_rt1;
+  uint64_t loc_rt2, loc_rt1;
   float x, y;
   cufftComplex p1, p2;
   
@@ -130,7 +130,7 @@ __global__ void transpose_pad_kernel(cufftComplex *dbuf_rt2, size_t offset_rt2, 
 __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
 {
   extern __shared__ cufftComplex sum_sdata[];
-  size_t tid, loc, s;
+  uint64_t tid, loc, s;
   
   tid = threadIdx.x;
   loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
@@ -159,10 +159,10 @@ __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
 /*
   This kernel calculate the mean of (samples and square of samples, which are padded in buf_rt1 for fold mode, or buf_rt2 for search mode). 
  */
-__global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim)
+__global__ void mean_kernel(cufftComplex *buf_rt1, uint64_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim)
 {
   int i;
-  size_t loc_freq, loc;
+  uint64_t loc_freq, loc;
   float dat_offs = 0, square_mean = 0;
   
   loc_freq = threadIdx.x;
@@ -183,7 +183,7 @@ __global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *dda
 */
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl)
 {
-  size_t loc_freq = threadIdx.x;
+  uint64_t loc_freq = threadIdx.x;
   ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_INT8;
 }
 
@@ -212,14 +212,14 @@ __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_
 /* 
    This is the speedup version with dat_scl and dat_offs calculated from data
 */
-__global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_fold, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
+__global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_fold, uint64_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
   // For 27 seconds data, 64-point FFT option needs around 720 ms
   // 32-point FFT option needs around 520ms
   __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 
   int i, x, y;
-  size_t loc, loc_rt2, loc_out, loc_freq;
+  uint64_t loc, loc_rt2, loc_out, loc_freq;
   cufftComplex p1, p2;
 
   x = threadIdx.x;
@@ -299,12 +299,12 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_
 ///* 
 //   This kernel can be used to record float data without scaling;
 //*/
-//__global__ void transpose_float_kernel(cufftComplex *dbuf_rt2, float *dbuf_out_fold, size_t offset_rt2)
+//__global__ void transpose_float_kernel(cufftComplex *dbuf_rt2, float *dbuf_out_fold, uint64_t offset_rt2)
 //{
 //  __shared__ float tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 //
 //  int i, x, y;
-//  size_t loc, loc_rt2, loc_out;
+//  uint64_t loc, loc_rt2, loc_out;
 //  cufftComplex p1, p2;
 //
 //  x = threadIdx.x;

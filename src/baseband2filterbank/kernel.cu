@@ -10,9 +10,9 @@
   This kernel is used to :
   1. unpack the incoming data reading from ring buffer and reorder the order from TFTFP to PFT;
 */
-__global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, size_t offset_rt1)
+__global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, uint64_t offset_rt1)
 {
-  size_t loc_in, loc_rt1;
+  uint64_t loc_in, loc_rt1;
   int64_t tmp;
   
   /* 
@@ -54,10 +54,10 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, size_t 
    3. drop the edge of passband to give a good number for reverse FFT;
    4. reorder the FFT data from PFTF to PTF;
 */
-__global__ void swap_select_transpose_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt, size_t offset_rt1, size_t offset_rt)
+__global__ void swap_select_transpose_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt, uint64_t offset_rt1, uint64_t offset_rt)
 {
   int remainder, loc;
-  size_t loc_rt1, loc_rt2;
+  uint64_t loc_rt1, loc_rt2;
   cufftComplex p1, p2;
 
   remainder = (threadIdx.x + CUFFT_MOD)%CUFFT_NX;
@@ -91,7 +91,7 @@ __global__ void swap_select_transpose_kernel(cufftComplex *dbuf_rt1, cufftComple
 __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
 {
   extern __shared__ cufftComplex sum_sdata[];
-  size_t tid, loc, s;
+  uint64_t tid, loc, s;
   
   tid = threadIdx.x;
   loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
@@ -120,10 +120,10 @@ __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
 /*
   This kernel calculate the mean of (samples and square of samples, which are padded in buf_rt1 for fold mode, or buf_rt2 for search mode). 
  */
-__global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim)
+__global__ void mean_kernel(cufftComplex *buf_rt1, uint64_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim)
 {
   int i;
-  size_t loc_freq, loc;
+  uint64_t loc_freq, loc;
   float dat_offs = 0, square_mean = 0;
   
   loc_freq = threadIdx.x;
@@ -144,7 +144,7 @@ __global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *dda
 */
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl)
 {
-  size_t loc_freq = threadIdx.x;
+  uint64_t loc_freq = threadIdx.x;
   ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_UINT8;
 }
 
@@ -152,10 +152,10 @@ __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_
   This kernel will add data in frequency, detect and scale the added data;
   The detail for the add here is different from the normal sum as we need to put two polarisation togethere here;
  */
-__global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
+__global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out, uint64_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
   extern __shared__ float scale_sdata[];
-  size_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
+  uint64_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
   float power;
   
   tid = threadIdx.x;
@@ -216,10 +216,10 @@ __global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
    4. pad the dbuf_rt1.y with the power of power;
    5. the important here is that the order of padded data is in FT;
  */
-__global__ void detect_add_pad_transpose_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, size_t offset_rt2)
+__global__ void detect_add_pad_transpose_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, uint64_t offset_rt2)
 {
   extern __shared__ float pad_sdata[];
-  size_t tid, loc1, loc11, loc2, loc22, s;
+  uint64_t tid, loc1, loc11, loc2, loc22, s;
   float power, power2;
   
   tid = threadIdx.x;

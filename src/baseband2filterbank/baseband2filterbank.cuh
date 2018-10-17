@@ -29,8 +29,7 @@
 #define NBYTE_OUT             1    // uint8_t
 
 #define OSAMP_RATEI           0.84375
-#define CUFFT_RANK1           1
-#define CUFFT_RANK2           1               // Only for fold mode
+#define CUFFT_RANK            1
 
 #define CUFFT_NX             64
 #define CUFFT_MOD            27              // Set to remove oversampled data

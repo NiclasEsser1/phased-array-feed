@@ -19,9 +19,9 @@ extern multilog_t *runtime_log;
 int init_baseband2power(conf_t *conf)
 {
   int i;
-  conf->nsamp_in     = conf->stream_ndf_chk * NCHAN_CHK * NCHK_BEAM * NSAMP_DF; // For each stream, here one stream will produce one final output
+  conf->nsamp_in     = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF; // For each stream, here one stream will produce one final output
   conf->nsamp_rt     = conf->nsamp_in;
-  conf->nsamp_out    = NCHAN_CHK * NCHK_BEAM;
+  conf->nsamp_out    = NCHAN_IN;
 
   conf->ndata_in     = conf->nsamp_in * NPOL_SAMP * NDIM_POL;
   conf->ndata_rt     = conf->nsamp_rt;
@@ -60,14 +60,14 @@ int init_baseband2power(conf_t *conf)
   conf->blocksize_unpack_detect.y = NCHAN_CHK;
   conf->blocksize_unpack_detect.z = 1;
 
-  conf->gridsize_sum1.x = NCHK_BEAM * NCHAN_CHK;
+  conf->gridsize_sum1.x = NCHAN_IN;
   conf->gridsize_sum1.y = conf->stream_ndf_chk * NSAMP_DF / (2 * SUM1_BLKSZ);
   conf->gridsize_sum1.z = 1;
   conf->blocksize_sum1.x = SUM1_BLKSZ;
   conf->blocksize_sum1.y = 1;
   conf->blocksize_sum1.z = 1;
 
-  conf->gridsize_sum2.x = NCHK_BEAM * NCHAN_CHK;
+  conf->gridsize_sum2.x = NCHAN_IN;
   conf->gridsize_sum2.y = 1;
   conf->gridsize_sum2.z = 1;
   conf->blocksize_sum2.x = conf->stream_ndf_chk * NSAMP_DF / (4 * SUM1_BLKSZ);
@@ -228,7 +228,7 @@ int register_header(conf_t *conf)
 {
   uint64_t hdrsz, file_size, bytes_per_seconds;
   char *hdrbuf_in, *hdrbuf_out;
-  double scale;
+  double scale, tsamp;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -255,6 +255,12 @@ int register_header(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "failed ascii_header_get FILE_SIZE\n");
       fprintf(stderr, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
+    }
+  if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &tsamp) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_get TSAMP\n");
+      fprintf(stderr, "Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
     }   
   if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"PRIu64"", &bytes_per_seconds) < 0)  
     {
@@ -268,13 +274,13 @@ int register_header(conf_t *conf)
   file_size = (uint64_t)(file_size * scale);
   bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
   
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", TSAMP * NSAMP_DF * conf->stream_ndf_chk) < 0)  
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp * NSAMP_DF * conf->stream_ndf_chk) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set TSAMP\n");
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBYTE_OUT * 8) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
       fprintf(stderr, "Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

@@ -21,11 +21,13 @@
 #define NDIM_POL      2
 #define NCHK_BEAM     48
 #define NCHAN_CHK     7
+#define NCHAN_IN      (NCHK_BEAM * NCHAN_CHK)
+
 #define SUM1_BLKSZ    1024
 #define NBYTE_RT      4 // float
 #define NBYTE_IN      2 // int16_t
 #define NBYTE_OUT     4 // float
-#define TSAMP         0.84375  // micro second
+#define NBIT          (8 * NBYTE_OUT)
 
 typedef struct conf_t
 {
