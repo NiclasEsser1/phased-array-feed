@@ -23,19 +23,18 @@ int init_baseband2filterbank(conf_t *conf)
   
   /* Prepare buffer, stream and fft plan for process */
   conf->nsamp1       = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;
-  conf->npol1        = conf->nsamp1 * NPOL_SAMP;
-  conf->ndata1       = conf->npol1  * NDIM_POL;
+  conf->npol1        = conf->nsamp1 * NPOL_IN;
+  conf->ndata1       = conf->npol1  * NDIM_IN;
   
   conf->nsamp2       = conf->nsamp1 * OSAMP_RATEI / NCHAN_RATEI;
-  conf->npol2        = conf->nsamp2 * NPOL_SAMP;
-  conf->ndata2       = conf->npol2  * NDIM_POL;
+  conf->npol2        = conf->nsamp2 * NPOL_IN;
+  conf->ndata2       = conf->npol2  * NDIM_IN;
 
   conf->nsamp3         = conf->nsamp2 * NCHAN_OUT / NCHAN_KEEP_BAND;
-  conf->npol3          = conf->nsamp3;
-  conf->ndata3         = conf->nsamp3;  
+  conf->npol3          = conf->nsamp3 * NPOL_OUT;
+  conf->ndata3         = conf->npol3  * NDIM_OUT;  
 
   conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF / CUFFT_NX;   // We do not average in time and here we work on detected data;
-  // The number here is too small, we need to get more data to estimate the standard deviation;
   
   nx        = CUFFT_NX;
   batch     = conf->npol1 / CUFFT_NX;
@@ -69,7 +68,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
   conf->hbufin_offset = conf->sbufin_size;
-  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_SAMP * NDIM_POL);
+  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_IN * NDIM_IN);
   conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
   conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
   
@@ -451,6 +450,7 @@ int register_header(conf_t *conf)
   uint64_t hdrsz;
   char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
   uint64_t file_size, bytes_per_seconds;
+  double tsamp;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -484,8 +484,13 @@ int register_header(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "failed ascii_header_get BYTES_PER_SECOND\n");
       fprintf(stderr, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
-    }
-  
+    }  
+  if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &tsamp) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_get TSAMP\n");
+      fprintf(stderr, "Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }   
   /* Get utc_start from hdrin */
   if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
     {
@@ -495,7 +500,7 @@ int register_header(conf_t *conf)
     }
   //fprintf(stdout, "%s\n", conf->utc_start);
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-  //scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_SAMP * NDIM_POL * (double)NBYTE_IN); 
+  //scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_IN * NDIM_IN * (double)NBYTE_IN); 
   //fprintf(stdout, "%.10f\n", scale);
   
   file_size = (uint64_t)(file_size * SCL_DTSZ);
@@ -513,25 +518,25 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", TSAMP) < 0)  
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp * CUFFT_NX) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set TSAMP\n");
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_OUT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
       fprintf(stderr, "Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_OUT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NDIM\n");
       fprintf(stderr, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_OUT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NPOL\n");
       fprintf(stderr, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

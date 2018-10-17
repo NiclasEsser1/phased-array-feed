@@ -20,8 +20,8 @@
 #define NCHK_BEAM             48   // How many frequency chunks we will receive, we should read the number from metadata
 #define NCHAN_CHK             7
 #define NSAMP_DF              128
-#define NPOL_SAMP             2
-#define NDIM_POL              2
+#define NPOL_IN             2
+#define NDIM_IN              2
 #define NCHAN_IN              (NCHK_BEAM * NCHAN_CHK)
 
 #define NBYTE_RT              8    // cudaComplex
@@ -42,18 +42,13 @@
 
 #define NCHAN_RATEI          (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND) 
 
-#define SCL_DTSZ             (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_SAMP * NDIM_POL * (double)NBYTE_IN))
-#define TSAMP                (CUFFT_NX * OSAMP_RATEI)
+#define SCL_DTSZ             (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_IN * NDIM_IN * (double)NBYTE_IN))
 #define BW                   (NCHAN_KEEP_BAND/(double)NCHAN_KEEP_CHAN)
-#define NBIT                 8
-#define NDIM                 1
-#define NPOL                 1
-//#define SCL_UINT8            255.0f          // For uint8_t, for search mode
-//#define SCL_UINT8            127.0f          // For uint8_t, for search mode
-//#define OFFS_UINT8           127.0f
+#define NBIT_OUT                 8
+#define NDIM_OUT                 1
+#define NPOL_OUT                 1
 #define SCL_UINT8            64.0f          // For uint8_t, for search mode
 #define OFFS_UINT8           64.0f
-//#define SCL_NSIG             4.0f            // 4 sigma, 99.993666%
 #define SCL_NSIG             6.0f 
 typedef struct conf_t
 {
