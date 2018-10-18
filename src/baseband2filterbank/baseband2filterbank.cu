@@ -77,19 +77,18 @@ int init_baseband2filterbank(conf_t *conf)
 
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
+  
   CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, NCHAN_OUT * sizeof(float)));
   CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, NCHAN_OUT * sizeof(float)));
   CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, NCHAN_OUT * sizeof(float)));
-  
   CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, NCHAN_OUT * sizeof(float)));   // We have to clear the memory for this parameter
   CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, NCHAN_OUT * sizeof(float)));// We have to clear the memory for this parameter
   
   CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, NCHAN_OUT * sizeof(float)));   // Malloc host memory to receive data from device
   CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, NCHAN_OUT * sizeof(float)));   // Malloc host memory to receive data from device
   CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, NCHAN_OUT * sizeof(float)));   // Malloc host memory to receive data from device
-  
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
 
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->stream_ndf_chk;
