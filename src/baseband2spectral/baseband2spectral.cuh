@@ -49,7 +49,8 @@ typedef struct conf_t
 
   int nrun_blk;
   char dir[MSTR_LEN];
-  
+
+  double scale;
   key_t key_in, key_out;
   dada_hdu_t *hdu_in, *hdu_out;
 

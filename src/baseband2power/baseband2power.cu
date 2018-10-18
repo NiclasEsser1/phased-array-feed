@@ -80,6 +80,8 @@ int init_baseband2power(conf_t *conf)
   conf->blocksize_sum2.y = 1;
   conf->blocksize_sum2.z = 1;
 
+  conf->scale = (double)NBYTE_OUT * NPOL_OUT * NDIM_OUT / (conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN);
+  
   /* Attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(runtime_log);
   dada_hdu_set_key(conf->hdu_in, conf->key_in);
@@ -187,7 +189,7 @@ int baseband2power(conf_t conf)
   dim3 gridsize_unpack_detect, blocksize_unpack_detect;
   dim3 gridsize_sum1, blocksize_sum1;
   dim3 gridsize_sum2, blocksize_sum2;
-  size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset;
+  size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset, curbufsz;
   
   gridsize_unpack_detect = conf.gridsize_unpack_detect;
   blocksize_unpack_detect = conf.blocksize_unpack_detect;
@@ -198,6 +200,9 @@ int baseband2power(conf_t conf)
   
   while(!ipcbuf_eod(conf.db_in))
     {      
+      conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
+      conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
+      
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
 	  for(j = 0; j < conf.nstream; j++)
@@ -223,7 +228,7 @@ int baseband2power(conf_t conf)
 	}
       
       /* Close current buffer */
-      ipcbuf_mark_filled(conf.db_out, conf.bufout_size);
+      ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * conf.scale));
       ipcbuf_mark_cleared(conf.db_in);      
     }
   
@@ -234,7 +239,7 @@ int register_header(conf_t *conf)
 {
   uint64_t hdrsz, file_size, bytes_per_seconds;
   char *hdrbuf_in, *hdrbuf_out;
-  double scale, tsamp;
+  double tsamp;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -274,11 +279,9 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-  scale = (double)NBYTE_OUT * NPOL_OUT * NDIM_OUT / (conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN);
-  file_size = (uint64_t)(file_size * scale);
-  bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
+  file_size = (uint64_t)(file_size * conf->scale);
+  bytes_per_seconds = (uint64_t)(bytes_per_seconds * conf->scale);
   
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp * NSAMP_DF * conf->stream_ndf_chk) < 0)  
     {

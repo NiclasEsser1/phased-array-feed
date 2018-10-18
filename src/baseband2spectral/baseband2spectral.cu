@@ -116,6 +116,8 @@ int init_baseband2spectral(conf_t *conf)
   conf->blocksize_sum2.x = conf->ndata_rtf1 / (4 * NCHAN_KEEP_BAND * SUM1_BLKSZ);
   conf->blocksize_sum2.y = 1;
   conf->blocksize_sum2.z = 1;
+
+  conf->scale = (double)NBYTE_OUT * CUFFT_NX/(conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN) * OSAMP_RATEI;
   
   /* attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(runtime_log);
@@ -270,7 +272,7 @@ int baseband2spectral(conf_t conf)
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	}
       
-      ipcbuf_mark_filled(conf.db_out, conf.bufout_size);
+      ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * conf.scale));
       ipcbuf_mark_cleared(conf.db_in);       
     }
   
@@ -308,7 +310,7 @@ int destroy_baseband2spectral(conf_t conf)
 
 int register_header(conf_t *conf)
 {
-  double tsamp, scale;
+  double tsamp;
   char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
   uint64_t file_size, bytes_per_seconds, hdrsz;
   
@@ -353,9 +355,8 @@ int register_header(conf_t *conf)
     }
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
   
-  scale = (double)NBYTE_OUT * CUFFT_NX/(conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN) * OSAMP_RATEI;
-  file_size = (uint64_t)(file_size * scale);
-  bytes_per_seconds = (uint64_t)(bytes_per_seconds * scale);
+  file_size = (uint64_t)(file_size * conf->scale);
+  bytes_per_seconds = (uint64_t)(bytes_per_seconds * conf->scale);
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", NCHAN_KEEP_BAND) < 0)  
     {

@@ -190,9 +190,7 @@ int init_baseband2filterbank(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
-  
-  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout_size, conf->bufout_size);
-  
+   
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");

@@ -52,7 +52,8 @@ typedef struct conf_t
   uint64_t hdrsz;
   uint64_t picoseconds;
   double mjd_start;
-
+  double scale;
+  
   char *curbuf_in, *curbuf_out;
   double bufin_ndf;
 
