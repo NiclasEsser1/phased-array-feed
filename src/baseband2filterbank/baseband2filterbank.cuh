@@ -47,9 +47,10 @@
 #define NBIT_OUT                 8
 #define NDIM_OUT                 1
 #define NPOL_OUT                 1
-#define SCL_UINT8            64.0f          // For uint8_t, for search mode
-#define OFFS_UINT8           64.0f
-#define SCL_NSIG             6.0f 
+#define SCL_UINT8            64.0f          // uint8_t, detected samples should vary in 0.5 * range(uint8_t) = 127, to be safe, use 0.25
+#define OFFS_UINT8           64.0f          // uint8_t, detected samples should center at 0.5 * range(uint8_t) = 127, to be safe, use 0.25
+#define SCL_NSIG             3.0f
+  
 typedef struct conf_t
 {
   int stream_ndf_chk;

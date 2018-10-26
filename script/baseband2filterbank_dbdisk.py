@@ -75,7 +75,8 @@ def dbdisk(args):
     print com_line
     os.system(com_line)
     
-# ./baseband2filterbank_dbdisk.py -a ../config/pipeline.conf -b 0 -c 0 -d 8 9 -e J1939+2134.par
+# ./baseband2filterbank_dbdisk.py -a ../config/pipeline.conf -b 0 -c 0 -d 8 9
+
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -86,9 +87,6 @@ if __name__ == "__main__":
                         help='The part id from 0')
     parser.add_argument('-d', '--cpu', type=int, nargs='+',
                         help='Bind threads to cpu')
-    parser.add_argument('-e', '--par_fname', type=str, nargs='+',
-                        help='The pulsar par file name')
-
     args          = parser.parse_args()
     
     t_dbdisk             = threading.Thread(target = dbdisk, args = (args,))

@@ -21,6 +21,8 @@ def ConfigSectionMap(fname, section):
 
 # ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J0332+5434/J0332+5434.dada -d 0 -e /beegfs/DENG/AUG/baseband/J0332+5434/ -f 0
 # ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1713+0747/J1713+0747.dada -d 0 -e /beegfs/DENG/AUG/baseband/J1713+0747/ -f 0
+# ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1939+2134/J1939+2134.dada -d 0 -e /beegfs/DENG/AUG/baseband/J1939+2134/ -f 0
+# ./dada_diskdb.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458.dada -d 0 -e /beegfs/DENG/AUG/baseband/J1819-1458/ -f 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To transfer data from shared memeory to disk with a docker container')

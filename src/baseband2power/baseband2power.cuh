@@ -17,8 +17,8 @@
 #define MSTR_LEN      1024
 #define DADA_HDRSZ    4096
 #define NSAMP_DF      128
-#define NPOL_IN     2
-#define NDIM_IN      2
+#define NPOL_IN       2
+#define NDIM_IN       2
 #define NCHK_BEAM     48
 #define NCHAN_CHK     7
 #define NCHAN_IN      (NCHK_BEAM * NCHAN_CHK)

@@ -52,9 +52,9 @@
 #define TSAMP                 (NCHAN_KEEP_CHAN/(double)CUFFT_NX2)
 #define NBIT                  8
 
-#define SCL_INT8              127.0f          // int8_t
-#define OFFS_INT8             0.0f
-#define SCL_NSIG              6.0f            // 4 sigma, 99.993666%
+#define SCL_INT8              64.0f          // int8_t, baseband samples should vary in 0.5 * range(int8_t) = 127, to be safe, 0.25;
+#define OFFS_INT8             0.0f            // int8_t, baseband samples should center at 0;
+#define SCL_NSIG              3.0f            
 
 typedef struct conf_t
 {
