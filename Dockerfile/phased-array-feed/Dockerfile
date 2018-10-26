@@ -1,4 +1,4 @@
-# Copyright (C) 2016 by Ewan Barr
+# Copyright (C) 2018 by Xinping Deng
 # Licensed under the Academic Free License version 3.0
 # This program comes with ABSOLUTELY NO WARRANTY.
 # You are free to modify and redistribute this code as long

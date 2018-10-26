@@ -21,14 +21,11 @@ void usage ()
 	   "Usage: paf_baseband2power [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
-	   " -c  The number of data frames (per frequency chunk) of input ring buffer\n"
-	   
+	   " -c  The number of data frames (per frequency chunk) of input ring buffer\n"	   
 	   " -d  How many times we need to repeat the process to finish one incoming block\n"
 	   " -e  The number of streams \n"
 	   " -f  The number of data frames (per frequency chunk) of each stream\n"
-
-	   " -g  The name of the directory in which we will record the data\n"
-	   
+	   " -g  The name of the directory in which we will record the data\n"	   
 	   " -h  show help\n");
 }
 

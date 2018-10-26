@@ -70,7 +70,6 @@ def b2f_db(pipeline_conf, system_conf):
     nchan_keep_band = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nchan_keep_band'])
     osamp_ratei     = float(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['osamp_ratei'])
     ndf_chk_rbuf    = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['ndf_chk_rbuf'])
-    nsamp_ave       = int(ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['nsamp_ave'])
     nchan_ratei     = nchan_keep_chan * nchan_in / nchan_keep_band
     
     nsamp_df      = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])

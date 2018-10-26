@@ -92,7 +92,8 @@ int init_baseband2power(conf_t *conf)
       return EXIT_FAILURE;    
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
-  if(ipcbuf_get_bufsz(conf->db_in) != conf->bufin_size)
+  fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->bufin_size, ipcbuf_get_bufsz(conf->db_in));
+  if(ipcbuf_get_bufsz(conf->db_in) % conf->bufin_size)
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -127,7 +128,8 @@ int init_baseband2power(conf_t *conf)
       return EXIT_FAILURE;    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
-  if(ipcbuf_get_bufsz(conf->db_out) != conf->bufout_size)  
+  fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->bufout_size, ipcbuf_get_bufsz(conf->db_out));
+  if(ipcbuf_get_bufsz(conf->db_out) % conf->bufout_size)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

@@ -34,15 +34,16 @@
 #define CUFFT_NX             64
 #define CUFFT_MOD            27              // Set to remove oversampled data
 #define NCHAN_KEEP_CHAN      (int)(CUFFT_NX * OSAMP_RATEI)
-#define NCHAN_OUT            512            // Final number of channels for search mode
-//#define NCHAN_OUT            1024            // Final number of channels for search mode
+//#define NCHAN_OUT            512            // Final number of channels for search mode
+#define NCHAN_OUT            1024            // Final number of channels for search mode
 #define NCHAN_KEEP_BAND      16384           // a good number which is divisible by NCHAN_OUT
 #define NCHAN_EDGE           (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
-#define NSAMP_AVE            (int)(NCHAN_KEEP_BAND / NCHAN_OUT)
+//#define NSAMP_AVE            (int)(NCHAN_KEEP_BAND / NCHAN_OUT)
 
 #define NCHAN_RATEI          (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND) 
 
-#define SCL_DTSZ             (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_IN * NDIM_IN * (double)NBYTE_IN))
+#define SCL_DTSZ             (OSAMP_RATEI * (double)(NBYTE_OUT * NCHAN_OUT)/ (NCHAN_RATEI * NCHAN_KEEP_BAND * NPOL_IN * NDIM_IN * (double)NBYTE_IN))
+//#define SCL_DTSZ             (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * NSAMP_AVE * NPOL_IN * NDIM_IN * (double)NBYTE_IN))
 #define BW                   (NCHAN_KEEP_BAND/(double)NCHAN_KEEP_CHAN)
 #define NBIT_OUT                 8
 #define NDIM_OUT                 1
