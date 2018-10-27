@@ -20,7 +20,7 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# docker run --ipc=container:disk2db --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name baseband2power xinpingdeng/phased-array-feed "./baseband2power.py -a ../config/pipeline.conf -b ../config/system.conf -c 0.016"
+# docker run --ipc=container:disk2db --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name baseband2spectral xinpingdeng/phased-array-feed "./baseband2spectral.py -a ../config/pipeline.conf -b ../config/system.conf -c 0.016"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert baseband data to power with original channels')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -36,14 +36,14 @@ if __name__ == "__main__":
     tsamp         = args.tsamp[0]
 
     df_res         = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
-    ndf_chk_rbuf   = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['ndf_chk_rbuf'])
-    nchan          = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nchan_out'])
-    nbyte          = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nbyte_out'])
-    nstream        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nstream'])
-    nreader        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nreader'])
-    nblk           = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nblk'])
-    ddir           = ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['dir']
-    key_output     = ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['key']
+    ndf_chk_rbuf   = int(ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['ndf_chk_rbuf'])
+    nchan          = int(ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['nchan_out'])
+    nbyte          = int(ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['nbyte_out'])
+    nstream        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['nstream'])
+    nreader        = int(ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['nreader'])
+    nblk           = int(ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['nblk'])
+    ddir           = ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['dir']
+    key_output     = ConfigSectionMap(pipeline_conf, "BASEBAND2SPECTRAL")['key']
     key_input      = ConfigSectionMap(pipeline_conf, "DISK2DB")['key']
     
     # Find the number of data frames for each stream
@@ -70,9 +70,9 @@ if __name__ == "__main__":
     os.system(db_create)
 
     # Do the work
-    b2p = "../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
-    #b2p = "nvprof ../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
-    #b2p = "cuda-memcheck ../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
+    b2p = "../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
+    #b2p = "nvprof ../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
+    #b2p = "cuda-memcheck ../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
     
     print b2p
     os.system(b2p)

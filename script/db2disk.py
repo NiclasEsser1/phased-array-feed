@@ -35,6 +35,6 @@ if __name__ == "__main__":
     ddir          = ConfigSectionMap(pipeline_conf, "{:s}".format(data_source))['dir']
     key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "{:s}".format(data_source))['key']), 0), 'x')
 
-    db2disk = "dada_dbdisk -k {:s} -D {:s} -s".format(key, ddir)
+    db2disk = "dada_dbdisk -k {:s} -D {:s} -s -W".format(key, ddir)
     print db2disk
     os.system(db2disk)

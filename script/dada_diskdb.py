@@ -51,13 +51,13 @@ if __name__ == "__main__":
     baseband      = args.baseband[0]
     
     diskdb_container_name  = "paf-diskdb"
-    nblk          = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nblk'])
+    nblk          = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['nblk'])
     dvolume       = '{:s}:{:s}'.format(directory, directory)
     hvolume       = "/home/pulsar:/home/pulsar"
-    pktsz         = int(ConfigSectionMap(pipeline_conf, "DISKDB")['pktsz'])
-    ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISKDB")['ndf_chk_rbuf'])
-    nreader       = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nreader'])
-    nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nchk_beam'])
+    pktsz         = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['pktsz'])
+    ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['ndf_chk_rbuf'])
+    nreader       = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['nreader'])
+    nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['nchk_beam'])
     blksz         = pktsz * ndf_chk_rbuf * nchk_beam
     script_name   = "/home/pulsar/xinping/phased-array-feed/script/dada_diskdb_entry.py"
 

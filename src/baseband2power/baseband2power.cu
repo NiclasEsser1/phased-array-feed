@@ -22,11 +22,17 @@ int init_baseband2power(conf_t *conf)
   conf->nsamp_in     = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF; // For each stream, here one stream will produce one final output
   conf->ndata_in     = conf->nsamp_in * NPOL_IN * NDIM_IN;
   
-  conf->nsamp_rt1     = conf->nsamp_in / (2 * SUM1_BLKSZ);
+  conf->nsamp_rt1     = conf->nsamp_in;
   conf->ndata_rt1     = conf->nsamp_rt1;
 
-  conf->nsamp_rt2     = NCHAN_OUT;
-  conf->ndata_rt2     = conf->nsamp_rt2 * NPOL_OUT * NDIM_OUT;
+  conf->nsamp_rt2     = conf->nsamp_in / (2 * SUM1_BLKSZ);
+  conf->ndata_rt2     = conf->nsamp_rt1;
+
+  //conf->nsamp_rt1     = conf->nsamp_in / (2 * SUM1_BLKSZ);
+  //conf->ndata_rt1     = conf->nsamp_rt1;
+  //
+  //conf->nsamp_rt2     = NCHAN_OUT;
+  //conf->ndata_rt2     = conf->nsamp_rt2 * NPOL_OUT * NDIM_OUT;
   
   conf->nsamp_out    = NCHAN_OUT;
   conf->ndata_out    = conf->nsamp_out * NPOL_OUT * NDIM_OUT;
@@ -60,6 +66,7 @@ int init_baseband2power(conf_t *conf)
   
   /* Prepare the setup of kernels */
   conf->gridsize_unpack_detect.x = conf->stream_ndf_chk;
+  fprintf(stdout, "%d\n", conf->stream_ndf_chk);
   conf->gridsize_unpack_detect.y = NCHK_BEAM;
   conf->gridsize_unpack_detect.z = 1;
   conf->blocksize_unpack_detect.x = NSAMP_DF; 
@@ -199,11 +206,13 @@ int baseband2power(conf_t conf)
   blocksize_sum1 = conf.blocksize_sum1;
   gridsize_sum2 = conf.gridsize_sum2;
   blocksize_sum2 = conf.blocksize_sum2;
-  
+  //fprintf(stdout, "%d\n", blocksize_sum1.x * sizeof(float) + blocksize_sum2.x * sizeof(float));
+
   while(!ipcbuf_eod(conf.db_in))
     {      
       conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
       conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
+      //fprintf(stdout, "HERE\n");
       
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
@@ -216,14 +225,12 @@ int baseband2power(conf_t conf)
 	      
 	      dbufout_offset = j * conf.dbufout_offset;
 	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
+	      //fprintf(stdout, "%d\t%d\n", i, j);
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));	      
-	      
 	      unpack_detect_kernel<<<gridsize_unpack_detect, blocksize_unpack_detect, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset]);
 	      sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
 	      sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset]);
-	      
-	      /* Copy the final output to host */
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams

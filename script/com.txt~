@@ -1,0 +1,1 @@
+dspsr -b 1024 -L 10 -A -E /home/pulsar/xinping/phased-array-feed/config/J1939+2134.par -m 58360.8414467593 J1939+2134-1024chan-64scl.fil -O J1939+2134-1024chan-64scl

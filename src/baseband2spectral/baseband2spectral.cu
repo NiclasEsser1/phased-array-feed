@@ -26,10 +26,6 @@ int init_baseband2spectral(conf_t *conf)
   conf->npol_in        = conf->nsamp_in * NPOL_IN;
   conf->ndata_in       = conf->npol_in  * NDIM_IN;
   
-  conf->nsamp_out      = NCHAN_KEEP_BAND;
-  conf->npol_out       = conf->nsamp_out * NPOL_OUT;
-  conf->ndata_out      = conf->npol_out  * NDIM_OUT;
-
   conf->nsamp_rtc      = conf->nsamp_in;
   conf->npol_rtc       = conf->nsamp_rtc * NPOL_IN;
   conf->ndata_rtc      = conf->npol_rtc  * NDIM_IN;
@@ -42,6 +38,10 @@ int init_baseband2spectral(conf_t *conf)
   conf->npol_rtf2      = conf->nsamp_rtf2 * NPOL_OUT;
   conf->ndata_rtf2     = conf->npol_rtf2   * NDIM_OUT;
   
+  conf->nsamp_out      = NCHAN_KEEP_BAND;
+  conf->npol_out       = conf->nsamp_out * NPOL_OUT;
+  conf->ndata_out      = conf->npol_out  * NDIM_OUT;
+
   nx        = CUFFT_NX;
   batch     = conf->npol_rtc / CUFFT_NX;
   
@@ -253,7 +253,7 @@ int baseband2spectral(conf_t conf)
 	      
 	      dbufout_offset = j * conf.dbufout_offset;
 	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
-		      
+	      
 	      /* Copy data into device */
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
 	      
@@ -364,13 +364,13 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "BW", "%lf", BW_OUT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "BW", "%d", BW_OUT) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set BW\n");
       fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp) < 0)  
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp * NSAMP_DF * conf->stream_ndf_chk) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set TSAMP\n");
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

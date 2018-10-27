@@ -47,7 +47,7 @@ __global__ void unpack_detect_kernel(int64_t *dbuf_in,  float *dbuf_rt1)
   p2x = (int16_t)((tmp & 0x0000ffff00000000ULL) >> 32);
   p2y = (int16_t)((tmp & 0xffff000000000000ULL) >> 48);
   
-  dbuf_rt1[loc_rt1] = p1x * p1x + p1y * p1y + p2x * p2x + p2y * p2y;
+  dbuf_rt1[loc_rt1] = (float)(p1x * p1x + p1y * p1y + p2x * p2x + p2y * p2y);
 }
 
 

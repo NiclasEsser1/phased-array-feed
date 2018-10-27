@@ -19,12 +19,12 @@ def ConfigSectionMap(fname, section):
     return dict_conf
 
 def diskdb_db(pipeline_conf, system_conf):    
-    key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
-    nblk          = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nblk'])
-    pktsz         = int(ConfigSectionMap(pipeline_conf, "DISKDB")['pktsz'])
-    ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISKDB")['ndf_chk_rbuf'])
-    nreader       = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nreader'])
-    nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISKDB")['nchk_beam'])
+    key           = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISK2DB")['key']), 0), 'x')
+    nblk          = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['nblk'])
+    pktsz         = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['pktsz'])
+    ndf_chk_rbuf  = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['ndf_chk_rbuf'])
+    nreader       = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['nreader'])
+    nchk_beam     = int(ConfigSectionMap(pipeline_conf, "DISK2DB")['nchk_beam'])
     blksz         = pktsz * ndf_chk_rbuf * nchk_beam
 
     kfname       = "diskdb.key"
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     else:
         t_b2f_db.join()
 
-    key_diskdb = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISKDB")['key']), 0), 'x')
+    key_diskdb = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "DISK2DB")['key']), 0), 'x')
     if baseband:
         key_b2b    = format(int("0x{:s}".format(ConfigSectionMap(pipeline_conf, "BASEBAND2BASEBAND")['key']), 0), 'x')
     else:

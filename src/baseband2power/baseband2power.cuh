@@ -24,6 +24,7 @@
 #define NCHAN_IN      (NCHK_BEAM * NCHAN_CHK)
 
 #define SUM1_BLKSZ    1024
+//#define SUM1_BLKSZ    128
 #define NBYTE_RT      4 // float
 #define NBYTE_IN      2 // int16_t
 #define NBYTE_OUT     4 // float
