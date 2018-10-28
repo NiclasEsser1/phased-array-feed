@@ -70,7 +70,9 @@ __global__ void swap_select_transpose_detect_kernel(cufftComplex *dbuf_rtc, floa
       p2 = dbuf_rtc[loc_rtc + offset_rtc];
 
       loc = blockIdx.x * NCHAN_KEEP_CHAN + remainder;
-      loc_rtf1 = blockDim.y * loc + blockIdx.y; // FT order      
+      //loc_rtf1 = blockDim.y * loc + blockIdx.y; // FT order
+      loc_rtf1 = gridDim.y * loc + blockIdx.y; // FT order
+      
       dbuf_rtf1[loc_rtf1] = p1.x * p1.x + p1.y * p1.y + p2.x * p2.x + p2.y * p2.y;
     }
 }

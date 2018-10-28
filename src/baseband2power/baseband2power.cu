@@ -229,8 +229,10 @@ int baseband2power(conf_t conf)
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));	      
 	      unpack_detect_kernel<<<gridsize_unpack_detect, blocksize_unpack_detect, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset]);
+	      
 	      sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
 	      sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset]);
+	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams

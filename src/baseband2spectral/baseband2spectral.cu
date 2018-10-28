@@ -62,11 +62,11 @@ int init_baseband2spectral(conf_t *conf)
       CufftSafeCall(cufftSetStream(conf->fft_plans[i], conf->streams[i]));
     }
   
-  conf->sbufin_size  = conf->ndata_in * NBYTE_IN;
+  conf->sbufin_size  = conf->ndata_in  * NBYTE_IN;
   conf->sbufout_size = conf->ndata_out * NBYTE_OUT;  
   conf->sbufrtc_size  = conf->npol_rtc * NBYTE_RT_C;
-  conf->sbufrtf1_size = conf->npol_rtf1 * NBYTE_RT_F;
-  conf->sbufrtf2_size = conf->npol_rtf2 * NBYTE_RT_F;
+  conf->sbufrtf1_size = conf->ndata_rtf1 * NBYTE_RT_F;
+  conf->sbufrtf2_size = conf->ndata_rtf2 * NBYTE_RT_F;
 
   conf->bufin_size   = conf->nstream * conf->sbufin_size;
   conf->bufout_size  = conf->nstream * conf->sbufout_size;
@@ -264,8 +264,11 @@ int baseband2spectral(conf_t conf)
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rtc[bufrtc_offset], &conf.buf_rtc[bufrtc_offset], CUFFT_FORWARD));
 
 	      swap_select_transpose_detect_kernel<<<gridsize_swap_select_transpose_detect, blocksize_swap_select_transpose_detect, 0, conf.streams[j]>>>(&conf.buf_rtc[bufrtc_offset], &conf.buf_rtf1[bufrtf1_offset], conf.nsamp_rtc);
-	      sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rtf1[bufrtf1_offset], &conf.buf_rtf2[bufrtf2_offset]);
-	      sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rtf2[bufrtf2_offset], &conf.dbuf_out[dbufout_offset]);
+
+	      sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rtf1[bufrtf1_offset], &conf.dbuf_out[dbufout_offset]);
+	      
+	      //sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rtf1[bufrtf1_offset], &conf.buf_rtf2[bufrtf2_offset]);
+	      //sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rtf2[bufrtf2_offset], &conf.dbuf_out[dbufout_offset]);
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
@@ -288,11 +291,11 @@ int destroy_baseband2spectral(conf_t conf)
       CufftSafeCall(cufftDestroy(conf.fft_plans[i]));
     }
   
-  cudaFree(conf.dbuf_in);
-  cudaFree(conf.dbuf_out);
   dada_hdu_unlock_write(conf.hdu_out);
   dada_hdu_destroy(conf.hdu_out);
-  
+
+  cudaFree(conf.dbuf_in);
+  cudaFree(conf.dbuf_out);
   cudaFree(conf.buf_rtc);
   cudaFree(conf.buf_rtf1);
   cudaFree(conf.buf_rtf2);

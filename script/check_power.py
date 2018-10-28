@@ -11,6 +11,7 @@ import numpy.fft as fft
 repeat     = 1
 nsamp      = 1
 nchan      = 336 * 54
+#nchan      = 336 
 ndata      = nsamp * nchan 
 hdrsize    = 4096
 dsize      = 4
@@ -18,7 +19,7 @@ fdir  = "/beegfs/DENG/AUG/"
 fname = '2018-08-30-19:37:27_0000000000000000.000000.dada'
 fname = '2018-08-30-20:11:41_0000000000000000.000000.dada'
 #fname = '2018-08-31-01:11:19_0000000000000000.000000.dada'
-fname = 'J0332+5434-power.dada'
+#fname = 'J0332+5434-power.dada'
 fname = 'J0332+5434-spectral.dada'
 
 blksize = ndata * dsize
