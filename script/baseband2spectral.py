@@ -70,9 +70,9 @@ if __name__ == "__main__":
     os.system(db_create)
 
     # Do the work
-    b2p = "../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
+    #b2p = "../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
     #b2p = "nvprof ../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
-    #b2p = "cuda-memcheck ../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
+    b2p = "cuda-memcheck ../src/baseband2spectral/baseband2spectral_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
     
     print b2p
     os.system(b2p)

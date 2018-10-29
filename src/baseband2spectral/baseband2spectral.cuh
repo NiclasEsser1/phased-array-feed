@@ -31,8 +31,8 @@
 
 #define OSAMP_RATEI           0.84375
 #define CUFFT_RANK            1
-//#define SUM1_BLKSZ            64
-#define SUM1_BLKSZ            128
+#define SUM1_BLKSZ            64
+//#define SUM1_BLKSZ            128
 
 #define CUFFT_NX             64
 #define CUFFT_MOD            27              // Set to remove oversampled data
