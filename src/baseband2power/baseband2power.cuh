@@ -23,8 +23,6 @@
 #define NCHAN_CHK     7
 #define NCHAN_IN      (NCHK_BEAM * NCHAN_CHK)
 
-#define SUM1_BLKSZ    1024
-//#define SUM1_BLKSZ    128
 #define NBYTE_RT      4 // float
 #define NBYTE_IN      2 // int16_t
 #define NBYTE_OUT     4 // float
@@ -37,6 +35,7 @@ typedef struct conf_t
 {
   char dir[MSTR_LEN];
   cudaStream_t *streams;
+  int twice_sum, sum1_blksz;
   
   uint64_t hbufin_offset, dbufin_offset;
   uint64_t bufrt1_offset, bufrt2_offset;

@@ -24,9 +24,11 @@ void usage ()
 	   " -c  The number of data frame (per frequency chunk) of each incoming ring buffer block\n"
 	   " -d  How many times we need to repeat the process and finish one incoming block\n"
 	   " -e  The number of streams \n"
-	   " -f  The number of data stream (per frequency chunk) of each stream\n"
-	   " -g  The directory to put log file\n"
-	   " -h  show help\n");
+	   " -f  The number of data frame (per frequency chunk) of each stream\n"
+	   " -g  Do we need to run sum_kernel twice\n"
+	   " -h  show help\n"	   
+	   " -i  The block size of the first sum_kernel\n"
+	   " -j  The directory to put log file\n");
 }
 
 multilog_t *runtime_log;
@@ -39,7 +41,7 @@ int main(int argc, char *argv[])
   char log_fname[MSTR_LEN];
   
   /* Initial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:")) != -1)
     {
       switch(arg)
 	{
@@ -80,10 +82,18 @@ int main(int argc, char *argv[])
 	case 'f':
 	  sscanf(optarg, "%d", &conf.stream_ndf_chk);
 	  break;
-	  	  
+	  	  	  
 	case 'g':
+	  sscanf(optarg, "%d", &conf.twice_sum);
+	  break;
+	  
+	case 'i':
+	  sscanf(optarg, "%d", &conf.sum1_blksz);
+	  break;
+	  
+	case 'j':
 	  sscanf(optarg, "%s", conf.dir);
-	  break;	  
+	  break;
 	}
     }
 

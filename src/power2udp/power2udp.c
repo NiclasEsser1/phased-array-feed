@@ -142,10 +142,12 @@ int power2udp(conf_t conf)
 	      
 	      tt_r = tt;
 	    }
-	  conf.leap = 37;  // determine the leap auto
+	  
 	  bat2mjd(bat, conf.leap, &mjd);
 	  mjd_i = (int32_t)mjd;
 	  mjd_f = mjd - mjd_i;
+
+	  fprintf(stdout, "HERE\n");
 	  
 	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", ra_f);
 	  byte_sum +=NBYTE_BIN;

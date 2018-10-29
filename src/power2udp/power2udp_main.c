@@ -12,9 +12,9 @@
 void usage ()
 {
   fprintf (stdout,
-	   "paf_power2udp - To packet the power data with other parameters to UDP and send it via given ip_udp:port_udp, it also forward TOS metadata from ip_meta:port_meta\n"
+	   "paf_power2udp - To packet the power data with other parameters to UDP and send it via given ip_udp and port_udp, it also forwards TOS metadata from ip_meta and port_meta\n"
 	   "\n"
-	   "Usage: paf_power2udp [options]\n"
+	   "Usage: power2udp_main [options]\n"
 	   " -h  show help\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
 	   " -b  The name of the directory in which we will record the log\n"
@@ -23,6 +23,7 @@ void usage ()
 	   " -e  IP address to receive metadata \n"
 	   " -f  Port number to receive metadata \n"
 	   " -g  Number of runs to finish one buffer \n"
+	   " -i The leap seconds \n"
 	   );
 }
 
@@ -35,7 +36,7 @@ int main(int argc, char *argv[])
   char log_fname[MSTR_LEN];
   conf_t conf;
   
-  while((arg=getopt(argc,argv,"a:b:hc:d:e:f:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:d:e:hf:g:i:")) != -1)
     {
       switch(arg)
 	{
@@ -73,6 +74,10 @@ int main(int argc, char *argv[])
 	  
 	case 'g':	  	  	  
 	  sscanf (optarg, "%d", &conf.nrun);
+	  break;
+	  
+	case 'i':	  	  	  
+	  sscanf (optarg, "%d", &conf.leap);
 	  break;
 	}
     }

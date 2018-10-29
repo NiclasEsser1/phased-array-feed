@@ -3,6 +3,8 @@
 import os, parser, argparse, ConfigParser, time
 import numpy as np
 
+BLKSZ = 1024
+
 def ConfigSectionMap(fname, section):
     # Play with configuration file
     Config = ConfigParser.ConfigParser()
@@ -36,6 +38,7 @@ if __name__ == "__main__":
     tsamp         = args.tsamp[0]
 
     df_res         = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
+    nsamp_df       = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
     ndf_chk_rbuf   = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['ndf_chk_rbuf'])
     nchan          = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nchan_out'])
     nbyte          = int(ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['nbyte_out'])
@@ -58,6 +61,19 @@ if __name__ == "__main__":
             break
     print ndf_chk_stream
 
+    # To get the parameters for sum
+    nsum = int(ndf_chk_stream * nsamp_df)
+    print nsum
+    if (nsum < (2 * BLKSZ)):
+        twice_sum = 0
+        sum1_blksz = nsum / 2
+    else:
+        twice_sum = 1
+        sum1_blksz = nsum
+        while (sum1_blksz > BLKSZ):
+            sum1_blksz = sum1_blksz / 2
+    print sum1_blksz, twice_sum
+
     # How many runs to finish one incoming buffer
     nrepeat = int(ndf_chk_rbuf/(nstream * ndf_chk_stream))
 
@@ -70,9 +86,9 @@ if __name__ == "__main__":
     os.system(db_create)
 
     # Do the work
-    b2p = "../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
-    #b2p = "nvprof ../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
-    #b2p = "cuda-memcheck ../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, ddir)
+    b2p = "../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:d} -i {:d} -j {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, twice_sum, sum1_blksz, ddir)
+    #b2p = "nvprof ../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:d} -i {:d} -j {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, twice_sum, sum1_blksz, ddir)
+    #b2p = "cuda-memcheck ../src/baseband2power/baseband2power_main -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:d} -i {:d} -j {:s}".format(key_input, key_output, ndf_chk_rbuf, nrepeat, nstream, ndf_chk_stream, twice_sum, sum1_blksz, ddir)
     
     print b2p
     os.system(b2p)

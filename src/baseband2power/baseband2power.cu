@@ -25,10 +25,13 @@ int init_baseband2power(conf_t *conf)
   conf->nsamp_rt1     = conf->nsamp_in;
   conf->ndata_rt1     = conf->nsamp_rt1;
 
-  conf->nsamp_rt2     = conf->nsamp_in / (2 * SUM1_BLKSZ);
-  conf->ndata_rt2     = conf->nsamp_rt1;
-
-  //conf->nsamp_rt1     = conf->nsamp_in / (2 * SUM1_BLKSZ);
+  if (conf->twice_sum)
+    {
+      conf->nsamp_rt2     = conf->nsamp_in / (2 * conf->sum1_blksz);
+      conf->ndata_rt2     = conf->nsamp_rt1;
+    }
+  
+  //conf->nsamp_rt1     = conf->nsamp_in / (2 * conf->sum1_blksz);
   //conf->ndata_rt1     = conf->nsamp_rt1;
   //
   //conf->nsamp_rt2     = NCHAN_OUT;
@@ -44,13 +47,15 @@ int init_baseband2power(conf_t *conf)
   
   conf->bufin_size  = conf->nstream * conf->sbufin_size;
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
-  conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
+  if (conf->twice_sum)
+    conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
   conf->bufout_size = conf->nstream * conf->sbufout_size;
   
   conf->hbufin_offset = conf->sbufin_size;
   conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_IN * NDIM_IN);
   conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
-  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
+  if (conf->twice_sum)
+    conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
   
   conf->dbufout_offset   = conf->sbufout_size / NBYTE_OUT;
   conf->hbufout_offset   = conf->sbufout_size;
@@ -58,7 +63,8 @@ int init_baseband2power(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
+  if (conf->twice_sum)
+    CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
   
   conf->streams = (cudaStream_t *)malloc(conf->nstream * sizeof(cudaStream_t));  
   for(i = 0; i < conf->nstream; i ++)
@@ -74,19 +80,21 @@ int init_baseband2power(conf_t *conf)
   conf->blocksize_unpack_detect.z = 1;
 
   conf->gridsize_sum1.x = NCHAN_OUT;
-  conf->gridsize_sum1.y = conf->stream_ndf_chk * NSAMP_DF / (2 * SUM1_BLKSZ);
+  conf->gridsize_sum1.y = conf->stream_ndf_chk * NSAMP_DF / (2 * conf->sum1_blksz);
   conf->gridsize_sum1.z = 1;
-  conf->blocksize_sum1.x = SUM1_BLKSZ;
+  conf->blocksize_sum1.x = conf->sum1_blksz;
   conf->blocksize_sum1.y = 1;
   conf->blocksize_sum1.z = 1;
-
-  conf->gridsize_sum2.x = NCHAN_OUT;
-  conf->gridsize_sum2.y = 1;
-  conf->gridsize_sum2.z = 1;
-  conf->blocksize_sum2.x = conf->stream_ndf_chk * NSAMP_DF / (4 * SUM1_BLKSZ);
-  conf->blocksize_sum2.y = 1;
-  conf->blocksize_sum2.z = 1;
-
+  
+  if (conf->twice_sum)
+    {
+      conf->gridsize_sum2.x = NCHAN_OUT;
+      conf->gridsize_sum2.y = 1;
+      conf->gridsize_sum2.z = 1;
+      conf->blocksize_sum2.x = conf->stream_ndf_chk * NSAMP_DF / (4 * conf->sum1_blksz);
+      conf->blocksize_sum2.y = 1;
+      conf->blocksize_sum2.z = 1;
+    }
   conf->scale = (double)NBYTE_OUT * NPOL_OUT * NDIM_OUT / (conf->stream_ndf_chk * NSAMP_DF * NPOL_IN * NDIM_IN * NBYTE_IN);
   
   /* Attach to input ring buffer */
@@ -177,7 +185,8 @@ int destroy_baseband2power(conf_t conf)
   cudaFree(conf.dbuf_in);
   cudaFree(conf.dbuf_out);
   cudaFree(conf.buf_rt1);
-  cudaFree(conf.buf_rt2);
+  if (conf.twice_sum)
+    cudaFree(conf.buf_rt2);
 
   dada_cuda_dbunregister(conf.hdu_in);
 
@@ -204,10 +213,13 @@ int baseband2power(conf_t conf)
   blocksize_unpack_detect = conf.blocksize_unpack_detect;
   gridsize_sum1 = conf.gridsize_sum1;
   blocksize_sum1 = conf.blocksize_sum1;
-  gridsize_sum2 = conf.gridsize_sum2;
-  blocksize_sum2 = conf.blocksize_sum2;
-  //fprintf(stdout, "%d\n", blocksize_sum1.x * sizeof(float) + blocksize_sum2.x * sizeof(float));
-
+  if (conf.twice_sum)
+    {
+      gridsize_sum2 = conf.gridsize_sum2;
+      blocksize_sum2 = conf.blocksize_sum2;
+      //fprintf(stdout, "%d\n", blocksize_sum1.x * sizeof(float) + blocksize_sum2.x * sizeof(float));
+    }
+  
   while(!ipcbuf_eod(conf.db_in))
     {      
       conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
@@ -221,7 +233,8 @@ int baseband2power(conf_t conf)
 	      hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
 	      dbufin_offset = j * conf.dbufin_offset; 
 	      bufrt1_offset = j * conf.bufrt1_offset;
-	      bufrt2_offset = j * conf.bufrt2_offset;
+	      if (conf.twice_sum)
+		bufrt2_offset = j * conf.bufrt2_offset;
 	      
 	      dbufout_offset = j * conf.dbufout_offset;
 	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
@@ -229,9 +242,14 @@ int baseband2power(conf_t conf)
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));	      
 	      unpack_detect_kernel<<<gridsize_unpack_detect, blocksize_unpack_detect, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset]);
-	      
-	      sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
-	      sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset]);
+
+	      if (conf.twice_sum)
+		{
+		  sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
+		  sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset]);
+		}
+	      else
+		sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.dbuf_out[dbufout_offset]);
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
