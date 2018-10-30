@@ -19,6 +19,7 @@
 #define NBYTE_UTC     28  // Bytes of UTC time stamp
 #define NBYTE_BIN     4   // Bytes for other number in the output binary
 #define NTOKEN_META   237 // Number of token in json metadata
+#define UDP_PKTSZ     1416
 
 typedef struct conf_t
 {

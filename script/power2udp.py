@@ -72,7 +72,7 @@ def getDUTCDt(dt=None):
     # Different system used before then
     return 0
 
-# docker run --ipc=container:baseband2power --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name power2udp xinpingdeng/phased-array-feed "./power2udp.py -a ../config/pipeline.conf -b ../config/system.conf -c 0.016"
+# docker run --ipc=container:baseband2power --net=host --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name power2udp xinpingdeng/phased-array-feed "./power2udp.py -a ../config/pipeline.conf -b ../config/system.conf -c 0.016"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert baseband data to power with original channels')
     parser.add_argument('-a', '--pipeline_conf', type=str, nargs='+',
@@ -90,10 +90,10 @@ if __name__ == "__main__":
     
     df_res    = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
     nsamp_df  = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['nsamp_df'])
-    fits_ip   = ConfigSectionMap(system_conf, "EthernetInterfacePACIFIX")['fits_ip']
-    fits_port = int(ConfigSectionMap(system_conf, "EthernetInterfacePACIFIX")['fits_port'])
-    meta_ip   = ConfigSectionMap(system_conf, "EthernetInterfacePACIFIX")['meta_ip']
-    meta_port = int(ConfigSectionMap(system_conf, "EthernetInterfacePACIFIX")['meta_port'])
+    fits_ip   = ConfigSectionMap(system_conf, "FITSInterfacePACIFIX")['ip']
+    fits_port = int(ConfigSectionMap(system_conf, "FITSInterfacePACIFIX")['port'])
+    meta_ip   = ConfigSectionMap(system_conf, "MetadataInterfaceTOS")['ip']
+    meta_port = int(ConfigSectionMap(system_conf, "MetadataInterfaceTOS")['port'])
 
     ddir      = ConfigSectionMap(pipeline_conf, "POWER2UDP")['dir']
     key       = ConfigSectionMap(pipeline_conf, "BASEBAND2POWER")['key']

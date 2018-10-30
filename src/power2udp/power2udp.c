@@ -62,39 +62,29 @@ int init_power2udp(conf_t *conf)
 
 int power2udp(conf_t conf)
 {
-  // To make sure the binary file is okay;
-  // To make sure that binary in stdout is okay;
-  // To make sure that I can send it via UDP;
-  // To make sure that I can receive the data on UDP port;
-  int i;
+  int i, first = 1;
   uint64_t curbufsz;
   struct tm tm;
-  char utc[MSTR_LEN];
-  double tsamp, tt, tt_f, tt_r;
+  char utc[MSTR_LEN], fname[MSTR_LEN], bat[MSTR_LEN], *curbuf = NULL, buf_meta[1<<16], buf_udp[1<<16]; // 1<<16 = 2^16
+  double tsamp, tt, tt_f, tt_r, mjd;
   time_t tt_i;
-  char binary_fname[MSTR_LEN];
   struct sockaddr_in sa_meta, sa_udp;
-  char buf_meta[1<<16], buf_udp[1<<16]; // 1<<16 = 2^16
   socklen_t fromlen, tolen;
-  float ra_f, dec_f, az_f, el_f;   // We need to be careful here, float may not be 4 bytes !!!!
-  char bat[MSTR_LEN];
-  double mjd;
   int32_t mjd_i;
-  float mjd_f;
-  float tsamp_f;
-  int byte_sum;
-  int first = 1;
-  char *curbuf = NULL;
+  float mjd_f, tsamp_f, ra_f, dec_f, az_f, el_f;   // We need to be careful here, float may not be 4 bytes !!!!
   ipcbuf_t *db = (ipcbuf_t *)conf.hdu->data_block;
+  FILE *fp = NULL;
   
   fromlen = sizeof(sa_meta);
-  tolen = sizeof(sa_meta);
+  tolen = sizeof(sa_udp);
 
   sa_udp.sin_family = AF_INET;
   sa_udp.sin_port   = htons(conf.port_udp);
   sa_udp.sin_addr.s_addr = inet_addr(conf.ip_udp);
   
-  sprintf(binary_fname, "%s/power2udp.bin", conf.dir);
+  sprintf(fname, "%s/power2udp.bin", conf.dir);
+  fp = fopen(fname, "wb+");
+  
   while(!ipcbuf_eod(db))
     {
       curbuf   = ipcbuf_get_next_read(db, &curbufsz);
@@ -109,30 +99,25 @@ int power2udp(conf_t conf)
 	  tsamp_f = conf.tsamp;
 	  tt      = mktime(&tm) + conf.picoseconds / 1E12 + tsamp / 2.0; // To added in the fraction part of reference time and half of the sampling time (the time stamps should be at the middle of integration)
 	  tt_r    = tt;
-	  
+
 	  recvfrom(conf.sock_meta, (void *)buf_meta, 1<<16, 0, (struct sockaddr *)&sa_meta, &fromlen);
 	  json2info(buf_meta, &ra_f, &dec_f, &az_f, &el_f, bat);
 	}
 
       for(i = 0; i < conf.nrun; i ++)
 	{
-	  byte_sum = 0;
 	  tt_i = (time_t)tt;
 	  tt_f = tt - tt_i;
 
 	  /* Put key information into binary stream */
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%d", conf.nchan);
-	  byte_sum +=NBYTE_BIN;	  
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN * conf.nchan, "%s", &curbuf[conf.buf_size * i]);
-	  byte_sum +=(NBYTE_BIN * conf.nchan);
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", tsamp_f);
-	  byte_sum +=NBYTE_BIN;
+	  fseek(fp, 0, SEEK_SET);
+	  fwrite(&conf.nchan, NBYTE_BIN, 1, fp);                          // Number of channels
+	  fwrite(&curbuf[conf.buf_size * i], NBYTE_BIN, conf.nchan, fp);// Flux of all channels
+	  fwrite(&tsamp_f, NBYTE_BIN, 1, fp);                          // Number of channels
 	  strftime (utc, MSTR_LEN, FITS_TIMESTR, gmtime(&tt_i));    // String start time without fraction second
 	  sprintf(utc, "%s.%04dUTC ", utc, (int)(tt_f * 1E4 + 0.5));// To put the fraction part in and make sure that it rounds to closest integer
-	  snprintf(&buf_udp[byte_sum], NBYTE_UTC, "%s", utc);
-	  byte_sum +=NBYTE_UTC;	  
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%d", conf.beam);
-	  byte_sum +=NBYTE_BIN;
+	  fwrite(utc, 1, NBYTE_UTC, fp);                     // UTC timestamps
+	  fwrite(&conf.beam, NBYTE_BIN, 1, fp);              // The beam id
 	  
 	  /* Put TOS position information into binary stream*/
 	  if (tt - tt_r > META_UP)  // For safe, we only update metadata every 2 seconds;
@@ -147,29 +132,21 @@ int power2udp(conf_t conf)
 	  mjd_i = (int32_t)mjd;
 	  mjd_f = mjd - mjd_i;
 
-	  fprintf(stdout, "HERE\n");
-	  
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", ra_f);
-	  byte_sum +=NBYTE_BIN;
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", dec_f);
-	  byte_sum +=NBYTE_BIN;
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%d", mjd_i);
-	  byte_sum +=NBYTE_BIN;
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", mjd_f);
-	  byte_sum +=NBYTE_BIN;
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", az_f);
-	  byte_sum +=NBYTE_BIN;
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", el_f);
-	  byte_sum +=NBYTE_BIN;
-	  
+	  fwrite(&ra_f, NBYTE_BIN, 1, fp);              // RA of boresight
+	  fwrite(&dec_f, NBYTE_BIN, 1, fp);             // DEC of boresight
+	  fwrite(&mjd_i, NBYTE_BIN, 1, fp);             // DEC of boresight
+	  fwrite(&mjd_f, NBYTE_BIN, 1, fp);             // DEC of boresight
+	  fwrite(&az_f, NBYTE_BIN, 1, fp);             // DEC of boresight
+	  fwrite(&el_f, NBYTE_BIN, 1, fp);             // DEC of boresight
+
 	  /* Put TOS frequency information into binary stream*/
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", conf.freq);
-	  byte_sum +=NBYTE_BIN;
-	  snprintf(&buf_udp[byte_sum], NBYTE_BIN, "%f", conf.chan_width);
-	  byte_sum +=NBYTE_BIN;
+	  fwrite(&conf.freq, NBYTE_BIN, 1, fp);             // DEC of boresight
+	  fwrite(&conf.chan_width, NBYTE_BIN, 1, fp);             // DEC of boresight
 	  
+	  fseek(fp, 0, SEEK_SET);
+	  fread(buf_udp, UDP_PKTSZ, 1, fp);
 	  /* Read the file and sent the content with UDP socket */
-	  if(sendto(conf.sock_udp, buf_udp, byte_sum, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
+	  if(sendto(conf.sock_udp, buf_udp, UDP_PKTSZ, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
 	    {	  
 	      multilog (runtime_log, LOG_ERR, "sento() failed\n");
 	      fprintf(stderr, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -181,6 +158,7 @@ int power2udp(conf_t conf)
       
       ipcbuf_mark_cleared(db);
     }
+  fclose(fp);
   
   return EXIT_SUCCESS;
 }
@@ -352,86 +330,10 @@ int bat2mjd(char bat[MSTR_LEN], int leap, double *mjd)
   
   sscanf(bat, "%lx", &bat_i);
 
-  //fprintf(stdout, "%f\t", *mjd);
   *mjd = (bat_i/1.0E6 - leap) / 86400.0;
-  //fprintf(stdout, "%f\t%f\t", *mjd, (bat_i/1.0E6 - leap) / 86400.0);
   
   return EXIT_SUCCESS;
 }
-
-
-//def getDUTCDt(dt=None):
-//    """
-//    Get the DUTC value in seconds that applied at the given (datetime)
-//    timestamp.
-//    """
-//    dt = dt or utc_now()
-//    for i in LEAPSECONDS:
-//        if i[0] < dt:
-//            return i[2]
-//    # Different system used before then
-//    return 0
-//
-//# Leap seconds definition, [UTC datetime, MJD, DUTC]
-//LEAPSECONDS = [
-//    [datetime.datetime(2017, 1, 1, tzinfo=pytz.utc), 57754, 37],
-//    [datetime.datetime(2015, 7, 1, tzinfo=pytz.utc), 57205, 36],
-//    [datetime.datetime(2012, 7, 1, tzinfo=pytz.utc), 56109, 35],
-//    [datetime.datetime(2009, 1, 1, tzinfo=pytz.utc), 54832, 34],
-//    [datetime.datetime(2006, 1, 1, tzinfo=pytz.utc), 53736, 33],
-//    [datetime.datetime(1999, 1, 1, tzinfo=pytz.utc), 51179, 32],
-//    [datetime.datetime(1997, 7, 1, tzinfo=pytz.utc), 50630, 31],
-//    [datetime.datetime(1996, 1, 1, tzinfo=pytz.utc), 50083, 30],
-//    [datetime.datetime(1994, 7, 1, tzinfo=pytz.utc), 49534, 29],
-//    [datetime.datetime(1993, 7, 1, tzinfo=pytz.utc), 49169, 28],
-//    [datetime.datetime(1992, 7, 1, tzinfo=pytz.utc), 48804, 27],
-//    [datetime.datetime(1991, 1, 1, tzinfo=pytz.utc), 48257, 26],
-//    [datetime.datetime(1990, 1, 1, tzinfo=pytz.utc), 47892, 25],
-//    [datetime.datetime(1988, 1, 1, tzinfo=pytz.utc), 47161, 24],
-//    [datetime.datetime(1985, 7, 1, tzinfo=pytz.utc), 46247, 23],
-//    [datetime.datetime(1993, 7, 1, tzinfo=pytz.utc), 45516, 22],
-//    [datetime.datetime(1982, 7, 1, tzinfo=pytz.utc), 45151, 21],
-//    [datetime.datetime(1981, 7, 1, tzinfo=pytz.utc), 44786, 20],
-//    [datetime.datetime(1980, 1, 1, tzinfo=pytz.utc), 44239, 19],
-//    [datetime.datetime(1979, 1, 1, tzinfo=pytz.utc), 43874, 18],
-//    [datetime.datetime(1978, 1, 1, tzinfo=pytz.utc), 43509, 17],
-//    [datetime.datetime(1977, 1, 1, tzinfo=pytz.utc), 43144, 16],
-//    [datetime.datetime(1976, 1, 1, tzinfo=pytz.utc), 42778, 15],
-//    [datetime.datetime(1975, 1, 1, tzinfo=pytz.utc), 42413, 14],
-//    [datetime.datetime(1974, 1, 1, tzinfo=pytz.utc), 42048, 13],
-//    [datetime.datetime(1973, 1, 1, tzinfo=pytz.utc), 41683, 12],
-//    [datetime.datetime(1972, 7, 1, tzinfo=pytz.utc), 41499, 11],
-//    [datetime.datetime(1972, 1, 1, tzinfo=pytz.utc), 41317, 10],
-//]
-//"# Leap seconds definition, [UTC datetime, MJD, DUTC]"
-//
-//def bat2utc(bat, dutc=None):
-//    """
-//    Convert Binary Atomic Time (BAT) to UTC.  At the ATNF, BAT corresponds to
-//    the number of microseconds of atomic clock since MJD (1858-11-17 00:00).
-//
-//    :param bat: number of microseconds of atomic clock time since
-//        MJD 1858-11-17 00:00.
-//    :type bat: long
-//    :returns utcDJD: UTC date and time (Dublin Julian Day as used by pyephem)
-//    :rtype: float
-//
-//    """
-//    dutc = dutc or getDUTCDt()
-//    if type(bat) is str:
-//        bat = long(bat, base=16)
-//    utcMJDs = (bat/1000000.0)-dutc
-//    utcDJDs = utcMJDs-86400.0*15019.5
-//    utcDJD = utcDJDs/86400.0
-//    return utcDJD + 2415020 - 2400000.5
-//
-//def utc_now():
-//    """
-//    Return current UTC as a timezone aware datetime.
-//    :rtype: datetime
-//    """
-//    dt=datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
-//    return dt
 
 int json2info(char *buf_meta, float *ra_f, float *dec_f, float *az_f, float *el_f, char *bat)
 {

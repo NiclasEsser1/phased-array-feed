@@ -81,7 +81,8 @@ int main(int argc, char *argv[])
 	  break;
 	}
     }
-
+  fprintf(stdout, "%s\t%d\t%s\t%d\n", conf.ip_udp, conf.port_udp, conf.ip_meta, conf.port_meta);
+  
   /* Setup log interface */
   sprintf(log_fname, "%s/power2udp_main.log", conf.dir);
   fp_log = fopen(log_fname, "ab+"); // File to record log information

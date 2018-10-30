@@ -22,7 +22,7 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# ./capture.py -a ../config/system.conf -b ../config/pipeline.conf -c 0 -d 0 -e 0 -f 1
+# ./capture_fold.py -a ../config/system.conf -b ../config/pipeline.conf -c 0 -d 0 -e 0 -f 1
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts) with a docker container')
     
@@ -59,6 +59,7 @@ if __name__ == "__main__":
     script_name    = "capture_entry_fold.py"
     
     nodes, address_nchks, freqs, nchans = metadata2streaminfo.metadata2streaminfo(system_conf)
+    
     freq = freqs[beam][part]
     nchan = nchans[beam][part]
 

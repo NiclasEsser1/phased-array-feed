@@ -14,6 +14,7 @@ sock.bind(server_address)
 while (1):
     data, server = sock.recvfrom(1<<16)
     print len(data)
+    print "HERE"
     
     nchan    = np.fromstring(data[0 : 4], dtype='int32')
     flux     = np.fromstring(data[4 : (nchan[0] * 4 + 4)], dtype='float32')
@@ -28,6 +29,8 @@ while (1):
     el       = np.fromstring(data[(nchan[0] * 4 + 60) : (nchan[0] * 4 + 64)], dtype='float32')
     
     print nchan[0], tsamp[0], utc_time, beam[0], ra[0], dec[0], mjd_i[0], mjd_f[0], az[0], el[0]
+    #print nchan[0], tsamp[0], utc_time, beam[0], ra[0], dec[0], mjd_i[0], mjd_f[0], az[0], el[0]
+    #print nchan[0]
     
     plt.figure()
     plt.plot(flux)
