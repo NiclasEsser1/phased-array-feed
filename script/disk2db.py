@@ -19,10 +19,10 @@ def ConfigSectionMap(fname, section):
             dict_conf[option] = None
     return dict_conf
 
-# docker run --ipc=container:shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458.dada -d 0"
-# docker run --ipc=container:shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1713+0747/J1713+0747.dada -d 0"
-# docker run --ipc=container:shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1939+2134/J1939+2134.dada -d 0"
-# docker run --ipc=container:shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458.dada -d 0"
+# docker run --ipc=shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458.dada -d 0"
+# docker run --ipc=shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1713+0747/J1713+0747.dada -d 0"
+# docker run --ipc=shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1939+2134/J1939+2134.dada -d 0"
+# docker run --ipc=shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458.dada -d 0"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer data from disk to memory')

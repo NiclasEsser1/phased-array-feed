@@ -1,4 +1,4 @@
-# Copyright (C) 2016 by Ewan Barr
+# Copyright (C) 2018 by Xinping Deng
 # Licensed under the Academic Free License version 3.0
 # This program comes with ABSOLUTELY NO WARRANTY.
 # You are free to modify and redistribute this code as long
@@ -30,6 +30,7 @@ RUN apt-get --no-install-recommends -y install \
     automake \
     autogen \
     libtool \
+    libtool-bin \
     libltdl-dev \
     pkg-config \ 
     cmake \
@@ -165,6 +166,38 @@ RUN ./bootstrap && \
     make install
 WORKDIR $SOURCE
 RUN rm -rf psrdada
+
+# Install boost
+WORKDIR $SOURCE
+RUN wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
+RUN tar xvzf boost_1_68_0.tar.gz
+WORKDIR $SOURCE/boost_1_68_0
+RUN ./bootstrap.sh
+RUN ./b2 install --prefix=/usr/local/
+WORKDIR $SOURCE
+RUN rm -rf boost_1_68_0 boost_1_68_0.tar.gz
+
+# Install dedisp
+WORKDIR $SOURCE
+RUN git clone https://github.com/ajameson/dedisp.git
+WORKDIR $SOURCE/dedisp
+RUN make
+COPY lib/* /usr/local/lib
+COPY src/*.h /usr/local/include
+COPY src/*.hpp /usr/local/include
+WORKDIR $SOURCE
+RUN rm -rf dedisp
+
+# Install Heimdall
+WORKDIR $SOURCE
+RUN git clone https://git.code.sf.net/p/heimdall-astro/code heimdall
+WORKDIR $SOURCE/heimdall
+RUN ./bootstrap
+RUN ./configure --prefix=/usr/local/ --with-thrust-include-dir=/usr/local/cuda/include/thrust --with-thrust-lib-dir=/usr/local/cuda/lib64 --with-cuda-dir=/usr/local/cuda
+RUN make
+RUN make install
+WORKDIR $SOURCE
+RUN rm -rf heimdall
 
 # Install dspsr
 WORKDIR $SOURCE

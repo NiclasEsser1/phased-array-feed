@@ -20,6 +20,7 @@ def ConfigSectionMap(fname, section):
     return dict_conf
 
 # docker run --rm -it --ipc=container:baseband2power -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name db2disk xinpingdeng/phased-array-feed "./db2disk.py -a ../config/pipeline.conf -b BASEBAND2POWER"
+# docker run --rm -it --ipc=container:baseband2spectral -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name db2disk xinpingdeng/phased-array-feed "./db2disk.py -a ../config/pipeline.conf -b BASEBAND2SPECTRAL"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer data from memeory to disk')
