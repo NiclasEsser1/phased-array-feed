@@ -135,18 +135,19 @@ WORKDIR $SOURCE
 RUN rm -r pyslalib
 
 # Presto
+ENV SOURCE $PREFIX
 WORKDIR $SOURCE
 ENV PRESTO $SOURCE/presto
 RUN git clone https://github.com/scottransom/presto.git
-ENV PATH $PATH:$PRESTO/bin
+ENV PATH $PATH:$PRESTO/bin:$PRESTO/lib/python
 ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:$PRESTO/lib
+ENV PYTHONPATH $PYTHONPATH:$PRESTO/lib/python
 WORKDIR $PRESTO/src
 RUN rm -rf ../.git && \
     make prep && \ 
     make makewisdom && \
     make
 WORKDIR $PRESTO/python
-ENV PYTHONPATH $PYTHONPATH:$PRESTO/lib/python
 RUN make 
 
 # Create pulsar user, psr group and change the ownership
@@ -155,14 +156,12 @@ RUN groupadd -g 50000 psr && \
 
 # Define home and create the directory
 ARG HOME=/home/pulsar
+ARG PATH=$PATH
+ARG LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+ARG PYTHONPATH=$PYTHONPATH
 RUN mkdir -p $HOME && \
     chown -R pulsar:psr $HOME
-USER pulsar
-WORKDIR $HOME
-RUN echo "export PYTHONPATH=$PYTHONPATH:$PRESTO/lib/python" >> .bashrc && \
-    echo "export PATH=$PATH:$PRESTO/bin" >> .bashrc && \
-    echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PRESTO/lib" >>    .bashrc 
-
+    
 # Back to root
 USER root
 WORKDIR /
