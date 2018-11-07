@@ -193,18 +193,14 @@ __global__ void detect_add_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      //power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE)/(NPOL_SAMP * NDIM_POL * CUFFT_NX * NSAMP_AVE);
       power = scale_sdata[0];
 
       if(ddat_scl[loc_freq] == 0.0)
-	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - 1 - blockIdx.y] = __float2uint_rz(power); // Reverse frequency order
       else
-	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);
-	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - (ddat_offs[loc_freq] - OFFS_UINT8)) / ddat_scl[loc_freq]);
-	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8);
-      //dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power / ddat_scl[loc_freq]);
-
-      //dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power) >> 10;
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - 1 - blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8); // Reverse frequency order
     }
 }
 

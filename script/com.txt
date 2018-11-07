@@ -1,1 +1,16 @@
-dspsr -b 1024 -L 10 -A -E /home/pulsar/xinping/phased-array-feed/config/J1939+2134.par -m 58360.8414467593 J1939+2134-1024chan-64scl.fil -O J1939+2134-1024chan-64scl
+dspsr -b 1024 -L 10 -A -E /home/pulsar/xinping/phased-array-feed/config/J1939+2134.par -m 58360.8414467593 /beegfs/DENG/AUG/J1939+2134-1024chan-64scl.fil -O J1939+2134-1024chan-64scl
+dspsr -b 1024 -L 10 -A -E /home/pulsar/xinping/phased-array-feed/config/J0332+5434.par -m 58361.0495254630 /beegfs/DENG/AUG/J0332+5434-1024chan-64scl-swap.fil -O J0332+5434-1024chan-64scl-swap
+dspsr -b 1024 -L 10 -A -E /home/pulsar/xinping/phased-array-feed/config/J1939+2134.par -m 58360.8414467593 /beegfs/DENG/AUG/J1939+2134-1024chan-64scl-swap.fil -O J1939+2134-1024chan-64scl-swap
+
+docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base heimdall -f /beegfs/DENG/AUG/J1819-1458-1024chan-64scl.fil -output_dir /beegfs/DENG/AUG
+docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base heimdall -f /beegfs/DENG/AUG/J1819-1458-1024chan-64scl.fil -output_dir /beegfs/DENG/AUG -dm 1 1000 -zap_chans 0 511
+docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base heimdall -f /beegfs/DENG/AUG/J1819-1458-1024chan-64scl-swap.fil -output_dir /beegfs/DENG/AUG -dm 1 1000 -zap_chans 0 511 -detect_thresh 10 
+
+docker run --rm -it -v /home/pulsar:/home/pulsar -v /beegfs:/beegfs mpifrpsr/sigproc
+
+docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base heimdall -f /beegfs/DENG/AUG/J1819-1458-1024chan-64scl-swap.fil -output_dir /beegfs/DENG/AUG/zap -dm 1 1000 -zap_chans 512 1023 -zap_chans 304 310 -detect_thresh 10
+docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base heimdall -f /beegfs/DENG/AUG/J1819-1458-1024chan-64scl-swap.fil -output_dir /beegfs/DENG/AUG/fswap -dm 1 1000 -zap_chans 512 1023 -detect_thresh 10 -fswap
+docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base heimdall -f /beegfs/DENG/AUG/J1819-1458-1024chan-64scl-swap.fil -output_dir /beegfs/DENG/AUG -dm 1 1000 -zap_chans 0 511 -detect_thresh 10
+
+# If we swap the frequency channels in filterbank files already, we do not need to do any additional setup;
+# If we do not swap the frequency channels in filterbank files, but use -fswap option of heimdall to do so, the header has to setup as the swapped data and any additional options should follow that as well;

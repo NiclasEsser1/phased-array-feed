@@ -16,7 +16,7 @@ hdrsize    = 4096
 dsize      = 4
 fdir       = "/beegfs/DENG/AUG/"
 fname      = 'J0332+5434-power.dada'
-c_freq     =1340.5
+c_freq     = 1340.5
 freq0      = c_freq - nchan/2.0
 freq       = freq0 + np.arange(int(nchan))
 

@@ -509,7 +509,8 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "BW", "%lf", BW) < 0)  
+  //if (ascii_header_set(hdrbuf_out, "BW", "%lf", -BW) < 0)
+  if (ascii_header_set(hdrbuf_out, "BW", "%lf", -BW) < 0)  // Reverse frequency order
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set BW\n");
       fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

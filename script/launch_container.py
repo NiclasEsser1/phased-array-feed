@@ -9,7 +9,7 @@ parser.add_argument('-a', '--numa_id', type=int, nargs='+',
 args    = parser.parse_args()
 numa_id = args.numa_id[0]
 hdir    = '/home/pulsar/'
-ddir    = '/beegfs/DENG/AUG'
+ddir    = '/beegfs/'
 uid     = 50000
 gid     = 50000
 dname   = 'paf-base'
