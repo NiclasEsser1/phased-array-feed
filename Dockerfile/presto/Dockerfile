@@ -136,6 +136,7 @@ RUN rm -r pyslalib
 
 # Presto
 ENV SOURCE $PREFIX
+# Pulsar can not access /root
 WORKDIR $SOURCE
 ENV PRESTO $SOURCE/presto
 RUN git clone https://github.com/scottransom/presto.git

@@ -10,4 +10,4 @@ if __name__ == "__main__":
     args        = parser.parse_args()
     packet_name = args.packet_name[0]
     
-    os.system('docker run --rm -it -u 50000:50000 -v /home/pulsar:/home/pulsar -v /beegfs:/beegfs {:s}'.format(packet_name))
+    os.system('docker run --rm -it --net=host -u 50000:50000 -e DISPLAY -v /home/pulsar:/home/pulsar -v /beegfs:/beegfs {:s}'.format(packet_name))
