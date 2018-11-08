@@ -55,6 +55,8 @@ RUN apt-get --no-install-recommends -y install \
     libhdf5-dev \
     libxml2-dev \    
     libgsl-dev \
+    python-tk \
+    xorg \
     ssh \
     gnuplot \
     && apt-get -y clean

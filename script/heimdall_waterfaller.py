@@ -29,12 +29,13 @@ fil_fname  = "{:s}/{:s}".format(ddir, fil_fname)
 cand_fname = "{:s}/{:s}".format(ddir, cand_fname)
 cand       = np.loadtxt(cand_fname)
 ncand      = len(cand)
+tsamp      = 54.0E-6
+dm         = 196.0
 
 for i in range(ncand):
-    tstart   = cand[i,2]
-    duration = 0.2
-    #print "waterfaller.py {:s} -T {:f} -t {:f} --colour-map=\"Blues\" --show-colour-bar".format(fil_fname, tstart, duration)
-    #os.system("waterfaller.py {:s} -T {:f} -t {:f} --colour-map=\"Blues\" --show-colour-bar".format(fil_fname, tstart, duration))
+    tstart   = cand[i,2] - 0.2
+    duration = 0.4
 
-    print "waterfaller.py {:s} -T {:f} -t {:f}".format(fil_fname, tstart, duration)
-    os.system("waterfaller.py {:s} -T {:f} -t {:f}".format(fil_fname, tstart, duration))
+    command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
+    print command, "SNR", cand[i,0]
+    os.system(command)

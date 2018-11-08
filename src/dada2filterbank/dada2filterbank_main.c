@@ -217,11 +217,11 @@ int main(int argc, char **argv)
   fwrite(field, sizeof(char), length, f_fp);
   fwrite((char*)&nbeams, sizeof(int), 1, f_fp);
   
-  length = 5;
-  fwrite((char*)&length, sizeof(int), 1, f_fp);
-  strcpy(field, "refdm");
-  fwrite(field, sizeof(char), length, f_fp);
-  fwrite((char*)&rdm, sizeof(double), 1, f_fp);
+  //length = 5;
+  //fwrite((char*)&length, sizeof(int), 1, f_fp);
+  //strcpy(field, "refdm");
+  //fwrite(field, sizeof(char), length, f_fp);
+  //fwrite((char*)&rdm, sizeof(double), 1, f_fp);
 
   length = 5;
   fwrite((char*)&length, sizeof(int), 1, f_fp);
