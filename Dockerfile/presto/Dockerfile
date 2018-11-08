@@ -52,7 +52,7 @@ RUN apt-get --no-install-recommends -y install \
     libglib2.0-0 \
     libglib2.0-dev \
     #openssh-server \
-    docker.io \
+    #docker.io \
     python-tk \	
     xorg \
     openbox \
