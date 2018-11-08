@@ -25,15 +25,18 @@ TARGET       = capture_main
 SRC_DIR      = .
 OBJ_DIR      = .
 
-LIBS         = -lm -lrt -lpthread
+LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 
 INCLUDE_DIRS = 
 
-dada2filterbank_main:dada2filterbank_main.o 
-	$(CC) -o dada2filterbank_main dada2filterbank_main.o $(LIB_DIRS) $(LIBS) 
+dada2filterbank_main:dada2filterbank_main.o dada2filterbank.o 
+	$(CC) -o dada2filterbank_main dada2filterbank_main.o dada2filterbank.o $(LIB_DIRS) $(LIBS) 
 
 dada2filterbank_main.o:dada2filterbank_main.c
 	$(CC) -c dada2filterbank_main.c $(INCLUDE_DIRS) ${C_FLAGS}
+
+dada2filterbank.o:dada2filterbank.c
+	$(CC) -c dada2filterbank.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 clean:
 	rm -f *.o *~
