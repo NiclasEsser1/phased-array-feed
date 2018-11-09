@@ -40,6 +40,7 @@ for i in range(ncand):
     duration = 0.4
 
     command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec --bandpass --maskfile=\"{:s}\"".format(fil_fname, tstart, duration, dm, mask_fname)
+    #command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
     print command, ", SNR:", cand[i,0]
     os.system(command)
     exit(1)

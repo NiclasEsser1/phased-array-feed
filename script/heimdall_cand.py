@@ -18,7 +18,8 @@ ddir  = "/beegfs/DENG/AUG"
 #fil_fname  = "J1939+2134-1024chan-64scl.fil"
 
 #cand_fname = "cand-J1819-1458-zap5121023-snr10-swap.txt"
-cand_fname = "cand-J1819-1458-zap5121023-zap304310-snr10-swap.txt"
+#cand_fname = "cand-J1819-1458-zap5121023-zap304310-snr10-swap.txt"
+cand_fname = "cand.txt"
 fil_fname  = "J1819-1458-1024chan-64scl-swap.fil"
 
 #cand_fname = "cand.txt"

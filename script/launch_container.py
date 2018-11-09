@@ -13,5 +13,6 @@ ddir    = '/beegfs/'
 uid     = 50000
 gid     = 50000
 dname   = 'paf-base'
+#dname   = 'sigproc'
 
 os.system('./do_launch.py -a {:d} -b {:s} -c {:s} -d {:d} -e {:d} -f {:s}'.format(numa_id, ddir, hdir, uid, gid, dname))

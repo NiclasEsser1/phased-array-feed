@@ -14,3 +14,8 @@ docker run --rm -it -u 50000:50000 -v /beegfs/:/beegfs  xinpingdeng/paf-base hei
 
 # If we swap the frequency channels in filterbank files already, we do not need to do any additional setup;
 # If we do not swap the frequency channels in filterbank files, but use -fswap option of heimdall to do so, the header has to setup as the swapped data and any additional options should follow that as well;
+
+docker run --ipc=container:disk2db --rm -it -u 50000:50000 -v /beegfs/:/beegfs --ulimit memlock=-1:-1 --name heimdall xinpingdeng/paf-base heimdall -k dada -output_dir /beegfs/DENG/AUG/ -dm 1 1000 -zap_chans 512 1023 -zap_chans 304 310 -detect_thresh 10
+docker run --ipc=shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/J1819-1458-1024chan-64scl-swap.dada -d 0"
+
+docker run --rm -it --ipc=container:disk2db -v /beegfs/:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name dada2filterbank xinpingdeng/phased-array-feed "/home/pulsar/xinping/phased-array-feed/src/dada2filterbank/dada2filterbank_main -a dada -b /beegfs/DENG/AUG/try.fil -c /beegfs/DENG/AUG"

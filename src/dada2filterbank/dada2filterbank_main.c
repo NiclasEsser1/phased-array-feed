@@ -18,8 +18,7 @@ void usage()
 	  "Usage: dada2filterbank_main [options]\n"
 	  " -a input dada file name or buffer key \n"
 	  " -b output filterbank file name \n"
-	  " -c the input is file or dada buffer \n"
-	  " -d Directory to put log file \n"
+	  " -c Directory to put log file \n"
 	   );
 }
 
@@ -31,7 +30,7 @@ int main(int argc, char **argv)
   char log_fname[MSTR_LEN];
   
   /* Get input parameters */
-  while((arg=getopt(argc,argv,"a:hb:c:d:")) != -1)
+  while((arg=getopt(argc,argv,"a:hb:c:")) != -1)
     {
       switch(arg)
 	{
@@ -40,18 +39,14 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	  
 	case 'a':
-	  sscanf(optarg, "%s", conf.d_fname);
+	  sscanf(optarg, "%x", &conf.key);
 	  break;
 
 	case 'b':
 	  sscanf(optarg, "%s", conf.f_fname);
 	  break;
-	  
+	  	  
 	case 'c':
-	  sscanf(optarg, "%d", &conf.file);
-	  break;
-	  
-	case 'd':
 	  sscanf(optarg, "%s", conf.dir);
 	  break;	  
 	}

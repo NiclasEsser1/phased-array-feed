@@ -37,6 +37,11 @@ FREQ         unset             # centre frequency in MHz
 BW           336               # bandwidth of in MHz (-ve lower sb)
 TSAMP        0.84375           # sampling interval in microseconds
 
+# description of formed beams
+NBEAM	      unset
+IBEAM	      unset
+
+# description of data
 BYTES_PER_SECOND  3185777778   # 336 channels, 8 bytes/sample, 128 samples in 108us, round to int
 NBIT         16                 # number of bits per sample
 NDIM         2                 # dimension of samples (2=complex, 1=real)

@@ -58,7 +58,7 @@ if __name__ == "__main__":
     print disk2db
     os.system(disk2db)    
 
-    time.sleep(10)
+    time.sleep(2000)
     db_destroy = "dada_db -d -k {:s}".format(key)
     print db_destroy
     os.system(db_destroy)

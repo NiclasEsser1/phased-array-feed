@@ -15,9 +15,8 @@
 typedef struct conf_t
 {
   key_t key;
-  int file;
   dada_hdu_t *hdu;
-  char d_fname[MSTR_LEN], f_fname[MSTR_LEN], source_name[MSTR_LEN], dir[MSTR_LEN];
+  char f_fname[MSTR_LEN], source_name[MSTR_LEN], dir[MSTR_LEN];
   ipcbuf_t *db;
   double mjd_start, picoseconds, freq, bw, tsamp, raj, decj, fch1, foff;
   int nchans, nbits, npol, ndim, nifs, data_type, machine_id, telescope_id, nbeams, ibeam;

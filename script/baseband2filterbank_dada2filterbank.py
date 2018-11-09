@@ -73,10 +73,9 @@ def dada2filterbank(args):
     key_b2f                 = ConfigSectionMap(pipeline_conf, "BASEBAND2FILTERBANK")['key']
     dvolume                 = '{:s}:{:s}'.format(ddir, ddir)
     hvolume                 = '{:s}:{:s}'.format(hdir, hdir)
-    file_stream             = 0
     
     #com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/paf-base taskset -c {:d} dada_dada2filterbank -k {:s} -D {:s} -s".format(previous_container_name, dvolume, uid, gid, current_container_name, cpu, key_b2f, ddir)
-    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"taskset -c {:d} /home/pulsar/xinping/phased-array-feed/src/dada2filterbank/{:s} -a {:s} -b try.fil -c {:d} -d {:s}\"".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, dname, cpu, software_name, key_b2f, file_stream, ddir)
+    com_line = "docker run --rm -it --ipc=container:{:s} -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"taskset -c {:d} /home/pulsar/xinping/phased-array-feed/src/dada2filterbank/{:s} -a {:s} -b /beegfs/DENG/AUG/try.fil -c {:s}\"".format(previous_container_name, dvolume, hvolume, uid, gid, current_container_name, dname, cpu, software_name, key_b2f, ddir)
     print com_line
     os.system(com_line)
     
@@ -94,7 +93,7 @@ if __name__ == "__main__":
                         help='Bind threads to cpu')
     args          = parser.parse_args()
     
-    t_dada2filterbank             = threading.Thread(target = dada2filterbank, args = (args,))
+    t_dada2filterbank     = threading.Thread(target = dada2filterbank, args = (args,))
     t_baseband2filterbank = threading.Thread(target = baseband2filterbank, args = (args,))
 
     t_dada2filterbank.start()

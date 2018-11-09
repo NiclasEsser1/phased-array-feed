@@ -89,9 +89,8 @@ ENV CUDA_DIR         /usr/local/cuda
 ENV CUDA_HOME        $CUDA_DIR
 ENV CUDA_LIB         $CUDA_DIR/lib64
 ENV CUDA_INCLUDE     $CUDA_DIR/include
-ENV C_INCLUDE_PATH   $C_INCLUDE_PATH:$INCLUDE_INCLUDE
-ENV LD_LIBRARY_PATH  $LD_LIBRARY_PATH:$INSTALL_LI
-    
+ENV C_INCLUDE_PATH   $INSTALL_INCLUDES:$C_INCLUDE_PATH
+ENV LD_LIBRARY_PATH  $INSTALL_LIB:$LD_LIBRARY_PATH    
 
 # Install psrcat
 WORKDIR $SOURCE
@@ -127,7 +126,7 @@ RUN rm -rf tempo
 WORKDIR $SOURCE
 RUN git clone https://github.com/scottransom/pyslalib.git 
 WORKDIR $SOURCE/pyslalib
-ENV PYTHONPATH $PREFIX
+ENV PYTHONPATH $PREFIX:$PYTHONPATH
 RUN python setup.py install --record list.txt && \
     python setup.py clean --all && \
     rm -rf .git
@@ -140,9 +139,9 @@ ENV SOURCE $PREFIX
 WORKDIR $SOURCE
 ENV PRESTO $SOURCE/presto
 RUN git clone https://github.com/scottransom/presto.git
-ENV PATH $PATH:$PRESTO/bin:$PRESTO/lib/python
-ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:$PRESTO/lib
-ENV PYTHONPATH $PYTHONPATH:$PRESTO/lib/python
+ENV PATH $PRESTO/bin:$PRESTO/lib/python:$PATH
+ENV LD_LIBRARY_PATH $PRESTO/lib:$LD_LIBRARY_PATH
+ENV PYTHONPATH $PRESTO/lib/python:$PYTHONPATH
 WORKDIR $PRESTO/src
 RUN rm -rf ../.git && \
     make prep && \ 
