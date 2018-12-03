@@ -25,7 +25,7 @@ TARGET       = capture_main
 SRC_DIR      = .
 OBJ_DIR      = .
 
-LIBS         = -lpsrdada -lm -lrt -lpthread
+LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread #-lpsrdada -lm -lrt -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 
 INCLUDE_DIRS = 
 

@@ -361,6 +361,7 @@ void *capture_control(void *conf)
   sa.sun_family = AF_UNIX;
   snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", captureconf->ctrl_addr);
   unlink(captureconf->ctrl_addr);
+  fprintf(stdout, "%s\n", captureconf->ctrl_addr);
   
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
     {

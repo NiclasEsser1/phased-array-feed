@@ -149,6 +149,8 @@ int main(int argc, char **argv)
 	  break;
 	}
     }
+
+  fprintf(stdout, "%f\n", conf.center_freq);
   
   /* Setup log interface */
   char fname_log[MSTR_LEN];

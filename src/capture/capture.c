@@ -438,7 +438,7 @@ int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *
 {
   *ichk = (int)((freq - center_freq + 0.5)/nchan_chk + nchk/2);
 
-  if ((*ichk < 0) || (*ichk >= MCHK_CAPTURE))
+  if ((*ichk < 0) || (*ichk >= nchk))
     return EXIT_FAILURE;
   
   return EXIT_SUCCESS;

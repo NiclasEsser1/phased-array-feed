@@ -95,10 +95,12 @@ def destination(multicast_data, conf_fname, beam):
     freq      = np.zeros(nip, dtype=float)
     for i in range(nip):
         nchan[i] = (max_min_chk[i][1] - max_min_chk[i][0] + 1) * nchan_chk;
-        freq[i]  = freq0 - 0.5 * (nchk_beam - (max_min_chk[i][1] + max_min_chk[i][0] + 1)) * nchan_chk 
+        freq[i]  = freq0 - 0.5 * (nchk_beam - (max_min_chk[i][1] + max_min_chk[i][0] + 1)) * nchan_chk
+        freq[i]  = 1340.5
+        
         print "The center frequency of data from {:s} is {:.1f} MHz with {:d} channels, the login detail is \"{:s}\".".format(ip[i], freq[i], nchan[i], node[i])
     print "\n"
-    
+
     return node, address_nchk, freq, nchan
     
 def metadata2streaminfo(system_conf):

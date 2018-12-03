@@ -43,7 +43,8 @@ gpu     = numa  # Either numa or "all"
 dvolume = '{:s}:{:s}'.format(ddir, ddir)
 hvolume = '{:s}:{:s}'.format(hdir, hdir)
 
-com_line = "docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia -e DISPLAY --net=host -v {:s} -v {:s} -v /tmp:/tmp -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s}{:d} xinpingdeng/{:s}".format(dvolume, hvolume, uid, gid, str(gpu), dname, numa, dname)
+#com_line = "docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia -e DISPLAY --net=host -v {:s} -v {:s} -v /tmp:/tmp -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s}{:d} xinpingdeng/{:s}".format(dvolume, hvolume, uid, gid, str(gpu), dname, numa, dname)
+com_line = "docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia -e DISPLAY --net=host -v {:s} -v {:s} -v /tmp:/tmp -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s}{:d} xinpingdeng/{:s}".format(dvolume, hvolume, str(gpu), dname, numa, dname)
 
 print com_line
 print "\nYou are going to a docker container with the name {:s}{:d}!\n".format(dname, numa)
