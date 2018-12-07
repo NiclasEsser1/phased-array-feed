@@ -20,14 +20,19 @@ RUN apt-get -y check && \
     apt-get -y upgrade && \
     apt-get -y install apt-utils software-properties-common && \
     apt-get -y update --fix-missing && \
-    apt-get -y upgrade 
-
+    apt-get -y upgrade
+    
 # Install dependencies
 RUN apt-get --no-install-recommends -y install \
     build-essential \
     autoconf \
     autotools-dev \
     automake \
+    sudo \
+    libibverbs-dev \
+    librdmacm-dev \
+    libnl-route-3-dev \
+    libnl-3-dev \
     autogen \
     libtool \
     libtool-bin \
@@ -185,9 +190,9 @@ WORKDIR $SOURCE
 RUN git clone https://github.com/ajameson/dedisp.git
 WORKDIR $SOURCE/dedisp
 RUN make
-COPY lib/* /usr/local/lib
-COPY src/*.h /usr/local/include
-COPY src/*.hpp /usr/local/include
+RUN cp lib/* /usr/local/lib
+RUN cp src/*.h /usr/local/include
+RUN cp src/*.hpp /usr/local/include
 WORKDIR $SOURCE
 RUN rm -rf dedisp
 
@@ -214,6 +219,32 @@ RUN ./bootstrap && \
     make install
 WORKDIR $SOURCE
 RUN rm -rf dspsr
+
+# To get source list updated for vma
+RUN echo "deb http://debcache.mpifr-bonn.mpg.de/debian/ stretch main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb-src http://debcache.mpifr-bonn.mpg.de/debian/ stretch main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://debcache.mpifr-bonn.mpg.de/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb-src http://debcache.mpifr-bonn.mpg.de/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9D6D8F6BC857C906 8B48AD6246925553 8B48AD6246925553 7638D0442B90D010 EF0F382A1A7B6500 && \
+    apt-get update
+
+# Install VMA driver
+WORKDIR $SOURCE
+RUN wget http://www.mellanox.com/downloads/ofed/MLNX_OFED-4.5-1.0.1.0/MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz && \
+    tar xvzf MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz
+WORKDIR $SOURCE/MLNX_OFED_SRC-4.5-1.0.1.0
+RUN ./install.pl  --vma
+WORKDIR $SOURCE
+RUN rm -rf MLNX_OFED_SRC-4.5-1.0.1.0 MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz
+
+# Install libvma
+WORKDIR $SOURCE
+RUN git clone https://github.com/Mellanox/libvma.git
+WORKDIR $SOURCE/libvma
+RUN ./install.sh
+#RUN echo "options ib_uverbs disable_raw_qp_enforcement=1" > /etc/modprobe.d/ib_uverbs.conf
+WORKDIR $SOURCE
+RUN rm -rf libvma
 
 # Create pulsar user, psr group and change the ownership
 RUN groupadd -g 50000 psr && \

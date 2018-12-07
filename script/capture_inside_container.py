@@ -84,12 +84,17 @@ def capture_refinfo(destination, pktsz, system_conf):
     picosecond = int(1.0E6 * round(1.0E6 * (sec_prd - np.floor(sec_prd))))
     
     #return sec, picosecond
-    return epoch_ref, sec_ref, int(idf_ref)
+    return epoch_ref, int(sec_ref+1), int(idf_ref)
 
-# ./capture_2beams1nic_36beams_36chunks.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 -e 12 -f 0 -g 1 -i 0
-# ./capture_2beams1nic_36beams_36chunks.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17103 17104 17105 -e 12 -f 0 -g 1 -i 1
-# ./capture_2beams1nic_36beams_36chunks.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17100 17101 17102 -e 12 -f 0 -g 1 -i 2
-# ./capture_2beams1nic_36beams_36chunks.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17103 17104 17105 -e 12 -f 0 -g 1 -i 3
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 0
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 1
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 2
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 3
+
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 -e 12 -f 0 -g 1 -i 0
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17103 17104 17105 -e 12 -f 0 -g 1 -i 1
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17100 17101 17102 -e 12 -f 0 -g 1 -i 2
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17103 17104 17105 -e 12 -f 0 -g 1 -i 3
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='To capture data with given ip and port')
@@ -130,8 +135,9 @@ if __name__ == "__main__":
     key            = "dada"
 
     nreader        = 1
-    nblk           = 8
-    ndf            = 51200
+    nblk           = 2
+    #ndf            = 51200
+    ndf            = 10240
     pktsz          = 7232
     ndf_check      = 1024
     period         = 27
@@ -163,10 +169,6 @@ if __name__ == "__main__":
     print destination_alive
     
     refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
-    #capture_command = "LD_PRELOAD=libvma.so ../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu + ncpu_numa/2, cpu + 1 + ncpu_numa/2, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
-    #capture_command = "VMA_SPEC=latency VMA_MEM_ALLOC_TYPE=0 LD_PRELOAD=libvma.so ../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu + ncpu_numa/2, cpu + 1 + ncpu_numa/2, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
-    #capture_command = "LD_PRELOAD=libvma.so ../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu + ncpu_numa/2, cpu + 1 + ncpu_numa/2, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
-    #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu + ncpu_numa/2 - 1, cpu + ncpu_numa/2, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
     capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, cpu, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
     print capture_command
     os.system(capture_command)

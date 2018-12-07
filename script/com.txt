@@ -19,3 +19,16 @@ docker run --ipc=container:disk2db --rm -it -u 50000:50000 -v /beegfs/:/beegfs -
 docker run --ipc=shareable --rm -it -v /beegfs:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --ulimit memlock=-1:-1 --name disk2db xinpingdeng/phased-array-feed "./disk2db.py -a ../config/pipeline.conf -b ../config/system.conf -c /beegfs/DENG/AUG/J1819-1458-1024chan-64scl-swap.dada -d 0"
 
 docker run --rm -it --ipc=container:disk2db -v /beegfs/:/beegfs -v /home/pulsar:/home/pulsar -u 50000:50000 --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name dada2filterbank xinpingdeng/phased-array-feed "/home/pulsar/xinping/phased-array-feed/src/dada2filterbank/dada2filterbank_main -a dada -b /beegfs/DENG/AUG/try.fil -c /beegfs/DENG/AUG"
+
+docker run -it --net=host --ulimit memlock=-1:-1  --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -v /home/:/home -v /beegfs:/beegfs xinpingdeng/paf_psrdada-libvma
+
+docker run -it --net=host --ulimit memlock=-1:-1  --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -v /home/:/home -v /beegfs:/beegfs -v /proc:/home/pulsar/xinping/phased-array-feed/proc xinpingdeng/paf_psrdada-libvma
+
+docker run  --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm  --rm -it mellanox/ubuntu_mofed
+
+docker run --privileged -it --net=host --ulimit memlock=-1:-1  --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -v /home/:/home -v /beegfs:/beegfs -v /proc:/home/pulsar/xinping/phased-array-feed/proc xinpingdeng/paf_psrdada-libvma
+
+sockperf server -i 10.17.6.1
+sockperf throughput -t 40 -i 10.17.6.1 --msg-size=14720
+LD_PRELOAD=libvma.so VMA_SPEC=latency  sockperf server -i 10.17.6.1
+LD_PRELOAD=libvma.so VMA_SPEC=latency VMA_MEM_ALLOC_TYPE=1 sockperf throughput -t 40 -i 10.17.6.1 --msg-size=14720

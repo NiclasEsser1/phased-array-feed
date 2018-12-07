@@ -362,8 +362,9 @@ void *capture(void *conf)
 	      pthread_mutex_unlock(&transit_mutex[ithread]);
 	      
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
-	      cbuf_loc = (uint64_t)((idf * captureconf->nchk + ichk) * required_pktsz); // This is in TFTFP order
 	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
+	      cbuf_loc = (uint64_t)((idf * captureconf->nchk + ichk) * required_pktsz); // This is in TFTFP order
+	      //cbuf_loc = (uint64_t)((idf * captureconf->nchk) * required_pktsz); // This is in TFTFP order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
@@ -376,9 +377,9 @@ void *capture(void *conf)
 	    }
 	}
       
-      pthread_mutex_lock(&quit_mutex);
-      quit_status = quit;
-      pthread_mutex_unlock(&quit_mutex);
+      //pthread_mutex_lock(&quit_mutex);
+      //quit_status = quit;
+      //pthread_mutex_unlock(&quit_mutex);
     }
     
   /* Exit */
