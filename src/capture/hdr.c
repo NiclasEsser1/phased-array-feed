@@ -15,14 +15,14 @@ int hdr_keys(char *df, hdr_t *hdr)
   writebuf = bswap_64(*ptr);
   hdr->idf = writebuf & 0x00000000ffffffff;
   hdr->sec = (writebuf & 0x3fffffff00000000) >> 32;
-  hdr->valid = (writebuf & 0x8000000000000000) >> 63;
+  //hdr->valid = (writebuf & 0x8000000000000000) >> 63;
     
-  writebuf = bswap_64(*(ptr + 1));
-  hdr->epoch = (writebuf & 0x00000000fc000000) >> 26;
+  //writebuf = bswap_64(*(ptr + 1));
+  //hdr->epoch = (writebuf & 0x00000000fc000000) >> 26;
     
   writebuf = bswap_64(*(ptr + 2));
   hdr->freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
-  hdr->beam = writebuf & 0x000000000000ffff;
+  //hdr->beam = writebuf & 0x000000000000ffff;
     
   return EXIT_SUCCESS;
 }

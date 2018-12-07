@@ -29,13 +29,9 @@ extern uint64_t ndf_port[MPORT_CAPTURE];
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
 
-extern hdr_t hdr0[MPORT_CAPTURE];
 extern hdr_t hdr_ref[MPORT_CAPTURE];
-extern hdr_t hdr_current[MPORT_CAPTURE];
 
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
-extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
-
 extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
 
 int threads(conf_t *conf)
@@ -97,8 +93,8 @@ void *buf_control(void *conf)
   int ifreq, idf;
   ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
   hdr_t hdr;
-  uint64_t ndf_port_expect[MPORT_CAPTURE];
-  uint64_t ndf_port_actual[MPORT_CAPTURE];
+  uint64_t ndf_port_expect;
+  uint64_t ndf_port_actual;
   double loss_rate;
   double rbuf_time; // The duration of each ring buffer block
   uint64_t rbuf_iblk = 0;
@@ -114,27 +110,6 @@ void *buf_control(void *conf)
       /* To see if we need to move to next buffer block or quit */
       if(transited)                   // Get new buffer when we see transit
 	{
-	  rbuf_iblk++;
-	  loss_rate = 0;
-	  for(i = 0; i < captureconf->nport_active; i++)
-	    {
-	      pthread_mutex_lock(&hdr_current_mutex[i]);
-	      hdr = hdr_current[i];
-	      pthread_mutex_unlock(&hdr_current_mutex[i]);
-	      
-	      ndf_port_expect[i] = captureconf->rbuf_ndf_chk * captureconf->nchk_active_actual[i]; // Only for current buffer
-	      
-	      pthread_mutex_lock(&ndf_port_mutex[i]);
-	      ndf_port_actual[i] = ndf_port[i];
-	      ndf_port[i] = 0;  // Only for current buffer
-	      pthread_mutex_unlock(&ndf_port_mutex[i]);
-	      
-	      fprintf(stdout, "Thread %d:\t\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, rbuf_iblk * rbuf_time, ndf_port_actual[i], ndf_port_expect[i], 1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i]);
-	      loss_rate += fabs((1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i])/(double)captureconf->nport_active);
-	    }
-	  fprintf(stdout, "\n");
-	  multilog(runtime_log, LOG_INFO, "PACKET LOSS RATE ON %s: is %E\n", captureconf->ip_active[0], loss_rate);
-
 	  /* Close current buffer */
 	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
 	    {
@@ -193,37 +168,86 @@ void *buf_control(void *conf)
 	      transited = 0;
 	      for(i = 0; i < captureconf->nport_active; i++)
 		transited = transited||transit[i];
-	      if(transited == 0)
-		break;
-	    }
-	  
-	  /* To see if we need to copy data from temp buffer into ring buffer */
-	  ntail = 0;
-	  for(i = 0; i < captureconf->nport_active; i++)
-	    ntail = (tail[i] > ntail) ? tail[i] : ntail;
+	      
+	      if(transited == 0) 
+		{
+		  /* Check the traffic of previous buffer cycle */
+		  rbuf_iblk++;
+		  loss_rate = 0;
+		  for(i = 0; i < captureconf->nport_active; i++)
+		    {
+		      pthread_mutex_lock(&ndf_port_mutex[i]);
+		      ndf_port_actual = ndf_port[i];
+		      ndf_port[i] = 0;  // Only for current buffer
+		      pthread_mutex_unlock(&ndf_port_mutex[i]);
+		      
+		      ndf_port_expect = captureconf->rbuf_ndf_chk * captureconf->nchk_active_actual[i]; // Only for current buffer
+		      
+		      fprintf(stdout, "Thread %d:\t\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, rbuf_iblk * rbuf_time, ndf_port_actual, ndf_port_expect, 1.0 - ndf_port_actual/(double)ndf_port_expect);
+		      loss_rate += fabs((1.0 - ndf_port_actual/(double)ndf_port_expect)/(double)captureconf->nport_active);
+		    }
+		  fprintf(stdout, "\n");
+		  multilog(runtime_log, LOG_INFO, "PACKET LOSS RATE ON %s: is %E\n", captureconf->ip_active[0], loss_rate);
+		  
+		  /* To see if we need to copy data from temp buffer into ring buffer */
+		  ntail = 0;
+		  for(i = 0; i < captureconf->nport_active; i++)
+		    ntail = (tail[i] > ntail) ? tail[i] : ntail;
 	 	  
 #ifdef DEBUG
-	  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
+		  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
 #endif
-	  
-	  for(i = 0; i < ntail; i++)
-	    {
-	      tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
-	      if(tbuf[tbuf_loc] == 'Y')
-		{		  
-		  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
 		  
-		  //idf = (int)(i / nchk);
-		  //ifreq = i - idf * nchk;
-		  //cbuf_loc = (uint64_t)(ifreq * captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
-
-		  memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
-		  tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
-		  // If we do not do that, we may have too many data frames to copy later
+		  for(i = 0; i < ntail; i++)
+		    {
+		      tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
+		      if(tbuf[tbuf_loc] == 'Y')
+			{		  
+			  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
+			  
+			  //idf = (int)(i / nchk);
+			  //ifreq = i - idf * nchk;
+			  //cbuf_loc = (uint64_t)(ifreq * captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
+			  
+			  memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
+			  tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
+			  // If we do not do that, we may have too many data frames to copy later
+			}
+		    }
+		  for(i = 0; i < captureconf->nport_active; i++)
+		    tail[i] = 0;  // Reset the location of tbuf;
+		  
+		  break;
 		}
 	    }
-	  for(i = 0; i < captureconf->nport_active; i++)
-	    tail[i] = 0;  // Reset the location of tbuf;
+	  
+	 ///* To see if we need to copy data from temp buffer into ring buffer */
+	 //ntail = 0;
+	 //for(i = 0; i < captureconf->nport_active; i++)
+	 //  ntail = (tail[i] > ntail) ? tail[i] : ntail;
+	 //	  
+#ifdef DE//UG
+	 //fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
+#endif	 //
+	 //
+	 //for(i = 0; i < ntail; i++)
+	 //  {
+	 //    tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
+	 //    if(tbuf[tbuf_loc] == 'Y')
+	 //	{		  
+	 //	  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
+	 //	  
+	 //	  //idf = (int)(i / nchk);
+	 //	  //ifreq = i - idf * nchk;
+	 //	  //cbuf_loc = (uint64_t)(ifreq * captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
+	 //
+	 //	  memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
+	 //	  tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
+	 //	  // If we do not do that, we may have too many data frames to copy later
+	 //	}
+	 //  }
+	 //for(i = 0; i < captureconf->nport_active; i++)
+	 //  tail[i] = 0;  // Reset the location of tbuf;
 	}
     }
   
@@ -252,8 +276,6 @@ void *capture_control(void *conf)
   char command_line[MSTR_LEN], command[MSTR_LEN];
   uint64_t start_byte, start_buf;
   ipcbuf_t *db = (ipcbuf_t *)captureconf->hdu->data_block;
-  uint64_t ndf_port_expect[MPORT_CAPTURE];
-  uint64_t ndf_port_actual[MPORT_CAPTURE];
   hdr_t hdr;
   double chan_res, bw;
   uint64_t picoseconds;
@@ -309,41 +331,14 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
 	      fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
 
-	      for(i = 0; i < captureconf->nport_active; i++)
-		{
-		  pthread_mutex_lock(&hdr_current_mutex[i]);
-		  hdr = hdr_current[i];
-		  pthread_mutex_unlock(&hdr_current_mutex[i]);
-
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
-		  pthread_mutex_lock(&ndf_port_mutex[i]);
-		  ndf_port_actual[i] = ndf_port[i];
-		  pthread_mutex_unlock(&ndf_port_mutex[i]);
-		}
-	      quit = 1;
-	      fprintf(stdout, "\n");
-	      
+	      quit = 1;	      
 	      if(ipcbuf_is_writing(db))
 		ipcbuf_enable_eod(db);
 	      
 	      close(sock);
 	      pthread_exit(NULL);
 	      return NULL;
-	    }
-	  if(strstr(command_line, "STATUS-OF-TRAFFIC") != NULL)
-	    {	      
-	      for(i = 0; i < captureconf->nport_active; i++)
-		{
-		  pthread_mutex_lock(&hdr_current_mutex[i]);
-		  hdr = hdr_current[i];
-		  pthread_mutex_unlock(&hdr_current_mutex[i]);
-
-		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
-		  pthread_mutex_lock(&ndf_port_mutex[i]);
-		  ndf_port_actual[i] = ndf_port[i];
-		  pthread_mutex_unlock(&ndf_port_mutex[i]);
-		}
-	    }	  
+	    }  
 	  if(strstr(command_line, "END-OF-DATA") != NULL)
 	    {
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
@@ -555,7 +550,6 @@ void *capture_control(void *conf)
 	      	  pthread_exit(NULL);
 	      	  return NULL;
 	      	}
-	      //ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}
     }
