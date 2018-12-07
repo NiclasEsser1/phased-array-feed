@@ -23,10 +23,8 @@ extern char *cbuf;
 extern char *tbuf;
 
 extern int quit;
-//extern int force_next;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
-extern uint64_t ndf_chk[MCHK_CAPTURE];
 
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
@@ -35,15 +33,10 @@ extern hdr_t hdr0[MPORT_CAPTURE];
 extern hdr_t hdr_ref[MPORT_CAPTURE];
 extern hdr_t hdr_current[MPORT_CAPTURE];
 
-//extern pthread_mutex_t force_next_mutex;
-
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
 
 extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
-extern pthread_mutex_t ndf_chk_mutex[MCHK_CAPTURE];
-
-extern pthread_mutex_t transit_mutex[MPORT_CAPTURE];
 
 int threads(conf_t *conf)
 {
@@ -91,7 +84,6 @@ int threads(conf_t *conf)
     }
   
   for(i = 0; i < nport_active + 2; i++)   // Join threads and unbind cpus
-    //for(i = 0; i < nport_active + 1; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
 
   return EXIT_SUCCESS;
@@ -100,16 +92,13 @@ int threads(conf_t *conf)
 void *buf_control(void *conf)
 {
   conf_t *captureconf = (conf_t *)conf;
-  int i, nchk = captureconf->nchk, ntransit;
+  int i, nchk = captureconf->nchk, transited;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ifreq, idf;
-  //int force_next_status;
   ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
   hdr_t hdr;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
   uint64_t ndf_port_actual[MPORT_CAPTURE];
-  uint64_t ndf_chk_actual[MCHK_CAPTURE];
-  uint64_t ndf_chk_expect[MCHK_CAPTURE];
   double loss_rate;
   double rbuf_time; // The duration of each ring buffer block
   uint64_t rbuf_iblk = 0;
@@ -118,21 +107,12 @@ void *buf_control(void *conf)
   
   while(!quit)
     {
-      ntransit = 0; 
+      transited = 0;
       for(i = 0; i < captureconf->nport_active; i++)
-	{
-	  pthread_mutex_lock(&transit_mutex[i]);
-	  ntransit += transit[i];
-	  pthread_mutex_unlock(&transit_mutex[i]);
-	}
-      
+	transited = transited || transit[i];
+	      
       /* To see if we need to move to next buffer block or quit */
-      //pthread_mutex_lock(&force_next_mutex);
-      //force_next_status = force_next;
-      //pthread_mutex_unlock(&force_next_mutex);
-
-      //if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
-      if(ntransit > nchk)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
+      if(transited)                   // Get new buffer when we see transit
 	{
 	  rbuf_iblk++;
 	  loss_rate = 0;
@@ -149,8 +129,6 @@ void *buf_control(void *conf)
 	      ndf_port[i] = 0;  // Only for current buffer
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 	      
-	      ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
-
 	      fprintf(stdout, "Thread %d:\t\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, rbuf_iblk * rbuf_time, ndf_port_actual[i], ndf_port_expect[i], 1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i]);
 	      loss_rate += fabs((1.0 - ndf_port_actual[i]/(double)ndf_port_expect[i])/(double)captureconf->nport_active);
 	    }
@@ -202,7 +180,7 @@ void *buf_control(void *conf)
 	      
 	      pthread_mutex_lock(&hdr_ref_mutex[i]);
 	      hdr_ref[i].idf += captureconf->rbuf_ndf_chk;
-	      if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)                       // Here I assume that we could not lose one period;
+	      if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)       
 		{
 		  hdr_ref[i].sec += captureconf->sec_prd;
 		  hdr_ref[i].idf -= captureconf->ndf_chk_prd;
@@ -212,14 +190,10 @@ void *buf_control(void *conf)
 
 	  while(!quit) // Wait until all threads are on new buffer block
 	    {
-	      ntransit = 0;
+	      transited = 0;
 	      for(i = 0; i < captureconf->nport_active; i++)
-		{
-		  pthread_mutex_lock(&transit_mutex[i]);
-		  ntransit += transit[i];
-		  pthread_mutex_unlock(&transit_mutex[i]);
-		}
-	      if(ntransit == 0)
+		transited = transited||transit[i];
+	      if(transited == 0)
 		break;
 	    }
 	  
@@ -250,16 +224,11 @@ void *buf_control(void *conf)
 	    }
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    tail[i] = 0;  // Reset the location of tbuf;
-	  
-	  //pthread_mutex_lock(&force_next_mutex);
-	  //force_next = 0;
-	  //pthread_mutex_unlock(&force_next_mutex);
 	}
     }
   
   /* Exit */
   if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
-    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
     {
       multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
       fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -285,8 +254,6 @@ void *capture_control(void *conf)
   ipcbuf_t *db = (ipcbuf_t *)captureconf->hdu->data_block;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
   uint64_t ndf_port_actual[MPORT_CAPTURE];
-  uint64_t ndf_chk_actual[MCHK_CAPTURE];
-  uint64_t ndf_chk_expect[MCHK_CAPTURE];
   hdr_t hdr;
   double chan_res, bw;
   uint64_t picoseconds;
@@ -348,18 +315,10 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  //ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
-		  
-		  //ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  //pthread_mutex_lock(&ndf_chk_mutex[i]);
-		  //ndf_chk_actual[i] = ndf_chk[i];
-		  //pthread_mutex_unlock(&ndf_chk_mutex[i]);
-		  
-		  fprintf(stdout, "Thread %d:\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
 	      quit = 1;
 	      fprintf(stdout, "\n");
@@ -379,17 +338,11 @@ void *capture_control(void *conf)
 		  hdr = hdr_current[i];
 		  pthread_mutex_unlock(&hdr_current_mutex[i]);
 
-		  //ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
 		  ndf_port_expect[i] = (uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
 		  pthread_mutex_lock(&ndf_port_mutex[i]);
 		  ndf_port_actual[i] = ndf_port[i];
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
-		  
-		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  
-		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
-	      fprintf(stdout, "\n");
 	    }	  
 	  if(strstr(command_line, "END-OF-DATA") != NULL)
 	    {

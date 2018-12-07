@@ -21,29 +21,23 @@ extern multilog_t *runtime_log;
 char *cbuf = NULL;
 char *tbuf = NULL;
 
-int quit;
-//int force_next;
-int ithread_extern;
+int quit = 0;
+int ithread_extern = 0;
 
-uint64_t ndf_port[MPORT_CAPTURE];
-uint64_t ndf_chk[MCHK_CAPTURE];
+uint64_t ndf_port[MPORT_CAPTURE] = {0};
 
-int transit[MPORT_CAPTURE];
-uint64_t tail[MPORT_CAPTURE];
+int transit[MPORT_CAPTURE] = {0};
+uint64_t tail[MPORT_CAPTURE] = {0};
 hdr_t hdr0[MPORT_CAPTURE]; // It is the reference for packet counter, we do not need mutex lock for this
 hdr_t hdr_ref[MPORT_CAPTURE];
 hdr_t hdr_current[MPORT_CAPTURE];
 
-//pthread_mutex_t force_next_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutex_t ndf_chk_mutex[MCHK_CAPTURE]   = {PTHREAD_MUTEX_INITIALIZER};
 
 pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE]     = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-
-pthread_mutex_t transit_mutex[MPORT_CAPTURE]     = {PTHREAD_MUTEX_INITIALIZER};
 
 int init_buf(conf_t *conf)
 {
@@ -62,18 +56,13 @@ int init_buf(conf_t *conf)
       fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
     
       pthread_mutex_destroy(&ithread_mutex);
-      //pthread_mutex_destroy(&force_next_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
 	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-	  pthread_mutex_destroy(&transit_mutex[i]);
 	  pthread_mutex_destroy(&ndf_port_mutex[i]);
 	}
       
-      for(i = 0; i < MCHK_CAPTURE; i++)
-	pthread_mutex_destroy(&ndf_chk_mutex[i]);
-  
       dada_hdu_destroy(conf->hdu);
       return EXIT_FAILURE;    
     }
@@ -84,17 +73,12 @@ int init_buf(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
   
       pthread_mutex_destroy(&ithread_mutex);
-      //pthread_mutex_destroy(&force_next_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
 	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-	  pthread_mutex_destroy(&transit_mutex[i]);
 	  pthread_mutex_destroy(&ndf_port_mutex[i]);
 	}
-      
-      for(i = 0; i < MCHK_CAPTURE; i++)
-	pthread_mutex_destroy(&ndf_chk_mutex[i]);
       
       dada_hdu_disconnect(conf->hdu);
       return EXIT_FAILURE;
@@ -107,18 +91,13 @@ int init_buf(conf_t *conf)
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
         
       pthread_mutex_destroy(&ithread_mutex);
-      //pthread_mutex_destroy(&force_next_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
 	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-	  pthread_mutex_destroy(&transit_mutex[i]);
 	  pthread_mutex_destroy(&ndf_port_mutex[i]);
 	}
       
-      for(i = 0; i < MCHK_CAPTURE; i++)
-	pthread_mutex_destroy(&ndf_chk_mutex[i]);
-  
       dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;    
     }
@@ -128,18 +107,13 @@ int init_buf(conf_t *conf)
       fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
   
       pthread_mutex_destroy(&ithread_mutex);
-      //pthread_mutex_destroy(&force_next_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
   	{
   	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
   	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-  	  pthread_mutex_destroy(&transit_mutex[i]);
   	  pthread_mutex_destroy(&ndf_port_mutex[i]);
   	}
       
-      for(i = 0; i < MCHK_CAPTURE; i++)
-  	pthread_mutex_destroy(&ndf_chk_mutex[i]);
-  
       dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;
     }
@@ -232,7 +206,6 @@ void *capture(void *conf)
       pthread_mutex_unlock(&hdr_current_mutex[ithread]);
       clock_gettime(CLOCK_REALTIME, &stop);
       elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-      //fprintf(stdout, "%E seconds used for hdr\n", elapsed_time);
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
       acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->sec_prd, captureconf->ndf_chk_prd, &idf);	
@@ -251,73 +224,17 @@ void *capture(void *conf)
       	  return NULL;
       	}
       
-      if(idf < 0)
+      if(idf < 0) // discard the data frame if it does not fit to current buffer
 	continue;
       else
-	//if(idf >= 0)
       	{
-	  // Drop data frams which are behind time;
-	  if(idf >= captureconf->rbuf_ndf_chk)
+	  if(idf >= captureconf->rbuf_ndf_chk) // Start the buffer block change
 	    {
-	      /*
-		Means we can not put the data into current ring buffer block anymore and we have to use temp buffer;
-		If the number of chunks we used on temp buffer is equal to active chunks, we have to move to a new ring buffer block;
-		If the temp buffer is too small, we may lose packets;
-		If the temp buffer is too big, we will waste time to copy the data from it to ring buffer;
+	      transit[ithread] = 1;
 	      
-		The above is the original plan, but it is too strict that we may stuck on some point;
-		THE NEW PLAN IS we count the data frames which are not recorded with ring buffer, later than rbuf_ndf_chk;
-		If the counter is bigger than the active links, we active a new ring buffer block;
-		Meanwhile, before reference hdr is updated, the data frames can still be put into temp buffer if it is not behind rbuf_ndf_chk + tbuf_ndf_chk;
-		The data frames which are behind the limit will have to be dropped;
-		the reference hdr update follows tightly and then sleep for about 1 millisecond to wait all capture threads move to new ring buffer block;
-		at this point, no data frames will be put into temp buffer anymore and we are safe to copy data from it into the new ring buffer block and reset the temp buffer;
-		If the data frames are later than rbuf_ndf_chk + tbuf_ndf_chk, we force the swtich of ring buffer blocks;
-		The new plan will drop couple of data frames every ring buffer block, but it guarentee that we do not stuck on some point;
-		We force to quit the capture if we do not get any data in one block;
-		We also foce to quit if we have time out problem;
-	      */
-	      pthread_mutex_lock(&transit_mutex[ithread]);
-	      transit[ithread]++;
-	      pthread_mutex_unlock(&transit_mutex[ithread]);
-	      
-	      //if(idf >= (2 * captureconf->rbuf_ndf_chk)) // quit
-	      //	{
-	      //	  /* Force to quit if we do not get any data in one data block */
-	      //	  quit = 1;
-//#ifdef DEBUG  //
-//	      //	  pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-//	      //	  fprintf(stdout, "Too many temp data frames:\t%d\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n", ithread, ntohs(sa.sin_port), ichk, hdr_ref[ithread].sec, hdr_ref[ithread].idf, hdr.sec, hdr.idf, idf);
-//#endif	      //
-//	      //	  pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-//	      //
-//	      //	  free(df);
-//	      //	  conf = (void *)captureconf;
-//	      //	  close(sock);
-//	      //	  
-//	      //	  pthread_exit(NULL);
-//	      //	  return NULL;
-//	      //	}
-//	      //else if(((idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) && (idf < (2 * captureconf->rbuf_ndf_chk))))   // Force to get a new ring buffer block
-//	      //	{
-//	      //	  /* 
-//	      //	     One possibility here: if we lose more that rbuf_ndf_nchk data frames continually, we will miss one data block;
-//	      //	     for rbuf_ndf_chk = 12500, that will be about 1 second data;
-//	      //	     Do we need to deal with it?
-//	      //	     I force the thread quit and also tell other threads quit if we loss one buffer;
-//	      //	  */
-//#ifdef DEBUG  //
-//	      //	  fprintf(stdout, "Forced %d\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\n", ithread, hdr.sec, hdr.idf, ichk, idf);
-//#endif	      //
-	      //	  //pthread_mutex_lock(&force_next_mutex);
-	      //	  //force_next = 1;
-	      //	  //pthread_mutex_unlock(&force_next_mutex);
-	      //	}
-	      //else  // Put data in to temp buffer
-	      if(idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk))
+	      if(idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
 		continue;
-	      //if(idf < (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk))
-	      else
+	      else   // Put data into temp buffer
 		{
 		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * captureconf->nchk + ichk); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
@@ -330,31 +247,20 @@ void *capture(void *conf)
 		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
 		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-		  
-		  pthread_mutex_lock(&ndf_chk_mutex[ichk]);
-		  ndf_chk[ichk]++;
-		  pthread_mutex_unlock(&ndf_chk_mutex[ichk]);
 		}
 	    }
-	  else
+	  else  // Put data into current ring buffer block
 	    {
-	      pthread_mutex_lock(&transit_mutex[ithread]);
 	      transit[ithread] = 0;
-	      pthread_mutex_unlock(&transit_mutex[ithread]);
 	      
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
 	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      cbuf_loc = (uint64_t)((idf * captureconf->nchk + ichk) * required_pktsz); // This is in TFTFP order
-	      //cbuf_loc = (uint64_t)((idf * captureconf->nchk) * required_pktsz); // This is in TFTFP order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
 	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-	      
-	      pthread_mutex_lock(&ndf_chk_mutex[ichk]);
-	      ndf_chk[ichk]++;
-	      pthread_mutex_unlock(&ndf_chk_mutex[ichk]);
 	    }
 	}
     }
@@ -374,22 +280,12 @@ int init_capture(conf_t *conf)
 
   init_buf(conf);  // Initi ring buffer
   
-  ithread_extern = 0;
-  for(i = 0; i < conf->nchk; i++) // Setup the counter for each frequency
-    ndf_chk[i] = 0;
-  quit = 0;
-  
   /* Init status */
   for(i = 0; i < conf->nport_active; i++)
     {
-      transit[i] = 0;
-      tail[i]    = 0;
-
-      ndf_port[i]    = 0;
       hdr_ref[i].sec = conf->sec_ref;
       hdr_ref[i].idf = conf->idf_ref;
     }
-  //force_next = 0;
     
   /* Get the buffer block ready */
   uint64_t block_id = 0;
@@ -415,7 +311,10 @@ int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *
   *ichk = (int)((freq - center_freq + 0.5)/nchan_chk + nchk/2);
 
   if ((*ichk < 0) || (*ichk >= nchk))
-    return EXIT_FAILURE;
+    {
+      quit = 1;
+      return EXIT_FAILURE;
+    }
   
   return EXIT_SUCCESS;
 }
@@ -431,18 +330,13 @@ int destroy_capture(conf_t conf)
   int i;
   
   pthread_mutex_destroy(&ithread_mutex);
-  //pthread_mutex_destroy(&force_next_mutex);
   for(i = 0; i < MPORT_CAPTURE; i++)
     {
       pthread_mutex_destroy(&hdr_ref_mutex[i]);
       pthread_mutex_destroy(&hdr_current_mutex[i]);
-      pthread_mutex_destroy(&transit_mutex[i]);
       pthread_mutex_destroy(&ndf_port_mutex[i]);
     }
 
-  for(i = 0; i < MCHK_CAPTURE; i++)
-    pthread_mutex_destroy(&ndf_chk_mutex[i]);
-  
   dada_hdu_unlock_write(conf.hdu);
   dada_hdu_disconnect(conf.hdu);
   dada_hdu_destroy(conf.hdu);
