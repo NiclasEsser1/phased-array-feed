@@ -61,6 +61,8 @@ typedef struct conf_t
 
   int ichk0;
   uint64_t rbufsz, tbufsz;
+
+  double rbuf_blk_sec;// The duration of each ring buffer block
   
   uint64_t ndf_chk_prd;
 }conf_t;

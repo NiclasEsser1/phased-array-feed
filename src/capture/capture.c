@@ -270,11 +270,12 @@ int init_capture(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  conf->df_res   = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
-  conf->blk_res  = conf->df_res * (double)conf->rbuf_ndf_chk;
-  conf->nchan_chk = conf->nchan/conf->nchk;
-  conf->ichk0     = (0.5 - conf->center_freq)/conf->nchan_chk + conf->nchk/2;
-
+  conf->df_res       = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
+  conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
+  conf->nchan_chk    = conf->nchan/conf->nchk;
+  conf->ichk0        = (0.5 - conf->center_freq)/conf->nchan_chk + conf->nchk/2;
+  conf->rbuf_blk_sec = conf->sec_prd * conf->rbuf_ndf_chk/(double)conf->ndf_chk_prd;
+  
   return EXIT_SUCCESS;
 }
 
