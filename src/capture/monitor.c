@@ -18,7 +18,6 @@
 
 extern multilog_t *runtime_log;
 extern int quit;
-extern pthread_mutex_t quit_mutex;
 extern hdr_t hdr_current[MPORT_CAPTURE];
 extern uint64_t ndf_port[MPORT_CAPTURE];
 extern uint64_t ndf_chk[MCHK_CAPTURE];
@@ -35,7 +34,6 @@ void *monitor_thread(void *conf)
   conf_t *captureconf = (conf_t *)conf;
   struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 second;
   char command[MSTR_LEN];
-  int quit_status;
   uint64_t start_byte, start_buf;
   ipcbuf_t *db = NULL;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
@@ -49,38 +47,29 @@ void *monitor_thread(void *conf)
     {
       multilog(runtime_log, LOG_ERR, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      pthread_mutex_lock(&quit_mutex);
-      quit = 1;
-      pthread_mutex_unlock(&quit_mutex);
 
+      quit = 1;
       pthread_exit(NULL);
       return NULL;
     }  
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
-  snprintf(sa.sun_path, UNIX_PATH_MAX, "/tmp/capture_socket");
-  unlink("/tmp/capture_socket");
+  snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", captureconf->ctrl_addr);
+  unlink(captureconf->ctrl_addr);
   
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
     {
       multilog(runtime_log, LOG_ERR, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      pthread_mutex_lock(&quit_mutex);
-      quit = 1;
-      pthread_mutex_unlock(&quit_mutex);
 
+      quit = 1;
       close(sock);
       pthread_exit(NULL);
       return NULL;
     }
-  
-  pthread_mutex_lock(&quit_mutex);
-  quit_status = quit;
-  pthread_mutex_unlock(&quit_mutex);
-  while(quit_status == 0)
+
+  while(!quit)
     {
       if(recvfrom(sock, (void *)command, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
@@ -105,15 +94,11 @@ void *monitor_thread(void *conf)
 		  pthread_mutex_lock(&ndf_chk_mutex[i]);
 		  ndf_chk_actual[i] = ndf_chk[i];
 		  pthread_mutex_unlock(&ndf_chk_mutex[i]);
-		  
+
 		  fprintf(stdout, "HERE\t%"PRIu64"\t%"PRIu64"\t%.1E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", ndf_chk_actual[i], ndf_chk_expect[i], (double)(ndf_chk_expect[i])/(double)(ndf_chk_actual[i]) - 1.0, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
 	      fprintf(stdout, "\n");
-	      
-	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
-	      pthread_mutex_unlock(&quit_mutex);
-	      
 	      close(sock);
 	      pthread_exit(NULL);
 	      return NULL;
@@ -162,9 +147,6 @@ void *monitor_thread(void *conf)
 	    }
 	}
 
-      pthread_mutex_lock(&quit_mutex);
-      quit_status = quit;
-      pthread_mutex_unlock(&quit_mutex);
     }
   
   close(sock);

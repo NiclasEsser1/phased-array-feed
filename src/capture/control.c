@@ -23,7 +23,7 @@ extern char *cbuf;
 extern char *tbuf;
 
 extern int quit;
-extern int force_next;
+//extern int force_next;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
 extern uint64_t ndf_chk[MCHK_CAPTURE];
@@ -35,8 +35,7 @@ extern hdr_t hdr0[MPORT_CAPTURE];
 extern hdr_t hdr_ref[MPORT_CAPTURE];
 extern hdr_t hdr_current[MPORT_CAPTURE];
 
-extern pthread_mutex_t quit_mutex;
-extern pthread_mutex_t force_next_mutex;
+//extern pthread_mutex_t force_next_mutex;
 
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t hdr_current_mutex[MPORT_CAPTURE];
@@ -104,25 +103,20 @@ void *buf_control(void *conf)
   int i, nchk = captureconf->nchk, ntransit;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ifreq, idf;
-  int force_next_status, quit_status;
+  //int force_next_status;
   ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
   hdr_t hdr;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
   uint64_t ndf_port_actual[MPORT_CAPTURE];
   uint64_t ndf_chk_actual[MCHK_CAPTURE];
   uint64_t ndf_chk_expect[MCHK_CAPTURE];
-  //char loss_rate[MSTR_LEN];
   double loss_rate;
   double rbuf_time; // The duration of each ring buffer block
   uint64_t rbuf_iblk = 0;
-  
-  pthread_mutex_lock(&quit_mutex);
-  quit_status = quit;
-  pthread_mutex_unlock(&quit_mutex);
 
   rbuf_time = captureconf->sec_prd * captureconf->rbuf_ndf_chk/(double)captureconf->ndf_chk_prd;
   
-  while(quit_status == 0)
+  while(!quit)
     {
       ntransit = 0; 
       for(i = 0; i < captureconf->nport_active; i++)
@@ -133,10 +127,12 @@ void *buf_control(void *conf)
 	}
       
       /* To see if we need to move to next buffer block or quit */
-      pthread_mutex_lock(&force_next_mutex);
-      force_next_status = force_next;
-      pthread_mutex_unlock(&force_next_mutex);
-      if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
+      //pthread_mutex_lock(&force_next_mutex);
+      //force_next_status = force_next;
+      //pthread_mutex_unlock(&force_next_mutex);
+
+      //if((ntransit > nchk) || force_next_status)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
+      if(ntransit > nchk)                   // Once we have more than nchunk data frames on temp buffer, we will move to new ring buffer block
 	{
 	  rbuf_iblk++;
 	  loss_rate = 0;
@@ -146,7 +142,6 @@ void *buf_control(void *conf)
 	      hdr = hdr_current[i];
 	      pthread_mutex_unlock(&hdr_current_mutex[i]);
 	      
-	      //ndf_port_expect[i] = rbuf_iblk * captureconf->rbuf_ndf_chk * captureconf->nchk_active_actual[i]; //(uint64_t)captureconf->nchk_active_actual[i] * (captureconf->ndf_chk_prd * (hdr.sec - hdr0[i].sec) / captureconf->sec_prd + (hdr.idf - hdr0[i].idf));
 	      ndf_port_expect[i] = captureconf->rbuf_ndf_chk * captureconf->nchk_active_actual[i]; // Only for current buffer
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[i]);
@@ -164,15 +159,11 @@ void *buf_control(void *conf)
 
 	  /* Close current buffer */
 	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
-	    //if(ipcio_close_block_write(captureconf->hdu->data_block, captureconf->rbufsz) < 0) 
 	    {
 	      multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
 	      fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
-	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
-	      pthread_mutex_unlock(&quit_mutex);
-
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
@@ -180,22 +171,17 @@ void *buf_control(void *conf)
 	    {	     
 	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
 	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
-	       
-	      pthread_mutex_lock(&quit_mutex);
+	      
 	      quit = 1;
-	      pthread_mutex_unlock(&quit_mutex);
-	  
 	      pthread_exit(NULL);
 	      return NULL;
 	    }
 	  
-	  pthread_mutex_lock(&quit_mutex);   // Need to check quit status before get new buffer block, otherwise it will stuck here
-	  quit_status = quit;
-	  pthread_mutex_unlock(&quit_mutex);
-	  if(quit_status == 0)
+	  if(!quit)
 	    cbuf = ipcbuf_get_next_write(db);
 	  else
-	    {	      
+	    {
+	      quit = 1;
 	      pthread_exit(NULL);
 	      return NULL; 
 	    }
@@ -204,11 +190,7 @@ void *buf_control(void *conf)
 	    {
 	      multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
 	      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      
-	      pthread_mutex_lock(&quit_mutex);
 	      quit = 1;
-	      pthread_mutex_unlock(&quit_mutex);
-
 	      pthread_exit(NULL);
 	      return NULL; 
 	    }
@@ -228,10 +210,7 @@ void *buf_control(void *conf)
 	      pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	    }
 
-	  pthread_mutex_lock(&quit_mutex);   // Need to check quit status in while loop, otherwise it will stuck here
-	  quit_status = quit;
-	  pthread_mutex_unlock(&quit_mutex);
-	  while(quit_status == 0) // Wait until all threads are on new buffer block
+	  while(!quit) // Wait until all threads are on new buffer block
 	    {
 	      ntransit = 0;
 	      for(i = 0; i < captureconf->nport_active; i++)
@@ -242,10 +221,6 @@ void *buf_control(void *conf)
 		}
 	      if(ntransit == 0)
 		break;
-	      
-	      pthread_mutex_lock(&quit_mutex);   // Need to check quit status in while loop, otherwise it will stuck here
-	      quit_status = quit;
-	      pthread_mutex_unlock(&quit_mutex);
 	    }
 	  
 	  /* To see if we need to copy data from temp buffer into ring buffer */
@@ -276,14 +251,10 @@ void *buf_control(void *conf)
 	  for(i = 0; i < captureconf->nport_active; i++)
 	    tail[i] = 0;  // Reset the location of tbuf;
 	  
-	  pthread_mutex_lock(&force_next_mutex);
-	  force_next = 0;
-	  pthread_mutex_unlock(&force_next_mutex);
+	  //pthread_mutex_lock(&force_next_mutex);
+	  //force_next = 0;
+	  //pthread_mutex_unlock(&force_next_mutex);
 	}
-
-      pthread_mutex_lock(&quit_mutex);
-      quit_status = quit;
-      pthread_mutex_unlock(&quit_mutex);
     }
   
   /* Exit */
@@ -292,7 +263,6 @@ void *buf_control(void *conf)
     {
       multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
       fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
       
       pthread_exit(NULL);
       return NULL;
@@ -311,7 +281,6 @@ void *capture_control(void *conf)
   conf_t *captureconf = (conf_t *)conf;
   struct timeval tout={1, 0};  // Force to timeout if we could not receive data frames in 1 second;
   char command_line[MSTR_LEN], command[MSTR_LEN];
-  int quit_status;
   uint64_t start_byte, start_buf;
   ipcbuf_t *db = (ipcbuf_t *)captureconf->hdu->data_block;
   uint64_t ndf_port_expect[MPORT_CAPTURE];
@@ -342,10 +311,7 @@ void *capture_control(void *conf)
       multilog(runtime_log, LOG_ERR, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
-      pthread_mutex_lock(&quit_mutex);
       quit = 1;
-      pthread_mutex_unlock(&quit_mutex);
-
       pthread_exit(NULL);
       return NULL;
     }  
@@ -361,19 +327,13 @@ void *capture_control(void *conf)
       multilog(runtime_log, LOG_ERR, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
-      pthread_mutex_lock(&quit_mutex);
       quit = 1;
-      pthread_mutex_unlock(&quit_mutex);
-
       close(sock);
       pthread_exit(NULL);
       return NULL;
     }
-  
-  pthread_mutex_lock(&quit_mutex);
-  quit_status = quit;
-  pthread_mutex_unlock(&quit_mutex);
-  while(quit_status == 0)
+
+  while(!quit)
     {
       if(recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
 	{
@@ -401,12 +361,9 @@ void *capture_control(void *conf)
 		  
 		  fprintf(stdout, "Thread %d:\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", i, captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
+	      quit = 1;
 	      fprintf(stdout, "\n");
 	      
-	      pthread_mutex_lock(&quit_mutex);
-	      quit = 1;
-	      pthread_mutex_unlock(&quit_mutex);
-
 	      if(ipcbuf_is_writing(db))
 		ipcbuf_enable_eod(db);
 	      
@@ -429,9 +386,6 @@ void *capture_control(void *conf)
 		  pthread_mutex_unlock(&ndf_port_mutex[i]);
 		  
 		  ndf_chk_expect[i] = (uint64_t)(captureconf->ndf_chk_prd * (hdr.sec - captureconf->sec_ref) / captureconf->sec_prd + (hdr.idf - captureconf->idf_ref));
-		  //pthread_mutex_lock(&ndf_chk_mutex[i]);
-		  //ndf_chk_actual[i] = ndf_chk[i];
-		  //pthread_mutex_unlock(&ndf_chk_mutex[i]);
 		  
 		  fprintf(stdout, "HERE\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->sec_prd * ndf_chk_expect[i]/(double)captureconf->ndf_chk_prd, ndf_port_actual[i], ndf_port_expect[i], (double)(ndf_port_expect[i])/(double)(ndf_port_actual[i]) - 1.0);
 		}
@@ -493,11 +447,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -506,11 +457,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -520,10 +468,7 @@ void *capture_control(void *conf)
 	      	  multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -534,11 +479,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -548,11 +490,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -562,11 +501,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -576,11 +512,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -590,11 +523,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -604,11 +534,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -617,11 +544,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -630,11 +554,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -644,10 +565,7 @@ void *capture_control(void *conf)
 	      	  multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -656,11 +574,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -670,11 +585,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -684,11 +596,8 @@ void *capture_control(void *conf)
 	      	{
 	      	  multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      	  fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      	  
-	      	  pthread_mutex_lock(&quit_mutex);
-	      	  quit = 1;
-	      	  pthread_mutex_unlock(&quit_mutex);
-	      	  
+
+		  quit = 1;
 	      	  close(sock);
 	      	  pthread_exit(NULL);
 	      	  return NULL;
@@ -696,10 +605,6 @@ void *capture_control(void *conf)
 	      //ipcbuf_enable_sod(db, start_buf, start_byte);
 	    }
 	}
-
-      pthread_mutex_lock(&quit_mutex);
-      quit_status = quit;
-      pthread_mutex_unlock(&quit_mutex);
     }
   
   close(sock);
