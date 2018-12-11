@@ -20,41 +20,45 @@ void usage()
 	  " -a Hexadecimal shared memory key for capture \n"
 	  " -b BMF packet size\n"
 	  " -c Start point of packet\n"
-	  " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected:nchunk_actual:cpu\" \n"
+	  " -d Alive IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected:nchunk_actual:cpu\" \n"
 	  " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected\" \n"
 	  " -f The center frequency of captured data\n"
-	  " -g Number of channels of current capture\n"
+	  " -g Frequency channels in each chunk\n"
 	  " -h Show help\n"
-	  " -i Reference information for the current capture, get from BMF packet header, epoch_ref:sec_ref:idf_ref\n"
+	  " -i Reference information for the current capture, get from BMF packet header, epoch:sec:idf\n"
 	  " -j Which directory to put log file\n"
 	  " -k The CPU for buf control thread\n"
-	  " -l The CPU for capture control thread\n"
+	  " -l The setup for the capture control, the format of it is \"cpt_ctrl:cpt_ctrl_cpu:cpt_ctrl_addr\"\n"
 	  " -m Bind thread to CPU or not\n"
-	  " -n Time out for sockets\n"
-	  " -o The number of chunks\n"
-	  " -p The number of data frames in each buffer block of each frequency chunk\n"
-	  " -q The number of data frames in each temp buffer of each frequency chunk\n"
-	  " -r The number of data frames in each period or each frequency chunk\n"
-	  " -s The address to get control signal, currently uses unix socket\n"
-	  " -t The name of header template for PSRDADA\n"
-	  " -u The name of instrument \n"
+	  " -n Streaming period\n"
+	  " -o The number of data frames in each buffer block of each frequency chunk\n"
+	  " -p The number of data frames in each temp buffer of each frequency chunk\n"
+	  " -q The number of data frames in each period or each frequency chunk\n"
+	  " -r The name of header template for PSRDADA\n"
+	  " -s The name of instrument \n"
+	  " -t The source information, which is required for the case without capture control, in the format \"name:ra:dec\" \n"
 	   );
 }
 
 int main(int argc, char **argv)
 {
   /* Initial part */
-  int i, arg;
+  int i, arg, source = 0;
   conf_t conf;
   
-  conf.nport_active = 0;
-  conf.nport_dead   = 0;
-  conf.buf_ctrl_cpu     = 0;
-  conf.capture_ctrl_cpu = 0;
-  conf.thread_bind  = 0; // Default do not bind thread to cpu
+  conf.nport_alive   = 0;
+  conf.nport_dead    = 0;
+  conf.rbuf_ctrl_cpu = 0;
+  conf.cpt_ctrl_cpu  = 0;
+  conf.cpt_ctrl      = 0;  // Default do not control the capture during the runtime;
+  conf.cpu_bind      = 0;  // Default do not bind thread to cpu
+  sprintf(conf.source, "unset");
+  sprintf(conf.ra, "unset");
+  sprintf(conf.dec, "unset");
+  
   for(i = 0; i < MPORT_CAPTURE; i++)
-    conf.port_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:u:")) != -1)
+    conf.cpt_cpu[i] = 0;
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
     {
       switch(arg)
 	{
@@ -79,8 +83,8 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'd':
-	  sscanf(optarg, "%[^:]:%d:%d:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchk_active_expect[conf.nport_active], &conf.nchk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
-	  conf.nport_active++;
+	  sscanf(optarg, "%[^:]:%d:%d:%d:%d", conf.ip_alive[conf.nport_alive], &conf.port_alive[conf.nport_alive], &conf.nchk_alive_expect[conf.nport_alive], &conf.nchk_alive_actual[conf.nport_alive], &conf.cpt_cpu[conf.nport_alive]);
+	  conf.nport_alive++;
 	  break;
 	  
 	case 'e':
@@ -89,73 +93,70 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'f':
-	  sscanf(optarg, "%lf", &conf.center_freq);
+	  sscanf(optarg, "%lf", &conf.cfreq);
 	  break;
 
 	case 'g':
-	  sscanf(optarg, "%d", &conf.nchan);
+	  sscanf(optarg, "%d", &conf.nchan_chk);
 	  break;
 
 	case 'i':
-	  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.epoch_ref, &conf.sec_ref, &conf.idf_ref);
+	  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.ref.epoch, &conf.ref.sec, &conf.ref.idf);
 	  break;
 	  
 	case 'j':
-	  sscanf(optarg, "%s", conf.dir);
+	  sscanf(optarg, "%s", conf.dir);  // It should be different for different beams and the directory name should be setup by pipeline;
 	  break;
 	  
 	case 'k':
-	  sscanf(optarg, "%d", &conf.buf_ctrl_cpu);
+	  sscanf(optarg, "%d", &conf.rbuf_ctrl_cpu);
 	  break;
 	  
 	case 'l':
-	  sscanf(optarg, "%d", &conf.capture_ctrl_cpu);
+	  sscanf(optarg, "%d:%d:%s", &conf.cpt_ctrl, &conf.cpt_ctrl_cpu, conf.cpt_ctrl_addr);
 	  break;
 	  
 	case 'm':
-	  sscanf(optarg, "%d", &conf.thread_bind);
+	  sscanf(optarg, "%d", &conf.cpu_bind);
 	  break;
 	  
 	case 'n':
-	  sscanf(optarg, "%d", &conf.sec_prd);
+	  sscanf(optarg, "%d", &conf.prd);
 	  break;
 	  
 	case 'o':
-	  sscanf(optarg, "%d", &conf.nchk);
-	  break;
-	  
-	case 'p':
 	  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf_chk);
 	  break;
 	  
-	case 'q':
+	case 'p':
 	  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf_chk);
 	  break;
 	  
-	case 'r':
+	case 'q':
 	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chk_prd);
 	  break;
 	  
-	case 's':
-	  sscanf(optarg, "%s", conf.ctrl_addr);
-	  break;
-	  
-	case 't':
+	case 'r':
 	  sscanf(optarg, "%s", conf.hfname);
 	  break;
 	  
-	case 'u':
+	case 's':
 	  sscanf(optarg, "%s", conf.instrument);
 	  break;
+	  
+	case 't':
+	  {
+	    source = 1;
+	    sscanf(optarg, "%s:%s:%s", conf.source, conf.ra, conf.dec);
+	    break;
+	  }
 	}
     }
-
-  fprintf(stdout, "%f\n", conf.center_freq);
-  
+    
   /* Setup log interface */
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;
-  sprintf(fname_log, "%s/capture-%s.log", conf.dir, conf.ip_active[0]);
+  sprintf(fname_log, "%s/capture.log", conf.dir);  // The file will be in different directory for different beam;
   fp_log = fopen(fname_log, "ab+"); 
   if(fp_log == NULL)
     {
@@ -165,18 +166,25 @@ int main(int argc, char **argv)
   runtime_log = multilog_open("capture", 1);
   multilog_add(runtime_log, fp_log);
   multilog(runtime_log, LOG_INFO, "CAPTURE START\n");
-    
-  /* To make sure that we are not going to bind all threads to one sigle CPU */
-  if(!(conf.thread_bind == 0))
+
+  /* Check the input */
+  if((conf.cpt_ctrl == 0) && (source == 0))
     {
-      for(i = 0; i < MPORT_CAPTURE; i++)
+      fprintf(stdout, "The target information will not be set.\n");
+      multilog(runtime_log, LOG_WARNING, "The target information will not be set, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    }
+
+  /* To make sure that we are not going to bind all threads to one sigle CPU */
+  if(!(conf.cpu_bind == 0))
+    {
+      for(i = 0; i < conf.nport_alive; i++)
 	{
-	  if(((conf.port_cpu[i] == conf.capture_ctrl_cpu)?0:1) == 1)
+	  if(((conf.cpt_cpu[i] == conf.cpt_ctrl_cpu)?0:1) == 1)
 	    break;
-	  if(((conf.port_cpu[i] == conf.buf_ctrl_cpu)?0:1) == 1)
+	  if(((conf.cpt_cpu[i] == conf.rbuf_ctrl_cpu)?0:1) == 1)
 	    break;
 	}
-      if(i == MPORT_CAPTURE)
+      if(i == conf.nport_alive)
 	{
 	  fprintf(stdout, "We can not bind all threads into one single CPU, has to abort!\n");
 	  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -209,9 +217,5 @@ int main(int argc, char **argv)
   multilog_close(runtime_log);
   fclose(fp_log);
 
-  //for(i = 0; i < 6; i++)
-  //  fprintf(stdout, "%"PRIu64"\t", ndf_port[i]);
-  //fprintf(stdout, "\n");
-  
   return EXIT_SUCCESS;
 }

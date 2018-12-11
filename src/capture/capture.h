@@ -18,23 +18,34 @@
 #define SECDAY        86400.0
 #define MJD1970       40587.0
 
+typedef struct ref_t
+{  
+  uint64_t sec, idf; // Reference seconds and idf, from BMF when we start the capture 
+  double epoch;
+  time_t sec_int;
+  uint64_t picoseconds;
+}ref_t;
+  
 typedef struct conf_t
-{ 
+{
+  ref_t ref;
   key_t key;
   dada_hdu_t *hdu;
   
   uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
 
   int pktsz, pktoff, required_pktsz;
-  int port_cpu[MPORT_CAPTURE];
-  int buf_ctrl_cpu, capture_ctrl_cpu;
-  int thread_bind;
+  int cpt_cpu[MPORT_CAPTURE];
+  int rbuf_ctrl_cpu, cpt_ctrl_cpu;
+  int cpt_ctrl;
+  char cpt_ctrl_addr[MSTR_LEN];
+  int cpu_bind;
   
-  char ip_active[MPORT_CAPTURE][MSTR_LEN];
-  int port_active[MPORT_CAPTURE];
-  int nport_active;
-  int nchk_active_expect[MPORT_CAPTURE];  
-  int nchk_active_actual[MPORT_CAPTURE];  
+  char ip_alive[MPORT_CAPTURE][MSTR_LEN];
+  int port_alive[MPORT_CAPTURE];
+  int nport_alive;
+  int nchk_alive_expect[MPORT_CAPTURE];  
+  int nchk_alive_actual[MPORT_CAPTURE];  
 
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
@@ -42,27 +53,28 @@ typedef struct conf_t
   int nchk_dead[MPORT_CAPTURE];
 
   char instrument[MSTR_LEN];
-  double center_freq;
-  int nchan;
-  int nchan_chk;
-
+  double cfreq;
+  int nchan, nchan_chk;
+  
   char hfname[MSTR_LEN];
-  uint64_t sec_ref, idf_ref; // Reference seconds and idf, from BMF when we start the capture 
-  double epoch_ref;
-
+  
   int nchk;    // Frequency chunks of current capture, including all alive chunks and dead chunks
-  int sec_prd;
-  char ctrl_addr[MSTR_LEN];
+  int prd;
   char dir[MSTR_LEN];
-
   double df_res;  // time resolution of each data frame, for start time determination;
   double blk_res; // time resolution of each buffer block, for start time determination;
-  //uint64_t buf_dfsz; // data fram size in buf, TFTFP order, and here is the size of each T, which is the size of each FTP. It is for the time determination with start_byte, it should be multiple of buf_size;
 
   int ichk0;
   uint64_t rbufsz, tbufsz;
 
-  double rbuf_blk_sec;// The duration of each ring buffer block
+  double rbuf_blk_res;// The duration of each ring buffer block
+  char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
+  
+  double chan_res, bw;
+  time_t sec_int;
+  uint64_t picoseconds;
+  char utc_start[MSTR_LEN];
+  double mjd_start;
   
   uint64_t ndf_chk_prd;
 }conf_t;
@@ -80,7 +92,6 @@ typedef struct hdr_t
 int init_capture(conf_t *conf);
 void *capture(void *conf);
 int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, double df_res, int64_t *idf_buf);
-//int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *ichk);
 int acquire_ichk(double freq, int nchan_chk, int ichk0, int nchk, int *ichk);
 int init_buf(conf_t *conf);
 int destroy_capture(conf_t conf);
@@ -95,5 +106,6 @@ uint64_t hdr_idf(char *df);
 uint64_t hdr_sec(char *df);
 double hdr_freq(char *df);
 int init_hdr(hdr_t *hdr);
+int dada_header(conf_t conf);
 
 #endif

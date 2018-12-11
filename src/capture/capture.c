@@ -94,20 +94,39 @@ int init_buf(conf_t *conf)
       dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;    
     }
-  if(ipcbuf_disable_sod(db) < 0)
+
+  if(conf->cpt_ctrl)
     {
-      multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-  
-      pthread_mutex_destroy(&ithread_mutex);
-      for(i = 0; i < MPORT_CAPTURE; i++)
-  	{
-  	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-  	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-  	}
+      if(ipcbuf_disable_sod(db) < 0)
+	{
+	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  
+	  pthread_mutex_destroy(&ithread_mutex);
+	  for(i = 0; i < MPORT_CAPTURE; i++)
+	    {
+	      pthread_mutex_destroy(&hdr_ref_mutex[i]);
+	      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	    }
       
-      dada_hdu_unlock_write(conf->hdu);
-      return EXIT_FAILURE;
+	  dada_hdu_unlock_write(conf->hdu);
+	  return EXIT_FAILURE;
+	}
+    }
+  else
+    {
+      for(i = 0; i < MSTR_LEN; i++)
+	{
+	  if(conf->ra[i] == ' ')
+	    conf->ra[i] = ':';
+	  if(conf->dec[i] == ' ')
+	    conf->dec[i] = ':';
+	}
+      conf->sec_int = conf->ref.sec_int;
+      conf->picoseconds = conf->ref.picoseconds;
+      strftime (conf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&conf->sec_int)); // String start time without fraction second 
+      conf->mjd_start = conf->sec_int / SECDAY + MJD1970;                         // Float MJD start time without fraction second
+      dada_header(*conf);
     }
   conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
   tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
@@ -128,8 +147,8 @@ void *capture(void *conf)
   double elapsed_time;
   struct timespec start, stop;
   int nchk = captureconf->nchk;
-  int sec_prd = captureconf->sec_prd;
-  struct timeval tout={sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
+  int prd = captureconf->prd;
+  struct timeval tout={prd, 0};  // Force to timeout if we could not receive data frames for one period.
   
   init_hdr(&hdr); 
   
@@ -148,8 +167,8 @@ void *capture(void *conf)
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));  
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
-  sa.sin_port        = htons(captureconf->port_active[ithread]);
-  sa.sin_addr.s_addr = inet_addr(captureconf->ip_active[ithread]);
+  sa.sin_port        = htons(captureconf->port_alive[ithread]);
+  sa.sin_addr.s_addr = inet_addr(captureconf->ip_alive[ithread]);
   if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
     {
       multilog(runtime_log, LOG_ERR,  "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -250,13 +269,14 @@ int init_capture(conf_t *conf)
 {
   int i;
 
-  init_buf(conf);  // Initi ring buffer
+  conf->nchk = 0;
   
   /* Init status */
-  for(i = 0; i < conf->nport_active; i++)
+  for(i = 0; i < conf->nport_alive; i++)
     {
-      hdr_ref[i].sec = conf->sec_ref;
-      hdr_ref[i].idf = conf->idf_ref;
+      hdr_ref[i].sec = conf->ref.sec;
+      hdr_ref[i].idf = conf->ref.idf;
+      conf->nchk += conf->nchk_alive_expect[i];
     }
     
   /* Get the buffer block ready */
@@ -270,18 +290,21 @@ int init_capture(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  conf->df_res       = (double)conf->sec_prd/(double)conf->ndf_chk_prd;
+  conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
-  conf->nchan_chk    = conf->nchan/conf->nchk;
-  conf->ichk0        = (0.5 - conf->center_freq)/conf->nchan_chk + conf->nchk/2;
-  conf->rbuf_blk_sec = conf->sec_prd * conf->rbuf_ndf_chk/(double)conf->ndf_chk_prd;
+  conf->nchan        = conf->nchk * conf->nchan_chk;
+  conf->ichk0        = (int)((0.5 - conf->cfreq)/conf->nchan_chk + conf->nchk/2);
+
+  conf->ref.sec_int  = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
+  conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));
+
+  init_buf(conf);  // Initi ring buffer, must be here;
   
   return EXIT_SUCCESS;
 }
 
 int acquire_ichk(double freq, int nchan_chk, int ichk0, int nchk, int *ichk)
 {
-  //*ichk = (int)((freq - center_freq + 0.5)/nchan_chk + nchk/2);
   *ichk = (int)(freq/nchan_chk + ichk0);
 
   return ((*ichk < 0) || (*ichk >= nchk));
@@ -309,4 +332,113 @@ int destroy_capture(conf_t conf)
   dada_hdu_destroy(conf.hdu);
   
   return EXIT_SUCCESS;
+}
+
+int dada_header(conf_t conf)
+{
+  char *hdrbuf = NULL;
+  
+  /* Register header */
+  hdrbuf = ipcbuf_get_next_write(conf.hdu->header_block);
+  if(!hdrbuf)
+    {
+      multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if(!conf.hfname)
+    {
+      multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }  
+  if(fileread(conf.hfname, hdrbuf, DADA_HDRSZ) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
+  /* Setup DADA header with given values */
+  if(ascii_header_set(hdrbuf, "UTC_START", "%s", conf.utc_start) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
+  if(ascii_header_set(hdrbuf, "RA", "%s", conf.ra) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
+  if(ascii_header_set(hdrbuf, "DEC", "%s", conf.dec) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
+  if(ascii_header_set(hdrbuf, "SOURCE", "%s", conf.source) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
+  if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", conf.instrument) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
+  if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, conf.picoseconds) < 0)  
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }    
+  if(ascii_header_set(hdrbuf, "FREQ", "%.6lf", conf.cfreq) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if(ascii_header_set(hdrbuf, "MJD_START", "%.10lf", conf.mjd_start) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  if(ascii_header_set(hdrbuf, "NCHAN", "%d", conf.nchan) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }  
+  if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &conf.chan_res) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  conf.bw = conf.chan_res * conf.nchan;
+  if(ascii_header_set(hdrbuf, "BW", "%.6lf", conf.bw) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  /* donot set header parameters anymore - acqn. doesn't start */
+  if(ipcbuf_mark_filled(conf.hdu->header_block, DADA_HDRSZ) < 0)
+    {
+      multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+
+  return EXIT_SUCCESS;	      
 }
