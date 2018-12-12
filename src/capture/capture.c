@@ -158,8 +158,6 @@ void *capture(void *conf)
   double elapsed_time;
   struct timespec start, stop;
   int nchk = captureconf->nchk;
-  int prd = captureconf->prd;
-  struct timeval tout={prd, 0};  // Force to timeout if we could not receive data frames for one period.
   
   init_hdr(&hdr); 
   
@@ -175,7 +173,7 @@ void *capture(void *conf)
   pthread_mutex_unlock(&ithread_mutex);
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));  
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));  
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(captureconf->port_alive[ithread]);
@@ -316,6 +314,9 @@ int init_capture(conf_t *conf)
   conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
   conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));
 
+  conf->tout.tv_sec     = conf->prd;
+  conf->tout.tv_usec    = 0;
+  
   init_buf(conf);  // Initi ring buffer, must be here;
   
   return EXIT_SUCCESS;

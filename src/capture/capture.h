@@ -74,7 +74,8 @@ typedef struct conf_t
   uint64_t picoseconds;
   char utc_start[MSTR_LEN];
   double mjd_start;
-  
+
+  struct timeval tout;
   uint64_t ndf_chk_prd;
 }conf_t;
 

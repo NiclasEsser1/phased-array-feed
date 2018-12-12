@@ -307,7 +307,7 @@ void *capture_control(void *conf)
       pthread_exit(NULL);
       return NULL;
     }  
-  //setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tout, sizeof(tout));
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
   snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", captureconf->cpt_ctrl_addr);
