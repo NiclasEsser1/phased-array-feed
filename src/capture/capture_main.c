@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'i':
-	  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.ref.epoch, &conf.ref.sec, &conf.ref.idf);
+	  sscanf(optarg, "%d:%"SCNu64":%"SCNu64"", &conf.ref.epoch, &conf.ref.sec, &conf.ref.idf);
 	  break;
 	  
 	case 'j':
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 	  }
 	}
     }
-    
+  
   /* Setup log interface */
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;

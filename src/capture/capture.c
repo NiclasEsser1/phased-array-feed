@@ -166,7 +166,7 @@ void *capture(void *conf)
   pktsz          = captureconf->pktsz;
   pktoff         = captureconf->pktoff;
   required_pktsz = captureconf->required_pktsz;
-  df = (char *)malloc(sizeof(char) * pktsz);
+  df             = (char *)malloc(sizeof(char) * pktsz);
   
   /* Get right socker for current thread */
   pthread_mutex_lock(&ithread_mutex);
@@ -193,6 +193,22 @@ void *capture(void *conf)
       return NULL;
     }
 
+  if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+    {
+      multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      
+      /* Force to quit if we have time out */
+      quit = 1;	  
+      free(df);
+      conf = (void *)captureconf;
+      pthread_exit(NULL);
+      return NULL;
+    }
+  hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
+  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", captureconf->ref.epoch, captureconf->ref.sec, captureconf->ref.idf);
+  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", hdr.epoch, hdr.sec, hdr.idf);
+  
   while(!quit)
     {
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
@@ -226,13 +242,13 @@ void *capture(void *conf)
       	  return NULL;
       	}
       
-      if(idf < 0) // discard the data frame if it does not fit to current buffer
-	continue;
+      if(idf < 0) // Discard the data frame if it does not fit to current buffer, also means the reference is already updated;
+	transit[ithread] = 0;
       else
       	{
 	  if(idf >= captureconf->rbuf_ndf_chk) // Start the buffer block change
 	    {
-	      transit[ithread] = 1;
+	      transit[ithread] = 1; // The reference should be updated very soon
 	      
 	      if(idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
 		continue;
@@ -253,9 +269,9 @@ void *capture(void *conf)
 	    }
 	  else  // Put data into current ring buffer block
 	    {
-	      transit[ithread] = 0;
+	      transit[ithread] = 0; // The reference is already updated.
 	      
-	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
+	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
 	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      cbuf_loc = (uint64_t)((idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);

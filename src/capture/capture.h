@@ -21,7 +21,7 @@
 typedef struct ref_t
 {  
   uint64_t sec, idf; // Reference seconds and idf, from BMF when we start the capture 
-  double epoch;
+  int epoch;
   time_t sec_int;
   uint64_t picoseconds;
 }ref_t;
