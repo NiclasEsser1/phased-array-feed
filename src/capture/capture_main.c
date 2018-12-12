@@ -33,7 +33,7 @@ void usage()
 	  " -n Streaming period\n"
 	  " -o The number of data frames in each buffer block of each frequency chunk\n"
 	  " -p The number of data frames in each temp buffer of each frequency chunk\n"
-	  " -q The number of data frames in each period or each frequency chunk\n"
+	  " -q The number of data frames in each period of each frequency chunk\n"
 	  " -r The name of header template for PSRDADA\n"
 	  " -s The name of instrument \n"
 	  " -t The source information, which is required for the case without capture control, in the format \"name:ra:dec\" \n"
@@ -191,7 +191,7 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	}
     }
-  
+
   /* Init capture */
   if(init_capture(&conf))
     {      
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
       fclose(fp_log);
       return EXIT_FAILURE;
     }
-  
+
   /* Do the job */
   threads(&conf);
 

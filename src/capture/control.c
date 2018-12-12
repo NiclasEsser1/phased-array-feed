@@ -107,6 +107,7 @@ void *buf_control(void *conf)
   uint64_t rbuf_iblk = 0;
   double sleep_time;
   int sleep_sec, sleep_usec;
+  uint64_t ndf_actual = 0, ndf_expect = 0;
   
   sleep_time   = 0.9 * captureconf->blk_res; // Sleep for part of buffer block time to save cpu source;
   sleep_sec    = (int)sleep_time;
@@ -174,37 +175,39 @@ void *buf_control(void *conf)
 	      pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	    }
 
-	  while(!quit) // Wait until all threads are on new buffer block
-	    {
-	      transited = 0;
-	      for(i = 0; i < captureconf->nport_alive; i++)
-		transited = transited||transit[i];
-	      
-	      if(transited == 0) 
+	  //while(!quit) // Wait until all threads are on new buffer block
+	  //  {
+	  //    transited = 0;
+	  //    for(i = 0; i < captureconf->nport_alive; i++)
+	  //    	transited = transited||transit[i];
+	  //    
+	  //    if(transited == 0) 
 		{
 		  /* Check the traffic of previous buffer cycle */
 		  rbuf_iblk++;
+		  fprintf(stdout, "PORT\t\tTIME (s)\tACTUAL\t\tEXPECT\t\tRATE\n");
 		  for(i = 0; i < captureconf->nport_alive; i++)
 		    {
 		      pthread_mutex_lock(&ndf_port_mutex[i]);
 		      ndf_port_actual = ndf_port[i];
 		      ndf_port[i] = 0;  // Only for current buffer
 		      pthread_mutex_unlock(&ndf_port_mutex[i]);
+		      
+		      ndf_port_expect = captureconf->rbuf_ndf_chk * captureconf->nchk_alive_actual[i]; // Only for current buffer
+		      
+		      fprintf(stdout, "%d\t\t%.1E\t\t%"PRIu64"\t\t%"PRIu64"\t\t%.1E\n", captureconf->port_alive[i], rbuf_iblk * captureconf->blk_res, ndf_port_actual, ndf_port_expect, 1.0 - ndf_port_actual/(double)ndf_port_expect);
 
-		      if(rbuf_iblk>1) // Need to ignore the first buffer block as a delay may exist;
-			{
-			  ndf_port_expect = captureconf->rbuf_ndf_chk * captureconf->nchk_alive_actual[i]; // Only for current buffer
-			  
-			  fprintf(stdout, "Port %d,\t\t%E\t%"PRIu64"\t%"PRIu64"\t%.1E\n", captureconf->port_alive[i], rbuf_iblk * captureconf->blk_res, ndf_port_actual, ndf_port_expect, 1.0 - ndf_port_actual/(double)ndf_port_expect);
-			  loss_rate += ((1.0 - ndf_port_actual/(double)ndf_port_expect)/(double)captureconf->nport_alive);
-			}
-		    }
-		  if(rbuf_iblk>1)    // Need to ignore the first buffer block as a delay may exist;
-		    {
-		      fprintf(stdout, "Packet loss rate so far is %E\n", loss_rate/(double)(rbuf_iblk - 1));
-		      multilog(runtime_log, LOG_INFO, "Packet loss rate so far is %E\n", loss_rate/(double)(rbuf_iblk - 1));
+		      ndf_actual += ndf_port_actual;
+		      ndf_expect += ndf_port_expect;
+		      //loss_rate += ((1.0 - ndf_port_actual/(double)ndf_port_expect)/(double)captureconf->nport_alive);
+		      //loss_rate += ((1.0 - ndf_port_actual/(double)ndf_port_expect) * captureconf->nchk_alive_actual[i]/(double)captureconf->nchk_alive);
 		    }
 		  
+		  //fprintf(stdout, "Packet loss rate so far is %E\n", loss_rate/(double)rbuf_iblk);
+		  //multilog(runtime_log, LOG_INFO, "Packet loss rate so far is %E\n", loss_rate/(double)rbuf_iblk);
+		  fprintf(stdout, "Packet loss rate so far is %.1E\n", 1.0 - ndf_actual/(double)ndf_expect);
+		  multilog(runtime_log, LOG_INFO, "Packet loss rate so far is %.1E\n", 1.0 - ndf_actual/(double)ndf_expect);
+		  		  
 		  /* To see if we need to copy data from temp buffer into ring buffer */
 		  ntail = 0;
 		  for(i = 0; i < captureconf->nport_alive; i++)
@@ -237,9 +240,9 @@ void *buf_control(void *conf)
 		  sleep(sleep_sec);
 		  usleep(sleep_usec);
 		  
-		  break;
+		  //break;
 		}
-	    }
+		//}
 	}
     }
   
@@ -332,8 +335,8 @@ void *capture_control(void *conf)
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
-	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start bytes from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
-	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_buf : ipcbuf_get_write_count(db); // To make sure the start bytes is valuable, to get the most recent buffer
+	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
+	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_buf : ipcbuf_get_write_count(db); // To make sure the start buffer is valuable, to get the most recent buffer
 	      fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db));
 
 	      multilog(runtime_log, LOG_INFO, "The data is enabled at %"PRIu64" buffer block.\n", start_buf);

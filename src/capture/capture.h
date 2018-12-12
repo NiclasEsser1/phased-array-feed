@@ -44,8 +44,8 @@ typedef struct conf_t
   char ip_alive[MPORT_CAPTURE][MSTR_LEN];
   int port_alive[MPORT_CAPTURE];
   int nport_alive;
-  int nchk_alive_expect[MPORT_CAPTURE];  
-  int nchk_alive_actual[MPORT_CAPTURE];  
+  int nchk_alive_expect[MPORT_CAPTURE];  // For each port;
+  int nchk_alive_actual[MPORT_CAPTURE];  // For each port;
 
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
@@ -54,11 +54,10 @@ typedef struct conf_t
 
   char instrument[MSTR_LEN];
   double cfreq;
-  int nchan, nchan_chk;
+  int nchan, nchan_chk, nchk, nchk_alive;    // Frequency chunks of current capture, including all alive chunks and dead chunks
   
   char hfname[MSTR_LEN];
-  
-  int nchk;    // Frequency chunks of current capture, including all alive chunks and dead chunks
+
   int prd;
   char dir[MSTR_LEN];
   double df_res;  // time resolution of each data frame, for start time determination;

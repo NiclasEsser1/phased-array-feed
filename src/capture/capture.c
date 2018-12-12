@@ -131,6 +131,17 @@ int init_buf(conf_t *conf)
   conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
   tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
   
+  /* Get the buffer block ready */
+  uint64_t block_id = 0;
+  uint64_t write_blkid;
+  cbuf = ipcbuf_get_next_write((ipcbuf_t*)conf->hdu->data_block);
+  if(cbuf == NULL)
+    {	     
+      multilog(runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
+  
   return EXIT_SUCCESS;
 }
 
@@ -269,33 +280,24 @@ int init_capture(conf_t *conf)
 {
   int i;
 
-  conf->nchk = 0;
+  conf->nchk       = 0;
+  conf->nchk_alive = 0;
   
   /* Init status */
   for(i = 0; i < conf->nport_alive; i++)
     {
       hdr_ref[i].sec = conf->ref.sec;
       hdr_ref[i].idf = conf->ref.idf;
-      conf->nchk += conf->nchk_alive_expect[i];
+      conf->nchk       += conf->nchk_alive_expect[i];
+      conf->nchk_alive += conf->nchk_alive_actual[i];
     }
-    
-  /* Get the buffer block ready */
-  uint64_t block_id = 0;
-  uint64_t write_blkid;
-  cbuf = ipcbuf_get_next_write((ipcbuf_t*)conf->hdu->data_block);
-  if(cbuf == NULL)
-    {	     
-      multilog(runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-
+  
   conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->nchan        = conf->nchk * conf->nchan_chk;
   conf->ichk0        = (int)((0.5 - conf->cfreq)/conf->nchan_chk + conf->nchk/2);
 
-  conf->ref.sec_int  = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
+  conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
   conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));
 
   init_buf(conf);  // Initi ring buffer, must be here;
