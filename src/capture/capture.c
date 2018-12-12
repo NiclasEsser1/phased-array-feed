@@ -23,6 +23,7 @@ char *tbuf = NULL;
 
 int quit = 0;
 int ithread_extern = 0;
+int new_rbuf_blk = 1;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
 
@@ -122,10 +123,10 @@ int init_buf(conf_t *conf)
 	  if(conf->dec[i] == ' ')
 	    conf->dec[i] = ':';
 	}
-      conf->sec_int = conf->ref.sec_int;
+      conf->sec_int     = conf->ref.sec_int;
       conf->picoseconds = conf->ref.picoseconds;
+      conf->mjd_start   = conf->sec_int / SECDAY + MJD1970;                       // Float MJD start time without fraction second
       strftime (conf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&conf->sec_int)); // String start time without fraction second 
-      conf->mjd_start = conf->sec_int / SECDAY + MJD1970;                         // Float MJD start time without fraction second
       dada_header(*conf);
     }
   conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
@@ -204,9 +205,7 @@ void *capture(void *conf)
       return NULL;
     }
   hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", captureconf->ref.epoch, captureconf->ref.sec, captureconf->ref.idf);
-  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", hdr.epoch, hdr.sec, hdr.idf);
-  
+    
   while(!quit)
     {
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
@@ -268,15 +267,20 @@ void *capture(void *conf)
 	  else  // Put data into current ring buffer block
 	    {
 	      transit[ithread] = 0; // The reference is already updated.
-	      
-	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
-	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
-	      cbuf_loc = (uint64_t)((idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
-	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 
-	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
-	      ndf_port[ithread]++;
-	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+	      if(new_rbuf_blk == 0) // New buffer block is not ready
+		continue;
+	      else
+		{
+		  /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
+		  //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
+		  cbuf_loc = (uint64_t)((idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
+		  memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
+
+		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
+		  ndf_port[ithread]++;
+		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+		}
 	    }
 	}
     }

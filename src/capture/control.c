@@ -21,6 +21,7 @@ extern multilog_t *runtime_log;
 
 extern char *cbuf;
 extern char *tbuf;
+extern int new_rbuf_blk;
 
 extern int quit;
 
@@ -44,7 +45,7 @@ int threads(conf_t *conf)
   
   for(i = 0; i < nport_alive; i++)
     // Create threads. Capture threads and ring buffer control thread are essential, the capture control thread is created when it is required to;
-    // If we create a capture thread, we can control the start and end of data during runtime, the header of DADA buffer will be setup each time we start the data, which means without rerun the pipeline, we can get multiple capture runs;
+    // If we create a capture control thread, we can control the start and end of data during runtime, the header of DADA buffer will be setup each time we start the data, which means without rerun the pipeline, we can get multiple capture runs;
     // If we do not create a capture thread, the data will start at the begining and we need to setup the header at that time, we can only do one capture without rerun the pipeline;
     {
       if(!(conf->cpu_bind == 0))
@@ -207,18 +208,21 @@ void *buf_control(void *conf)
 	    }
 	  
 	  if(!quit)
-	    cbuf = ipcbuf_get_next_write(db); // Race may happen here, for the performance, I take the risk;
+	    {
+	      new_rbuf_blk = 0;
+	      cbuf = ipcbuf_get_next_write(db); 
+	      if(cbuf == NULL)
+		{
+		  multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
+		  fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  quit = 1;
+		  pthread_exit(NULL);
+		  return NULL; 
+		}
+	      new_rbuf_blk = 1;
+	    }
 	  else
 	    {
-	      quit = 1;
-	      pthread_exit(NULL);
-	      return NULL; 
-	    }
-	  
-	  if(cbuf == NULL)
-	    {
-	      multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
-	      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      quit = 1;
 	      pthread_exit(NULL);
 	      return NULL; 
@@ -312,7 +316,6 @@ void *capture_control(void *conf)
   sa.sun_family = AF_UNIX;
   snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", captureconf->cpt_ctrl_addr);
   unlink(captureconf->cpt_ctrl_addr);
-  fprintf(stdout, "%s\n", captureconf->cpt_ctrl_addr);
   
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
     {
