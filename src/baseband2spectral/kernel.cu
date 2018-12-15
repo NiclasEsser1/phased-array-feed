@@ -59,6 +59,7 @@ __global__ void swap_select_transpose_detect_kernel(cufftComplex *dbuf_rtc, floa
   int remainder, loc;
   uint64_t loc_rtc, loc_rtf1;
   cufftComplex p1, p2;
+  float aa, bb, i, q, u, v, ab, phi;
 
   remainder = (threadIdx.x + CUFFT_MOD)%CUFFT_NX;
   if(remainder < NCHAN_KEEP_CHAN)
@@ -70,10 +71,22 @@ __global__ void swap_select_transpose_detect_kernel(cufftComplex *dbuf_rtc, floa
       p2 = dbuf_rtc[loc_rtc + offset_rtc];
 
       loc = blockIdx.x * NCHAN_KEEP_CHAN + remainder;
-      //loc_rtf1 = blockDim.y * loc + blockIdx.y; // FT order
       loc_rtf1 = gridDim.y * loc + blockIdx.y; // FT order
+
+      aa = p1.x * p1.x + p1.y * p1.y;
+      bb = p2.x * p2.x + p2.y * p2.y;
+      ab  = sqrtf(aa) * sqrtf(bb);
       
-      dbuf_rtf1[loc_rtf1] = p1.x * p1.x + p1.y * p1.y + p2.x * p2.x + p2.y * p2.y;
+      i = aa + bb;
+      q = aa - bb;
+      u = 2 * (p1.x * p2.x + p1.y * p2.y); // = 2 * ab * cosf(phi), dot multi
+      
+      phi = acosf(0.5 * u / ab);
+      
+      v = 2 * ab * sinf(phi);
+
+      // IQUV, AABB and I are ready, next step will copy them to device buffer;
+      dbuf_rtf1[loc_rtf1] = i;      
     }
 }
 

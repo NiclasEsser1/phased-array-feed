@@ -72,19 +72,18 @@ def capture_refinfo(destination, pktsz, system_conf):
     df_res   = float(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['df_res'])
     data     = np.fromstring(buf, 'uint64')
     hdr_part = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[0]))[0])
-    sec_ref  = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
-    idf_ref  = hdr_part & np.uint64(0x00000000ffffffff)
+    sec_ref  = int((hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32))
+    idf_ref  = int(hdr_part & np.uint64(0x00000000ffffffff))
 
     hdr_part  = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[1]))[0])
     epoch     = (hdr_part & np.uint64(0x00000000fc000000)) >> np.uint64(26)    
-    epoch_ref = float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)])
+    epoch_ref = int(float(ConfigSectionMap(system_conf, "EpochBMF")['{:d}'.format(epoch)]))
     sec_prd   = idf_ref * df_res
 
     sec        = int(np.floor(sec_prd) + sec_ref + epoch_ref * SECDAY)
     picosecond = int(1.0E6 * round(1.0E6 * (sec_prd - np.floor(sec_prd))))
     
-    #return sec, picosecond
-    return epoch_ref, int(sec_ref+1), int(idf_ref)
+    return epoch_ref, sec_ref, idf_ref
 
 # ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 0
 # ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 1
@@ -169,7 +168,8 @@ if __name__ == "__main__":
     print destination_alive
     
     refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
-    capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, cpu, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
+    #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, cpu, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
+    capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, "1:{:d}:capture.socket{:d}".format(cpu, beam), bind, period, ndf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00")
     print capture_command
     os.system(capture_command)
     
