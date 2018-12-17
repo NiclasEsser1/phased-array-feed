@@ -23,9 +23,9 @@ char *tbuf = NULL;
 
 int quit = 0;
 int ithread_extern = 0;
-int new_rbuf_blk = 1;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
+uint64_t ndf_chk[MCHK_CAPTURE] = {0};
 
 int transit[MPORT_CAPTURE] = {0};
 uint64_t tail[MPORT_CAPTURE] = {0};
@@ -268,19 +268,17 @@ void *capture(void *conf)
 	    {
 	      transit[ithread] = 0; // The reference is already updated.
 
-	      if(new_rbuf_blk == 0) // New buffer block is not ready
-		continue;
-	      else
-		{
-		  /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
-		  //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
-		  cbuf_loc = (uint64_t)((idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
-		  memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
-
-		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
-		  ndf_port[ithread]++;
-		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-		}
+	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
+	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
+	      cbuf_loc = (uint64_t)((idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
+	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
+	      //fprintf(stdout, "%f\n", hdr.freq);
+	      //if(ichk==2)
+	      //fprintf(stdout, "%d\n", ichk);
+	      
+	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
+	      ndf_port[ithread]++;
+	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 	    }
 	}
     }
@@ -313,8 +311,9 @@ int init_capture(conf_t *conf)
   conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->nchan        = conf->nchk * conf->nchan_chk;
-  conf->ichk0        = (int)((0.5 - conf->cfreq)/conf->nchan_chk + conf->nchk/2);
-
+  conf->ichk0        = (int)((-0.5 - conf->cfreq)/conf->nchan_chk + conf->nchk/2);
+  //fprintf(stdout, "HERE\t%f\t%d\t%d\t%d\n", -0.5 - conf->cfreq, conf->nchan_chk, conf->nchk/2, conf->ichk0);
+  
   conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
   conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));
 
