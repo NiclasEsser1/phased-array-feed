@@ -24,7 +24,7 @@ def ConfigSectionMap(fname, section):
 
 # ./capture.py -a ../config/system.conf -b ../config/pipeline.conf -c 0 -d 0 -e 0 -f 1
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='To capture data from given beam (with given part if the data arrives with multiple parts) with a docker container')
+    parser = argparse.ArgumentParser(description='To capture data from given beam with a docker container')
     
     parser.add_argument('-a', '--system_conf', type=str, nargs='+',
                         help='The configuration of PAF system')
@@ -32,21 +32,21 @@ if __name__ == "__main__":
                         help='The configuration of pipeline')    
     parser.add_argument('-c', '--beam', type=int, nargs='+',
                         help='The beam id from 0')
-    parser.add_argument('-d', '--part', type=int, nargs='+',
-                        help='The part id from 0')
-    parser.add_argument('-e', '--hdr', type=int, nargs='+',
+    parser.add_argument('-d', '--hdr', type=int, nargs='+',
                         help='Record packet header or not')
-    parser.add_argument('-f', '--bind', type=int, nargs='+',
+    parser.add_argument('-e', '--bind', type=int, nargs='+',
                         help='Bind threads to cpu or not')
     
     args          = parser.parse_args()
     system_conf   = args.system_conf[0]
     pipeline_conf = args.pipeline_conf[0]
     beam          = args.beam[0]
-    part          = args.part[0]
+    part          = 0
     hdr           = args.hdr[0]
     bind          = args.bind[0]
-    
+    numa          = (beam % 4) / 2
+    cpu0          = (beam % 4) * 5
+    cpu1          = (beam % 4 + 1) * 5 - 1
     uid = 50000
     gid = 50000
     ddir = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
     address_nchk = " ".join(address_nchks[beam][part])
     
-    com_line = "docker run --ipc=shareable --rm -it --net=host -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, hdr, bind, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    com_line = "docker run --ipc=shareable --rm -it --net=host --cpuset-mems={:d} --cpuset-cpus={:s} -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 -e DISPLAY -v /tmp:/tmp --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(numa, "{:d}-{:d}".format(cpu0, cpu1), dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, hdr, bind, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     
     print com_line
     os.system(com_line)

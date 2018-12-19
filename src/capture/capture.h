@@ -66,7 +66,6 @@ typedef struct conf_t
   int ichk0;
   uint64_t rbufsz, tbufsz;
 
-  double rbuf_blk_res;// The duration of each ring buffer block
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
   
   double chan_res, bw;

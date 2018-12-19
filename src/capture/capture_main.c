@@ -152,7 +152,9 @@ int main(int argc, char **argv)
 	  }
 	}
     }
-  
+
+  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", conf.ref.epoch, conf.ref.sec, conf.ref.idf);
+
   /* Setup log interface */
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;
@@ -203,7 +205,7 @@ int main(int argc, char **argv)
       fclose(fp_log);
       return EXIT_FAILURE;
     }
-
+  
   /* Do the job */
   threads(&conf);
 

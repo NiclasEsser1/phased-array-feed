@@ -26,6 +26,8 @@ extern int quit;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
 extern uint64_t ndf_chk[MCHK_CAPTURE];
+extern uint64_t ndf_chk_delay[MCHK_CAPTURE];
+
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
 
@@ -96,23 +98,21 @@ int threads(conf_t *conf)
 
 void *buf_control(void *conf)
 {
+  /* 
+     The software does not quit when sometime too many temp packets?
+     Stuck at the buffer get?
+   */
   conf_t *captureconf = (conf_t *)conf;
   int i, nchk = captureconf->nchk, transited;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ichk, idf;
   ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
-  uint64_t ndf_port_expect;
-  uint64_t ndf_port_actual;
-  double loss_rate = 0;
-  uint64_t rbuf_iblk;
-  double sleep_time;
-  int sleep_sec, sleep_usec;
+  uint64_t rbuf_nblk = 0;
   uint64_t ndf_actual = 0, ndf_expect = 0;
-  
-  sleep_time   = 0.9 * captureconf->blk_res; // Sleep for part of buffer block time to save cpu source;
-  sleep_sec    = (int)sleep_time;
-  sleep_usec   = (int)((sleep_time - sleep_sec) * 1E6);
-  
+  double sleep_time = 0.9 * captureconf->blk_res;
+  unsigned int sleep_sec = (int)sleep_time;
+  useconds_t sleep_usec  = 1.0E6 * (sleep_time - sleep_sec);
+
   while(!quit)
     {
       transited = transit[0];
@@ -124,7 +124,7 @@ void *buf_control(void *conf)
       */
       if(transited)                   
 	{
-	  rbuf_iblk = ipcbuf_get_write_count(db) + 1;
+	  rbuf_nblk = ipcbuf_get_write_count(db) + 1;
 	  
 	  /* Close current buffer */
 	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
@@ -151,6 +151,7 @@ void *buf_control(void *conf)
 	      return NULL;
 	    }
 
+	  //fprintf(stdout, "Before buffer\n");
 	  /* Get new buffer block */
 	  if(!quit) // Just in case that we stick here.
 	    {
@@ -170,6 +171,7 @@ void *buf_control(void *conf)
 	      pthread_exit(NULL);
 	      return NULL; 
 	    }
+	  //fprintf(stdout, "After buffer\n");
 
 	  /* Update reference point */
 	  for(i = 0; i < captureconf->nport_alive; i++)
@@ -226,25 +228,23 @@ void *buf_control(void *conf)
 	    }
 	  
 	  /* Check the traffic of previous buffer cycle */
-	  fprintf(stdout, "PORT\t\tTIME (s)\tACTUAL\t\tEXPECT\t\tRATE\n");
 	  for(i = 0; i < captureconf->nport_alive; i++)
 	    {
-	      pthread_mutex_lock(&ndf_port_mutex[i]); // If I only check the traffic status so far, I may not need the mutex here;
-	      ndf_port_actual = ndf_port[i];
-	      ndf_port[i] = 0;  // Only for current buffer
+	      pthread_mutex_lock(&ndf_port_mutex[i]); 
+	      ndf_actual += ndf_port[i];
+	      ndf_port[i] = 0; 
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
-
-	      ndf_port_expect = captureconf->rbuf_ndf_chk * captureconf->nchk_alive_actual[i]; // Only for current buffer
-	      
-	      fprintf(stdout, "%d\t\t%.1E\t\t%"PRIu64"\t\t%"PRIu64"\t\t%.1E\n", captureconf->port_alive[i], rbuf_iblk * captureconf->blk_res, ndf_port_actual, ndf_port_expect, 1.0 - ndf_port_actual/(double)ndf_port_expect);
-		  
-	      ndf_actual += ndf_port_actual;
-	      ndf_expect += ndf_port_expect;
 	    }
-	  fprintf(stdout, "Packet loss rate so far is %.1E\n", 1.0 - ndf_actual/(double)ndf_expect);
-	  multilog(runtime_log, LOG_INFO, "Packet loss rate so far is %.1E\n", 1.0 - ndf_actual/(double)ndf_expect);
-	  	  
-	  /* Sleep to save cpu cycles */
+	  if(rbuf_nblk==1)
+	    {
+	      for(i = 0; i < captureconf->nport_alive; i++)
+		ndf_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
+	    }
+	  else
+	    ndf_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
+	  multilog(runtime_log, LOG_INFO, "%f\t%E\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
+	  fprintf(stdout, "Relative difference of packet number at %f seconds is %E\n\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
+
 	  sleep(sleep_sec);
 	  usleep(sleep_usec);
 	}
@@ -286,7 +286,8 @@ void *capture_control(void *conf)
       quit = 1;
       pthread_exit(NULL);
       return NULL;
-    }  
+    }
+  
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;

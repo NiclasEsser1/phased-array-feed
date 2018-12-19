@@ -23,7 +23,8 @@ parser.add_argument('-c', '--command', type=str, nargs='+',
 args    = parser.parse_args()
 beam    = args.beam[0]
 part    = args.part[0]
-address = "baseband2baseband-demo.beam{:02d}part{:02d}.socket".format(beam, part)
+#address = "baseband2baseband-demo.beam{:02d}part{:02d}.socket".format(beam, part)
+address = "capture.socket{:2d}".format(beam)
 command = args.command[0]
 
 start_buf = 0

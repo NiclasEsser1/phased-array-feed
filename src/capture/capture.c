@@ -26,6 +26,7 @@ int ithread_extern = 0;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
 uint64_t ndf_chk[MCHK_CAPTURE] = {0};
+uint64_t ndf_chk_delay[MCHK_CAPTURE] = {0};
 
 int transit[MPORT_CAPTURE] = {0};
 uint64_t tail[MPORT_CAPTURE] = {0};
@@ -205,21 +206,10 @@ void *capture(void *conf)
       return NULL;
     }
   hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-    
+  ndf_chk_delay[ithread] = (hdr.sec - captureconf->ref.sec)/captureconf->prd * captureconf->ndf_chk_prd + hdr.idf - captureconf->ref.idf; // We would not update the epoch during the operation, so ignore it.
+  
   while(!quit)
     {
-      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-	{
-	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-
-	  /* Force to quit if we have time out */
-	  quit = 1;	  
-	  free(df);
-	  conf = (void *)captureconf;
-	  pthread_exit(NULL);
-	  return NULL;
-	}
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
@@ -231,7 +221,6 @@ void *capture(void *conf)
       	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
       	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
       
-      	  /* Force to quit if we have time out */
 	  quit = 1;
       	  free(df);
       	  conf = (void *)captureconf;
@@ -280,6 +269,18 @@ void *capture(void *conf)
 	      ndf_port[ithread]++;
 	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 	    }
+	}      
+      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+	{
+	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+
+	  /* Force to quit if we have time out */
+	  quit = 1;	  
+	  free(df);
+	  conf = (void *)captureconf;
+	  pthread_exit(NULL);
+	  return NULL;
 	}
     }
     

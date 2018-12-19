@@ -125,7 +125,7 @@ if __name__ == "__main__":
     bind          = args.bind[0]
     beam          = args.beam[0]
     
-    ddir           = "/beegfs/DENG"
+    ddir           = "/beegfs/DENG/beam{:02d}".format(beam)
     dvolume        = "{:s}:{:s}".format(ddir, ddir)
     hvolume        = "/home/pulsar:/home/pulsar"
     uid            = 50000
@@ -169,8 +169,8 @@ if __name__ == "__main__":
     print destination_alive
     
     refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
-    #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, cpu, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
-    capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, "1:{:d}:capture.socket{:d}".format(cpu, beam), bind, period, ndf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00")
+    #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, cpu, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:02d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
+    capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, "1:{:d}:capture.socket{:02d}".format(cpu, beam), bind, period, ndf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00")
     print capture_command
     os.system(capture_command)
     

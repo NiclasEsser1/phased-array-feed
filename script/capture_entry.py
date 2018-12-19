@@ -23,11 +23,11 @@ def ConfigSectionMap(fname, section):
 
 def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part):
     dir_capture = ConfigSectionMap(pipeline_conf, "CAPTURE")['dir']
-    destination_active, destination_dead, refinfo, key = captureinfo.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
+    destination_alive, destination_dead, refinfo, key = captureinfo.captureinfo(pipeline_conf, system_conf, address_nchk, nchan, hdr)
     print(datetime.datetime.now())
         
-    if (len(destination_active) == 0):
-        print "There is no active port for beam {:02d}, part {:02d}, have to abort ...".format(beam, part)
+    if (len(destination_alive) == 0):
+        print "There is no alive port for beam {:02d}, part {:02d}, have to abort ...".format(beam, part)
         exit(1)
         
     # Put the key into a file    
@@ -42,12 +42,12 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     # To set up cpu cores if we decide to bind threads
     ncpu_numa = int(ConfigSectionMap(system_conf, "NUMA")['ncpu_numa'])
     port0     = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['port0'])
-    node      = int(destination_active[0].split(":")[0].split(".")[3])
+    node      = int(destination_alive[0].split(":")[0].split(".")[3])
     cpus      = []
-    for i in range(len(destination_active)):  # The cpu thing here is not very smart
-        #cpu = (node - 1) * ncpu_numa + (int(destination_active[i].split(":")[1]) - port0)%ncpu_numa
+    for i in range(len(destination_alive)):  # The cpu thing here is not very smart
+        #cpu = (node - 1) * ncpu_numa + (int(destination_alive[i].split(":")[1]) - port0)%ncpu_numa
         cpu = (beam % 4) * ncpu_numa / 2 + i 
-        destination_active[i] = "{:s}:{:d}".format(destination_active[i], cpu)
+        destination_alive[i] = "{:s}:{:d}".format(destination_alive[i], cpu)
         cpus.append(cpu)
     cpus = np.array(cpus)
 
@@ -61,6 +61,7 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     ndf_chk_prd  = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['ndf_chk_prd'])
     ndf_chk_rbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_rbuf'])
     ndf_chk_tbuf = int(ConfigSectionMap(pipeline_conf, "CAPTURE")['ndf_chk_tbuf'])
+    ddir         = "{:s}/beam{:02d}".format(ConfigSectionMap(pipeline_conf, "CAPTURE")['dir'], beam)
     hdr_fname    = ConfigSectionMap(pipeline_conf, "CAPTURE")['hdr_fname']
     pktsz        = npol_samp * ndim_pol * nbyte_dim * nchan_chk * nsamp_df + df_hdrsz
     if(hdr == 0):
@@ -68,13 +69,17 @@ def main(system_conf, pipeline_conf, bind, hdr, nchan, freq, address_nchk, ctrl_
     else:
         pktoff = 0
 
+    period = 27
+    
     # Do the real work here
     sec_prd = int(ConfigSectionMap(system_conf, "EthernetInterfaceBMF")['sec_prd'])
     nchunk = nchan/nchan_chk
     if (len(destination_dead) == 0):
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_active), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
+        #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, int(refinfo[0]), refinfo[1], refinfo[2], ddir, max(cpus)+1, "1:{:d}:capture.socket{:02d}".format(max(cpus)+1, beam), bind, period, ndf_chk_rbuf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00")
     else:
-        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_active), " -e ".join(destination_dead), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
+        #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -e {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), " -e ".join(destination_dead), freq, nchan, refinfo[0], refinfo[1], refinfo[2], dir_capture, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, (node - 1) * ncpu_numa + (max(cpus) + 1)%ncpu_numa, bind, sec_prd, nchunk, ndf_chk_rbuf, ndf_chk_tbuf, ndf_chk_prd, ctrl_socket, hdr_fname, instrument)
+        capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, int(refinfo[0]), refinfo[1], refinfo[2], ddir, max(cpus)+1, "1:{:d}:capture.socket{:02d}".format(max(cpus)+1, beam), bind, period, ndf_chk_rbuf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00")
     
     print capture_command
     os.system(capture_command)

@@ -15,17 +15,14 @@ parser = argparse.ArgumentParser(description='To control the capture')
 
 parser.add_argument('-a', '--beam', type=int, nargs='+',
                     help='beam to control')
-parser.add_argument('-b', '--part', type=int, nargs='+',
-                    help='part to control')
-parser.add_argument('-c', '--length', type=int, nargs='+',
+parser.add_argument('-b', '--length', type=int, nargs='+',
                     help='length for valid data in seconds')
 
 args    = parser.parse_args()
 beam    = args.beam[0]
-part    = args.part[0]
 length  = args.length[0]
 
-address = "capture.beam{:02d}part{:02d}.socket".format(beam, part)
+address = "capture.socket{:d}".format(beam)
 
 start_buf = 0
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
