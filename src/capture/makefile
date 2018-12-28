@@ -25,9 +25,9 @@ TARGET       = capture_main
 SRC_DIR      = .
 OBJ_DIR      = .
 
-LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread #-lpsrdada -lm -lrt -lpthread
-LIB_DIRS     = -L/usr/local/cuda/lib64 
-INCLUDE_DIRS = 
+LIBS         = -lpsrdada -lm -lrt -lpthread 
+LIB_DIRS     = -L/home/pulsar/.local/lib
+INCLUDE_DIRS = -I/home/pulsar/.local/include
 
 capture_main:capture_main.o capture.o hdr.o control.o 
 	$(CC) -o capture_main capture_main.o capture.o hdr.o control.o $(LIB_DIRS) $(LIBS)

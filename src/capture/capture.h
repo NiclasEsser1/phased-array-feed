@@ -34,6 +34,7 @@ typedef struct conf_t
   
   uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
 
+  int pad;
   int pktsz, pktoff, required_pktsz;
   int cpt_cpu[MPORT_CAPTURE];
   int rbuf_ctrl_cpu, cpt_ctrl_cpu;

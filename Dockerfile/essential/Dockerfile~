@@ -77,6 +77,7 @@ RUN pip install --upgrade pip -U && \
     pip install matplotlib -U && \
     pip install katcp -U && \
     pip install tornado -U && \
+    pip install astropy -U && \		
     pip install cmd2 -U	
 
 # PGPLOT
@@ -103,66 +104,66 @@ ENV CUDA_INCLUDE     $CUDA_DIR/include
 ENV C_INCLUDE_PATH   $C_INCLUDE_PATH:$INCLUDE_INCLUDE
 ENV LD_LIBRARY_PATH  $LD_LIBRARY_PATH:$INSTALL_LIB
 
-# Install psrcat
-WORKDIR $SOURCE
-RUN wget http://www.atnf.csiro.au/people/pulsar/psrcat/downloads/psrcat_pkg.tar.gz && \
-    tar xvzf psrcat_pkg.tar.gz
-WORKDIR $SOURCE/psrcat_tar
-RUN /bin/bash makeit && \
-    cp psrcat    $INSTALL_BIN && \
-    cp *.h       $INSTALL_INCLUDES && \
-    cp *.a       $INSTALL_LIB && \
-    cp psrcat.db $INSTALL_SHARE
-ENV PSRCAT_FILE  $INSTALL_SHARE/psrcat.db
-WORKDIR $SOURCE
-RUN rm -rf psrcat_tar psrcat_pkg.tar.gz
+## Install psrcat
+#WORKDIR $SOURCE
+#RUN wget http://www.atnf.csiro.au/people/pulsar/psrcat/downloads/psrcat_pkg.tar.gz && \
+#    tar xvzf psrcat_pkg.tar.gz
+#WORKDIR $SOURCE/psrcat_tar
+#RUN /bin/bash makeit && \
+#    cp psrcat    $INSTALL_BIN && \
+#    cp *.h       $INSTALL_INCLUDES && \
+#    cp *.a       $INSTALL_LIB && \
+#    cp psrcat.db $INSTALL_SHARE
+#ENV PSRCAT_FILE  $INSTALL_SHARE/psrcat.db
+#WORKDIR $SOURCE
+#RUN rm -rf psrcat_tar psrcat_pkg.tar.gz
 
-# Install PSRXML
-WORKDIR $SOURCE
-RUN git clone https://github.com/SixByNine/psrxml.git 
-WORKDIR $SOURCE/psrxml
-RUN autoreconf --install --warnings=none && \
-    ./configure --prefix=$PREFIX && \
-    make -j $(nproc) && \
-    make install
-WORKDIR $SOURCE
-RUN rm -rf psrxml
+## Install PSRXML
+#WORKDIR $SOURCE
+#RUN git clone https://github.com/SixByNine/psrxml.git 
+#WORKDIR $SOURCE/psrxml
+#RUN autoreconf --install --warnings=none && \
+#    ./configure --prefix=$PREFIX && \
+#    make -j $(nproc) && \
+#    make install
+#WORKDIR $SOURCE
+#RUN rm -rf psrxml
 
-# Install calceph
-WORKDIR $SOURCE
-RUN wget https://www.imcce.fr/content/medias/recherche/equipes/asd/calceph/calceph-3.1.0.tar.gz && \
-    tar xvzf calceph-3.1.0.tar.gz
-WORKDIR $SOURCE/calceph-3.1.0
-RUN ./configure --enable-shared CFLAGS=-fPIC FFLAGS=-fPIC --prefix=$PREFIX && \
-    make -j $(nproc) && \
-    make install
-WORKDIR $SOURCE
-RUN rm -rf calceph-3.1.0 calceph-3.1.0.tar.gz
-
-# Install tempo2
-WORKDIR $SOURCE
-ENV TEMPO2 $INSTALL_SHARE
-RUN git clone https://bitbucket.org/psrsoft/tempo2.git 
-WORKDIR $SOURCE/tempo2
-RUN cp -r T2runtime/* $TEMPO2 && \
-    ./bootstrap && \
-    ./configure --prefix=$PREFIX --with-calceph=$INSTALL_LIB --enable-shared CFLAGS=-fPIC FFLAGS=-fPIC --enable-static --with-pic F77=gfortran --x-libraries=/usr/lib/x86_64-linux-gnu && \
-    make -j $(nproc) && \
-    make install && \
-    make plugins-install -j $(nproc)
-WORKDIR $SOURCE
-RUN rm -rf tempo2
-
-# Install psrchive
-WORKDIR $SOURCE
-RUN git clone git://git.code.sf.net/p/psrchive/code psrchive
-WORKDIR $SOURCE/psrchive
-RUN ./bootstrap && \
-    ./configure --prefix=$PREFIX --enable-shared CFLAGS=-fPIC FFLAGS=-fPIC --enable-static F77=gfortran --x-libraries=/usr/lib/x86_64-linux-gnu --with-psrxml-dir=$PREFIX LDFLAGS="-L$INSTALL_LIB" LIBS="-lpsrxml -lxml2"  && \
-    make -j $(nproc) && \
-    make install
-WORKDIR $SOURCE
-RUN rm -rf psrchive
+## Install calceph
+#WORKDIR $SOURCE
+#RUN wget https://www.imcce.fr/content/medias/recherche/equipes/asd/calceph/calceph-3.1.0.tar.gz && \
+#    tar xvzf calceph-3.1.0.tar.gz
+#WORKDIR $SOURCE/calceph-3.1.0
+#RUN ./configure --enable-shared CFLAGS=-fPIC FFLAGS=-fPIC --prefix=$PREFIX && \
+#    make -j $(nproc) && \
+#    make install
+#WORKDIR $SOURCE
+#RUN rm -rf calceph-3.1.0 calceph-3.1.0.tar.gz
+#
+## Install tempo2
+#WORKDIR $SOURCE
+#ENV TEMPO2 $INSTALL_SHARE
+#RUN git clone https://bitbucket.org/psrsoft/tempo2.git 
+#WORKDIR $SOURCE/tempo2
+#RUN cp -r T2runtime/* $TEMPO2 && \
+#    ./bootstrap && \
+#    ./configure --prefix=$PREFIX --with-calceph=$INSTALL_LIB --enable-shared CFLAGS=-fPIC FFLAGS=-fPIC --enable-static --with-pic F77=gfortran --x-libraries=/usr/lib/x86_64-linux-gnu && \
+#    make -j $(nproc) && \
+#    make install && \
+#    make plugins-install -j $(nproc)
+#WORKDIR $SOURCE
+#RUN rm -rf tempo2
+#
+## Install psrchive
+#WORKDIR $SOURCE
+#RUN git clone git://git.code.sf.net/p/psrchive/code psrchive
+#WORKDIR $SOURCE/psrchive
+#RUN ./bootstrap && \
+#    ./configure --prefix=$PREFIX --enable-shared CFLAGS=-fPIC FFLAGS=-fPIC --enable-static F77=gfortran --x-libraries=/usr/lib/x86_64-linux-gnu --with-psrxml-dir=$PREFIX LDFLAGS="-L$INSTALL_LIB" LIBS="-lpsrxml -lxml2"  && \
+#    make -j $(nproc) && \
+#    make install
+#WORKDIR $SOURCE
+#RUN rm -rf psrchive
 
 # Install psrdada
 WORKDIR $SOURCE
@@ -207,44 +208,44 @@ RUN make install
 WORKDIR $SOURCE
 RUN rm -rf heimdall
 
-# Install dspsr
-WORKDIR $SOURCE
-RUN git clone git://git.code.sf.net/p/dspsr/code dspsr
-WORKDIR $SOURCE/dspsr
-RUN ./bootstrap && \
-    echo " dummy fits sigproc dada" > backends.list && \
-    ./configure --prefix=$PREFIX --with-cuda-lib-dir=$CUDA_LIB --with-cuda-include-dir=$CUDA_INCLUDE --x-libraries=/usr/lib/x86_64-linux-gnu CPPFLAGS="-I/usr/include/hdf5/serial" LDFLAGS="-L/usr/lib/x86_64-linux-gnu/hdf5/serial" LIBS="-lpgplot -lcpgplot -lpsrxml -lxml2" && \
-    make -j $(nproc) && \
-    make && \
-    make install
-WORKDIR $SOURCE
-RUN rm -rf dspsr
+## Install dspsr
+#WORKDIR $SOURCE
+#RUN git clone git://git.code.sf.net/p/dspsr/code dspsr
+#WORKDIR $SOURCE/dspsr
+#RUN ./bootstrap && \
+#    echo " dummy fits sigproc dada" > backends.list && \
+#    ./configure --prefix=$PREFIX --with-cuda-lib-dir=$CUDA_LIB --with-cuda-include-dir=$CUDA_INCLUDE --x-libraries=/usr/lib/x86_64-linux-gnu CPPFLAGS="-I/usr/include/hdf5/serial" LDFLAGS="-L/usr/lib/x86_64-linux-gnu/hdf5/serial" LIBS="-lpgplot -lcpgplot -lpsrxml -lxml2" && \
+#    make -j $(nproc) && \
+#    make && \
+#    make install
+#WORKDIR $SOURCE
+#RUN rm -rf dspsr
 
-# To get source list updated for vma
-RUN echo "deb http://debcache.mpifr-bonn.mpg.de/debian/ stretch main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb-src http://debcache.mpifr-bonn.mpg.de/debian/ stretch main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb http://debcache.mpifr-bonn.mpg.de/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb-src http://debcache.mpifr-bonn.mpg.de/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9D6D8F6BC857C906 8B48AD6246925553 8B48AD6246925553 7638D0442B90D010 EF0F382A1A7B6500 && \
-    apt-get update
-
-# Install VMA driver
-WORKDIR $SOURCE
-RUN wget http://www.mellanox.com/downloads/ofed/MLNX_OFED-4.5-1.0.1.0/MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz && \
-    tar xvzf MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz
-WORKDIR $SOURCE/MLNX_OFED_SRC-4.5-1.0.1.0
-RUN ./install.pl  --vma
-WORKDIR $SOURCE
-RUN rm -rf MLNX_OFED_SRC-4.5-1.0.1.0 MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz
-
-# Install libvma
-WORKDIR $SOURCE
-RUN git clone https://github.com/Mellanox/libvma.git
-WORKDIR $SOURCE/libvma
-RUN ./install.sh
-#RUN echo "options ib_uverbs disable_raw_qp_enforcement=1" > /etc/modprobe.d/ib_uverbs.conf
-WORKDIR $SOURCE
-RUN rm -rf libvma
+## To get source list updated for vma
+#RUN echo "deb http://debcache.mpifr-bonn.mpg.de/debian/ stretch main contrib non-free" >> /etc/apt/sources.list && \
+#    echo "deb-src http://debcache.mpifr-bonn.mpg.de/debian/ stretch main contrib non-free" >> /etc/apt/sources.list && \
+#    echo "deb http://debcache.mpifr-bonn.mpg.de/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list && \
+#    echo "deb-src http://debcache.mpifr-bonn.mpg.de/debian-security stretch/updates main contrib non-free" >> /etc/apt/sources.list && \
+#    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9D6D8F6BC857C906 8B48AD6246925553 8B48AD6246925553 7638D0442B90D010 EF0F382A1A7B6500 && \
+#    apt-get update
+#
+## Install VMA driver
+#WORKDIR $SOURCE
+#RUN wget http://www.mellanox.com/downloads/ofed/MLNX_OFED-4.5-1.0.1.0/MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz && \
+#    tar xvzf MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz
+#WORKDIR $SOURCE/MLNX_OFED_SRC-4.5-1.0.1.0
+#RUN ./install.pl  --vma
+#WORKDIR $SOURCE
+#RUN rm -rf MLNX_OFED_SRC-4.5-1.0.1.0 MLNX_OFED_SRC-debian-4.5-1.0.1.0.tgz
+#
+## Install libvma
+#WORKDIR $SOURCE
+#RUN git clone https://github.com/Mellanox/libvma.git
+#WORKDIR $SOURCE/libvma
+#RUN ./install.sh
+##RUN echo "options ib_uverbs disable_raw_qp_enforcement=1" > /etc/modprobe.d/ib_uverbs.conf
+#WORKDIR $SOURCE
+#RUN rm -rf libvma
 
 # Create pulsar user, psr group and change the ownership
 RUN groupadd -g 50000 psr && \
@@ -256,8 +257,6 @@ RUN mkdir $HOME && \
     chown -R pulsar:psr $HOME
 USER pulsar
 WORKDIR $HOME
-RUN echo "Predictor::default = tempo2" >> .psrchive.cfg && \
-    echo "Predictor::policy = default" >> .psrchive.cfg
 
 # Back to root
 USER root

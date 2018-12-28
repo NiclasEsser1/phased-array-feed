@@ -28,7 +28,7 @@ void usage()
 	  " -i Reference information for the current capture, get from BMF packet header, epoch:sec:idf\n"
 	  " -j Which directory to put log file\n"
 	  " -k The CPU for buf control thread\n"
-	  " -l The setup for the capture control, the format of it is \"cpt_ctrl:cpt_ctrl_cpu:cpt_ctrl_addr\"\n"
+	  " -l The setup for the capture control, the format of it is \"cpt_ctrl:cpt_ctrl_cpu\"\n"
 	  " -m Bind thread to CPU or not\n"
 	  " -n Streaming period\n"
 	  " -o The number of data frames in each buffer block of each frequency chunk\n"
@@ -37,6 +37,7 @@ void usage()
 	  " -r The name of header template for PSRDADA\n"
 	  " -s The name of instrument \n"
 	  " -t The source information, which is required for the case without capture control, in the format \"name:ra:dec\" \n"
+	  " -u Force to pad band edge \n"
 	   );
 }
 
@@ -52,13 +53,14 @@ int main(int argc, char **argv)
   conf.cpt_ctrl_cpu  = 0;
   conf.cpt_ctrl      = 0;  // Default do not control the capture during the runtime;
   conf.cpu_bind      = 0;  // Default do not bind thread to cpu
+  conf.pad           = 0;  // Default do not pad
   sprintf(conf.source, "unset");
   sprintf(conf.ra, "unset");
   sprintf(conf.dec, "unset");
   
   for(i = 0; i < MPORT_CAPTURE; i++)
     conf.cpt_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:u:")) != -1)
     {
       switch(arg)
 	{
@@ -113,7 +115,7 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'l':
-	  sscanf(optarg, "%d:%d:%s", &conf.cpt_ctrl, &conf.cpt_ctrl_cpu, conf.cpt_ctrl_addr);
+	  sscanf(optarg, "%d:%d", &conf.cpt_ctrl, &conf.cpt_ctrl_cpu);
 	  break;
 	  
 	case 'm':
@@ -150,6 +152,10 @@ int main(int argc, char **argv)
 	    sscanf(optarg, "%s:%s:%s", conf.source, conf.ra, conf.dec);
 	    break;
 	  }
+	  
+	case 'u':
+	  sscanf(optarg, "%d", &conf.pad);
+	  break;
 	}
     }
 

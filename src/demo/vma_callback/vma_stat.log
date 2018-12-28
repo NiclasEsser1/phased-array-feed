@@ -1,0 +1,2154 @@
+[H[2J[H[2J[H[2J[H[2Jvmastat: stats for application: server_vma_cb with pid: 16541
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:             0
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:           0 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    184000
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:             0
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:           0 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    184000
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:             0
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:           0 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    184000
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:             0
+Buffer disorder:           0.00%
+======[H[2J[H[2J[H[2J================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:           0 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    184000
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:             0
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:           0 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    184000
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[0]
+- ???, Non-blocked
+Rx and Tx where not active
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:             0
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:           0 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    184000
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[0]
+- ???, Non-blocked
+Rx Offload: 40 KB / 11 / 0 / 1 [bytes/packets/eagains/errors]/s
+Rx byte: cur 0 / max 8760 / dropped/s 0 / limit 0
+Rx pkt : cur 0 / max 2 / dropped/s 0
+Rx zero copy buffers: cur 2
+======================================================
+	epoll[22]
+Polling CPU/s:0%
+Rx fds ready: 0 / 12 [os/offload]/s
+Polls [miss/hit]/s: 1 / 10 (90.91%)
+======================================================
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+[H[2J[H[2J[H[2JPackets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:               31 /s 
+Packets bytes:            42648 /s 
+Interrupt requests:     1462343 /s 
+Interrupt received:           2 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894470 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875365 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx[H[2J[H[2J[H[2J zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894236 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875455 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875346 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+=======================================[H[2J[H[2J[H[2J===============
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894474 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875113 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1893947 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17][H[2J[H[2J
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875593 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875570 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894324 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+------------------[H[2J[H[2J[H[2J-------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875313 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894051 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875333 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:       [H[2J[H[2J[H[2J             199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875194 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1910602 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1856369 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    18[H[2J[H[2J[H[2J3746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894192 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875387 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894291 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+=================================[H[2J[H[2J[H[2J=====================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875283 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875539 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894241 /s 
+Interrupt received:           0 /s 
+Moderation fra[H[2J[H[2J[H[2Jme count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875435 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894373 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /[H[2J[H[2J[H[2Js 
+Packets bytes:                0 /s 
+Interrupt requests:     1875815 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875667 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894235 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+============================[H[2J[H[2J[H[2J==========================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875273 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894322 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875367 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+[H[2J[H[2J[H[2JDrained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875481 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894786 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875549 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======[H[2J[H[2J[H[2J================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894238 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875376 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875116 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, [H[2J[H[2J[H[2JNon-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894246 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875601 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894476 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Addr[H[2J[H[2Jess   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875588 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1874965 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894369 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+--------------------------------------------------[H[2J[H[2J[H[2J-----------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875426 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894286 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875406 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers e[H[2J[H[2J[H[2Jrror:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875415 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1894205 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:             0
+======================================================
+	BUFFER_POOL(TX)=[1]
+Size:                    199744
+No buffers error:             0
+======================================================
+-------------------------------------------------------------------------------
+======================================================
+	Fd=[17]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+Rx and Tx where not active
+======================================================
+	Fd=[23]
+- TCP, Non-blocked
+- Local Address   = [192.168.1.1:8000]
+- Foreign Address = [192.168.1.2:51494]
+Rx zero copy buffers: cur 2
+======================================================
+	CQ=[0]
+Packets dropped:              0 /s 
+Packets queue len:            0
+Drained max:                  0
+Buffer pool size:           235
+Buffer disorder:           0.00%
+======================================================
+======================================================
+	RING=[0]
+Packets count:                0 /s 
+Packets bytes:                0 /s 
+Interrupt requests:     1875544 /s 
+Interrupt received:           0 /s 
+Moderation frame count:         48
+Moderation usec period:         50
+Retransmissions:              0 /s 
+======================================================
+======================================================
+	BUFFER_POOL(RX)=[0]
+Size:                    183746
+No buffers error:          

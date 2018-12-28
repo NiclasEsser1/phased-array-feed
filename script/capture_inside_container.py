@@ -85,10 +85,10 @@ def capture_refinfo(destination, pktsz, system_conf):
     
     return epoch_ref, sec_ref, idf_ref
 
-# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 0
-# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 1
-# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 2
-# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 3
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 0 -j 1
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 1 -j 1
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17100 17101 17102 17103 -e 8 -f 0 -g 1 -i 2 -j 1
+# ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.2 -d 17104 17105 17106 17107 -e 8 -f 0 -g 1 -i 3 -j 1
 
 # ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17100 17101 17102 -e 12 -f 0 -g 1 -i 0
 # ./capture_inside_container.py -a ../config/system.conf -b ../config/pipeline.conf -c 10.17.8.1 -d 17103 17104 17105 -e 12 -f 0 -g 1 -i 1
@@ -114,6 +114,9 @@ if __name__ == "__main__":
                         help='Bind threads to cpu or not')
     parser.add_argument('-i', '--beam', type=int, nargs='+',
                         help='Beam id')
+    parser.add_argument('-j', '--pad', type=int, nargs='+',
+                        help='Pad band edge or not')
+    
     
     args          = parser.parse_args()
     system_conf   = args.system_conf[0]
@@ -124,6 +127,7 @@ if __name__ == "__main__":
     hdr           = args.hdr[0]
     bind          = args.bind[0]
     beam          = args.beam[0]
+    pad           = args.pad[0]
     
     ddir           = "/beegfs/DENG/beam{:02d}".format(beam)
     dvolume        = "{:s}:{:s}".format(ddir, ddir)
@@ -146,7 +150,10 @@ if __name__ == "__main__":
     nchunk_all     = nchunk * nport
     freq           = 1340.5
     ncpu_numa      = 10
-    
+
+    if (pad == 1):
+        nchunk_all = 48
+        
     if hdr:
         pktoff = 0
     else:
@@ -169,8 +176,7 @@ if __name__ == "__main__":
     print destination_alive
     
     refinfo = capture_refinfo(destination_active[0], pktsz, system_conf)
-    #capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:f}:{:d}:{:d} -j {:s} -k {:d} -l {:d} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:d} -s {:s} -t {:s} -u {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, cpu, bind, period, nchunk_all, ndf, 250, 250000, "capture.socket{:02d}".format(beam), "../config/header_16bit.txt", "PAF-BMF")
-    capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, "1:{:d}:capture.socket{:02d}".format(cpu, beam), bind, period, ndf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00")
+    capture_command = "../src/capture/capture_main -a {:s} -b {:d} -c {:d} -d {:s} -f {:f} -g {:d} -i {:d}:{:d}:{:d} -j {:s} -k {:d} -l {:s} -m {:d} -n {:d} -o {:d} -p {:d} -q {:d} -r {:s} -s {:s} -t {:s} -u {}".format(key, pktsz, pktoff, " -d ".join(destination_alive), freq, nchan_chk, refinfo[0], refinfo[1], refinfo[2], ddir, cpu, "1:{:d}".format(cpu), bind, period, ndf, 250, 250000, "../config/header_16bit.txt", "PAF-BMF", "UNKNOW:00 00 00.00:00 00 00.00", pad)
     print capture_command
     os.system(capture_command)
     

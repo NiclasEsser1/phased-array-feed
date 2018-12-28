@@ -109,7 +109,8 @@ void *buf_control(void *conf)
   ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
   uint64_t rbuf_nblk = 0;
   uint64_t ndf_actual = 0, ndf_expect = 0;
-  double sleep_time = 0.9 * captureconf->blk_res;
+  uint64_t ndf_blk_actual = 0, ndf_blk_expect = 0;
+  double sleep_time = 0.0 * captureconf->blk_res;
   unsigned int sleep_sec = (int)sleep_time;
   useconds_t sleep_usec  = 1.0E6 * (sleep_time - sleep_sec);
 
@@ -228,22 +229,29 @@ void *buf_control(void *conf)
 	    }
 	  
 	  /* Check the traffic of previous buffer cycle */
+	  ndf_blk_expect = 0;
+	  ndf_blk_actual = 0;
 	  for(i = 0; i < captureconf->nport_alive; i++)
 	    {
 	      pthread_mutex_lock(&ndf_port_mutex[i]); 
-	      ndf_actual += ndf_port[i];
+	      ndf_blk_actual += ndf_port[i];
 	      ndf_port[i] = 0; 
 	      pthread_mutex_unlock(&ndf_port_mutex[i]);
 	    }
+	  ndf_actual += ndf_blk_actual;
 	  if(rbuf_nblk==1)
 	    {
 	      for(i = 0; i < captureconf->nport_alive; i++)
-		ndf_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
+		ndf_blk_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
 	    }
 	  else
-	    ndf_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
+	    ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
+	  ndf_expect += ndf_blk_expect;
 	  multilog(runtime_log, LOG_INFO, "%f\t%E\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
+
+	  fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", ndf_actual, ndf_expect);
 	  fprintf(stdout, "Relative difference of packet number at %f seconds is %E\n\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
+	  fprintf(stdout, "Relative difference of packet number of last ring buffer block is %E\n\n", fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
 
 	  sleep(sleep_sec);
 	  usleep(sleep_usec);

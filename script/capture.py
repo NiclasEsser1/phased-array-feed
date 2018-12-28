@@ -76,7 +76,8 @@ if __name__ == "__main__":
     ctrl_socket = "./capture.beam{:02d}part{:02d}.socket".format(beam, part)
     address_nchk = " ".join(address_nchks[beam][part])
     
-    com_line = "docker run --ipc=shareable --rm -it --net=host --cpuset-mems={:d} --cpuset-cpus={:s} -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 -e DISPLAY -v /tmp:/tmp --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(numa, "{:d}-{:d}".format(cpu0, cpu1), dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, hdr, bind, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    #com_line = "docker run --ipc=shareable --rm -it --net=host --cpuset-mems={:d} --cpuset-cpus={:s} -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 -e DISPLAY -v /tmp:/tmp --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(numa, "{:d}-{:d}".format(cpu0, cpu1), dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, hdr, bind, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
+    com_line = "docker run --ipc=shareable --rm -it --net=host --cpuset-mems={:d} -v {:s} -v {:s} -u {:d}:{:d} --cap-add=IPC_LOCK --ulimit memlock=-1:-1 -e DISPLAY -v /tmp:/tmp --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm --name {:s} xinpingdeng/{:s} \"./{:s} -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:f} -g {:s} -i {:s} -j {:s} -k {:d} -l {:d}\"".format(numa, dvolume, hvolume, uid, gid, container_name, dname, script_name, system_conf, pipeline_conf, hdr, bind, nchan, freq, address_nchk, ctrl_socket, instrument, beam, part)
     
     print com_line
     os.system(com_line)

@@ -207,6 +207,8 @@ void *capture(void *conf)
     }
   hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
   ndf_chk_delay[ithread] = (hdr.sec - captureconf->ref.sec)/captureconf->prd * captureconf->ndf_chk_prd + hdr.idf - captureconf->ref.idf; // We would not update the epoch during the operation, so ignore it.
+
+  fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr.sec, hdr.idf);
   
   while(!quit)
     {
@@ -218,8 +220,8 @@ void *capture(void *conf)
       
       if(acquire_ichk(hdr.freq, captureconf->nchan_chk, captureconf->ichk0, nchk, &ichk))
       	{	  
-      	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
-      	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", MCHK_CAPTURE,__FILE__, __LINE__);
+      	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
+      	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
       
 	  quit = 1;
       	  free(df);
@@ -297,6 +299,9 @@ int init_capture(conf_t *conf)
 {
   int i;
 
+  if(conf->cpt_ctrl)
+    sprintf(conf->cpt_ctrl_addr, "%s/capture.socket", conf->dir);  // The file will be in different directory for different beam;
+  
   conf->nchk       = 0;
   conf->nchk_alive = 0;
   
@@ -308,12 +313,15 @@ int init_capture(conf_t *conf)
       conf->nchk       += conf->nchk_alive_expect[i];
       conf->nchk_alive += conf->nchk_alive_actual[i];
     }
+  for(i = 0; i < conf->nport_dead; i++)
+    conf->nchk       += conf->nchk_dead[i];
   
+  if(conf->pad == 1)
+    conf->nchk = 48;
   conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->nchan        = conf->nchk * conf->nchan_chk;
-  conf->ichk0        = (int)((-0.5 - conf->cfreq)/conf->nchan_chk + conf->nchk/2);
-  //fprintf(stdout, "HERE\t%f\t%d\t%d\t%d\n", -0.5 - conf->cfreq, conf->nchan_chk, conf->nchk/2, conf->ichk0);
+  conf->ichk0        = (int)(-(0.5 + conf->cfreq)/conf->nchan_chk + conf->nchk/2);
   
   conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
   conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));

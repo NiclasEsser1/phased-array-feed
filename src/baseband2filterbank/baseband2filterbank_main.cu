@@ -24,7 +24,7 @@ void usage ()
 	   " -c  The number of data frame (per frequency chunk) of each incoming ring buffer block\n"
 	   " -d  How many times we need to repeat the process and finish one incoming block\n"
 	   " -e  The number of streams \n"
-	   " -f  The number of data stream (per frequency chunk) of each stream\n"
+	   " -f  The number of data frame (per frequency chunk) of each stream\n"
 	   " -g  The directory to put log file\n"
 	   " -h  show help\n");
 }
