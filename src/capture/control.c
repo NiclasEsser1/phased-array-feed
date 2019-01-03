@@ -202,9 +202,9 @@ void *buf_control(void *conf)
 		  for(i = 0; i < captureconf->nport_alive; i++)
 		    ntail = (tail[i] > ntail) ? tail[i] : ntail;
 		  
-#ifdef DEBUG
-		  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
-#endif
+//#ifdef DEBUG
+//		  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
+//#endif
 		  
 		  for(i = 0; i < ntail; i++)
 		    {
@@ -249,9 +249,12 @@ void *buf_control(void *conf)
 	  ndf_expect += ndf_blk_expect;
 	  multilog(runtime_log, LOG_INFO, "%f\t%E\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
 
-	  fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", ndf_actual, ndf_expect);
-	  fprintf(stdout, "Relative difference of packet number at %f seconds is %E\n\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
-	  fprintf(stdout, "Relative difference of packet number of last ring buffer block is %E\n\n", fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+	  fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+	  fflush(stdout);
+	  
+	  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", ndf_actual, ndf_expect);
+	  //fprintf(stdout, "Relative difference of packet number at %f seconds is %E\n\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
+	  //fprintf(stdout, "Relative difference of packet number of last ring buffer block is %E\n\n", fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
 
 	  sleep(sleep_sec);
 	  usleep(sleep_usec);
@@ -320,7 +323,7 @@ void *capture_control(void *conf)
 	  if(strstr(command_line, "END-OF-CAPTURE") != NULL)
 	    {	      
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
-	      fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
+	      //fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
 
 	      quit = 1;	      
 	      if(ipcbuf_is_writing(db))
@@ -333,26 +336,26 @@ void *capture_control(void *conf)
 	  if(strstr(command_line, "END-OF-DATA") != NULL)
 	    {
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
-	      fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
+	      //fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
 
 	      ipcbuf_enable_eod(db);
-	      fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
+	      //fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
 	    {
-	      fprintf(stdout, "IPCBUF_IS_WRITING, START-OF-DATA:\t%d\n", ipcbuf_is_writing(db));
-	      fprintf(stdout, "IPCBUF_IS_WRITER, START-OF-DATA:\t%d\n", ipcbuf_is_writer(db));
+	      //fprintf(stdout, "IPCBUF_IS_WRITING, START-OF-DATA:\t%d\n", ipcbuf_is_writing(db));
+	      //fprintf(stdout, "IPCBUF_IS_WRITER, START-OF-DATA:\t%d\n", ipcbuf_is_writer(db));
 	      
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
-	      fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
+	      //fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 
 	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
 	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_buf : ipcbuf_get_write_count(db); // To make sure the start buffer is valuable, to get the most recent buffer
-	      fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db));
+	      //fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db));
 
 	      multilog(runtime_log, LOG_INFO, "The data is enabled at %"PRIu64" buffer block.\n", start_buf);
-	      fprintf(stdout, "%"PRIu64"\n", start_buf);
+	      //fprintf(stdout, "%"PRIu64"\n", start_buf);
 
 	      ipcbuf_enable_sod(db, start_buf, 0);
 	      

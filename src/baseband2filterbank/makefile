@@ -25,8 +25,8 @@ SRC_DIR      = .
 OBJ_DIR      = .
 
 LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
-LIB_DIRS     = -L/usr/local/cuda/lib64 -L/home/pulsar/.local/lib
-INCLUDE_DIRS = -I/home/pulsar/.local/include
+LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib #-L/usr/local/cuda/lib64 -L/home/pulsar/.local/lib
+INCLUDE_DIRS = -I/usr/local/include #-I/home/pulsar/.local/include
 
 baseband2filterbank_main:cudautil.o kernel.o baseband2filterbank_main.o baseband2filterbank.o
 	$(NVCC) -o baseband2filterbank_main cudautil.o kernel.o baseband2filterbank_main.o baseband2filterbank.o $(LIB_DIRS) $(LIBS) 

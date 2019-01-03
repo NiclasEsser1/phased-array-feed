@@ -64,7 +64,8 @@ typedef struct conf_t
   double df_res;  // time resolution of each data frame, for start time determination;
   double blk_res; // time resolution of each buffer block, for start time determination;
 
-  int ichk0;
+  //int ichk0;
+  double ichk0;
   uint64_t rbufsz, tbufsz;
 
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
@@ -92,7 +93,7 @@ typedef struct hdr_t
 int init_capture(conf_t *conf);
 void *capture(void *conf);
 int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, double df_res, int64_t *idf_buf);
-int acquire_ichk(double freq, int nchan_chk, int ichk0, int nchk, int *ichk);
+int acquire_ichk(double freq, int nchan_chk, double ichk0, int nchk, int *ichk);
 int init_buf(conf_t *conf);
 int destroy_capture(conf_t conf);
 

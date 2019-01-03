@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 	}
     }
 
-  fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", conf.ref.epoch, conf.ref.sec, conf.ref.idf);
+  //fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", conf.ref.epoch, conf.ref.sec, conf.ref.idf);
 
   /* Setup log interface */
   char fname_log[MSTR_LEN];
@@ -178,7 +178,7 @@ int main(int argc, char **argv)
   /* Check the input */
   if((conf.cpt_ctrl == 0) && (source == 0))
     {
-      fprintf(stdout, "The target information will not be set.\n");
+      //fprintf(stdout, "The target information will not be set.\n");
       multilog(runtime_log, LOG_WARNING, "The target information will not be set, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
     }
 
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 	}
       if(i == conf.nport_alive)
 	{
-	  fprintf(stdout, "We can not bind all threads into one single CPU, has to abort!\n");
+	  //fprintf(stdout, "We can not bind all threads into one single CPU, has to abort!\n");
 	  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  return EXIT_FAILURE;
 	}
@@ -215,8 +215,6 @@ int main(int argc, char **argv)
   /* Do the job */
   threads(&conf);
 
-  fprintf(stdout, "HERE, ENF OF THREADS\n");
-  
   /* Destory capture */
   destroy_capture(conf);
   

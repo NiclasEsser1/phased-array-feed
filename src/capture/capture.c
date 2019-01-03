@@ -208,7 +208,7 @@ void *capture(void *conf)
   hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
   ndf_chk_delay[ithread] = (hdr.sec - captureconf->ref.sec)/captureconf->prd * captureconf->ndf_chk_prd + hdr.idf - captureconf->ref.idf; // We would not update the epoch during the operation, so ignore it.
 
-  fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr.sec, hdr.idf);
+  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr.sec, hdr.idf);
   
   while(!quit)
     {
@@ -321,7 +321,8 @@ int init_capture(conf_t *conf)
   conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->nchan        = conf->nchk * conf->nchan_chk;
-  conf->ichk0        = (int)(-(0.5 + conf->cfreq)/conf->nchan_chk + conf->nchk/2);
+  //conf->ichk0        = (int)(-(0.5 + conf->cfreq)/conf->nchan_chk + conf->nchk/2);
+  conf->ichk0        = -(conf->cfreq + 1.0)/conf->nchan_chk + 0.5 * conf->nchk;
   
   conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
   conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));
@@ -334,7 +335,7 @@ int init_capture(conf_t *conf)
   return EXIT_SUCCESS;
 }
 
-int acquire_ichk(double freq, int nchan_chk, int ichk0, int nchk, int *ichk)
+int acquire_ichk(double freq, int nchan_chk, double ichk0, int nchk, int *ichk)
 {
   *ichk = (int)(freq/nchan_chk + ichk0);
 

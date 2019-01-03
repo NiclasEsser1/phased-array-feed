@@ -26,8 +26,8 @@ SRC_DIR      = .
 OBJ_DIR      = .
 
 LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
-LIB_DIRS     = -L/usr/local/cuda/lib64 
-INCLUDE_DIRS = 
+LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
+INCLUDE_DIRS = -I/usr/local/include 
 
 baseband2baseband_main:cudautil.o kernel.o baseband2baseband_main.o baseband2baseband.o 
 	$(NVCC) -o baseband2baseband_main cudautil.o kernel.o baseband2baseband_main.o baseband2baseband.o $(LIB_DIRS) $(LIBS) 
