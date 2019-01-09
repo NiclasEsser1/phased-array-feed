@@ -26,7 +26,7 @@ int ithread_extern = 0;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
 uint64_t ndf_chk[MCHK_CAPTURE] = {0};
-uint64_t ndf_chk_delay[MCHK_CAPTURE] = {0};
+int64_t ndf_chk_delay[MCHK_CAPTURE] = {0};
 
 int transit[MPORT_CAPTURE] = {0};
 uint64_t tail[MPORT_CAPTURE] = {0};
@@ -180,6 +180,7 @@ void *capture(void *conf)
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(captureconf->port_alive[ithread]);
   sa.sin_addr.s_addr = inet_addr(captureconf->ip_alive[ithread]);
+  
   if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
     {
       multilog(runtime_log, LOG_ERR,  "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -206,30 +207,28 @@ void *capture(void *conf)
       return NULL;
     }
   hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-  ndf_chk_delay[ithread] = (hdr.sec - captureconf->ref.sec)/captureconf->prd * captureconf->ndf_chk_prd + hdr.idf - captureconf->ref.idf; // We would not update the epoch during the operation, so ignore it.
-
-  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", hdr.sec, hdr.idf);
+  
+  pthread_mutex_lock(&hdr_ref_mutex[ithread]);
+  acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);	
+  pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
+  ndf_chk_delay[ithread] = idf;
+  
+  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, hdr.idf, hdr_ref[ithread].idf, hdr.sec, hdr_ref[ithread].sec, idf, ndf_chk_delay[ithread]);
   
   while(!quit)
     {
-      hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-      
-      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);	
-      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-      
       if(acquire_ichk(hdr.freq, captureconf->nchan_chk, captureconf->ichk0, nchk, &ichk))
       	{	  
       	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
       	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
       
-	  quit = 1;
+      	  quit = 1;
       	  free(df);
       	  conf = (void *)captureconf;
       	  pthread_exit(NULL);
       	  return NULL;
       	}
-      
+            
       if(idf < 0) // Discard the data frame if it does not fit to current buffer, also means the reference is already updated;
 	transit[ithread] = 0;
       else
@@ -241,6 +240,7 @@ void *capture(void *conf)
 	      if(idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
 		continue;
 	      else   // Put data into temp buffer
+		//if(idf < (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
 		{
 		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
@@ -249,7 +249,7 @@ void *capture(void *conf)
 		  
 		  tbuf[tbuf_loc] = 'Y';
 		  memcpy(tbuf + tbuf_loc + 1, df + pktoff, required_pktsz);
-
+		  
 		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
 		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
@@ -263,27 +263,31 @@ void *capture(void *conf)
 	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
 	      cbuf_loc = (uint64_t)((idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
-	      //fprintf(stdout, "%f\n", hdr.freq);
-	      //if(ichk==2)
-	      //fprintf(stdout, "%d\n", ichk);
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
 	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 	    }
-	}      
-      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-	{
-	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-
-	  /* Force to quit if we have time out */
-	  quit = 1;	  
-	  free(df);
-	  conf = (void *)captureconf;
-	  pthread_exit(NULL);
-	  return NULL;
 	}
+
+      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+      	{
+      	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      
+      	  /* Force to quit if we have time out */
+      	  quit = 1;	  
+      	  free(df);
+      	  conf = (void *)captureconf;
+      	  pthread_exit(NULL);
+      	  return NULL;
+      	}
+      
+      hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets\
+      
+      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
+      acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);	
+      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
     }
     
   /* Exit */
@@ -321,7 +325,6 @@ int init_capture(conf_t *conf)
   conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->nchan        = conf->nchk * conf->nchan_chk;
-  //conf->ichk0        = (int)(-(0.5 + conf->cfreq)/conf->nchan_chk + conf->nchk/2);
   conf->ichk0        = -(conf->cfreq + 1.0)/conf->nchan_chk + 0.5 * conf->nchk;
   
   conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
@@ -344,7 +347,11 @@ int acquire_ichk(double freq, int nchan_chk, double ichk0, int nchk, int *ichk)
 
 int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, double df_res, int64_t *idf_buf)
 {
-  *idf_buf = (int64_t)(idf - idf_ref) + (int64_t)(sec - sec_ref) / df_res;
+
+  *idf_buf = (int64_t)(idf - idf_ref) + ((double)sec - (double)sec_ref) / df_res;
+  //if(((*idf_buf) >= 16384) || ((*idf_buf) < 0))
+  //multilog(runtime_log, LOG_INFO, "%"PRId64"", *idf_buf);
+      
   return EXIT_SUCCESS;
 }
 

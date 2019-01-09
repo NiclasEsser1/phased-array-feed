@@ -26,7 +26,7 @@ extern int quit;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
 extern uint64_t ndf_chk[MCHK_CAPTURE];
-extern uint64_t ndf_chk_delay[MCHK_CAPTURE];
+extern int64_t ndf_chk_delay[MCHK_CAPTURE];
 
 extern int transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
@@ -103,7 +103,7 @@ void *buf_control(void *conf)
      Stuck at the buffer get?
    */
   conf_t *captureconf = (conf_t *)conf;
-  int i, nchk = captureconf->nchk, transited;
+  int i, nchk = captureconf->nchk, transited = 0;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ichk, idf;
   ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
@@ -116,149 +116,144 @@ void *buf_control(void *conf)
 
   while(!quit)
     {
-      transited = transit[0];
-      for(i = 1; i < captureconf->nport_alive; i++) // When all ports are on the transit status
-	transited = transited && transit[i];
-	      
-      /* To see if we need to move to next buffer block or quit 
-	 If all ports have packet arrive after current ring buffer block, start to change the block 
+      /*
+	To see if we need to move to next buffer block or quit 
+	If all ports have packet arrive after current ring buffer block, start to change the block 
       */
-      if(transited)                   
+      while((!transited) && (!quit))
 	{
-	  rbuf_nblk = ipcbuf_get_write_count(db) + 1;
-	  
-	  /* Close current buffer */
-	  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
-	    {
-	      multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
-	      fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      
-	      quit = 1;
-	      pthread_exit(NULL);
-	      return NULL;
-	    }
-	  
-	  /*
-	    To see if the buffer is full, quit if yes.
-	    If we have a reader, there will be at least one buffer which is not full
-	   */
-	  if(ipcbuf_get_nfull(db) > (ipcbuf_get_nbufs(db) - 2)) 
-	    {	     
-	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
-	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
-	      
-	      quit = 1;
-	      pthread_exit(NULL);
-	      return NULL;
-	    }
-
-	  //fprintf(stdout, "Before buffer\n");
-	  /* Get new buffer block */
-	  if(!quit) // Just in case that we stick here.
-	    {
-	      cbuf = ipcbuf_get_next_write(db); 
-	      if(cbuf == NULL)
-		{
-		  multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
-		  fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  quit = 1;
-		  pthread_exit(NULL);
-		  return NULL; 
-		}
-	    }
-	  else
-	    {
-	      quit = 1;
-	      pthread_exit(NULL);
-	      return NULL; 
-	    }
-	  //fprintf(stdout, "After buffer\n");
-
-	  /* Update reference point */
-	  for(i = 0; i < captureconf->nport_alive; i++)
-	    {
-	      // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block or be dropped;
-	      // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
-	      
-	      pthread_mutex_lock(&hdr_ref_mutex[i]);
-	      hdr_ref[i].idf += captureconf->rbuf_ndf_chk;
-	      if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)       
-		{
-		  hdr_ref[i].sec += captureconf->prd;
-		  hdr_ref[i].idf -= captureconf->ndf_chk_prd;
-		}
-	      pthread_mutex_unlock(&hdr_ref_mutex[i]);
-	    }
-	  
-	  /* To see if we need to copy data from temp buffer into ring buffer */
-	  while(true)
-	    {
-	      transited = transit[0];
-	      for(i = 1; i < captureconf->nport_alive; i++) 
-		transited = transited && transit[i];
-	      if(!transited)  // When all ports are on new buffer block, do the copy;
-		{
-		  ntail = 0;
-		  for(i = 0; i < captureconf->nport_alive; i++)
-		    ntail = (tail[i] > ntail) ? tail[i] : ntail;
-		  
-//#ifdef DEBUG
-//		  fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
-//#endif
-		  
-		  for(i = 0; i < ntail; i++)
-		    {
-		      tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
-		      if(tbuf[tbuf_loc] == 'Y')
-			{		  
-			  cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
-			  
-			  //idf = (int)(i / nchk);
-			  //ichk = i - idf * nchk;
-			  //cbuf_loc = (uint64_t)(ichk * captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
-			  
-			  memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
-			  tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
-			  // If we do not do that, we may have too many data frames to copy later
-			}
-		    }
-		  for(i = 0; i < captureconf->nport_alive; i++)
-		    tail[i] = 0;  // Reset the location of tbuf;
-		  break;
-		}
-	    }
-	  
-	  /* Check the traffic of previous buffer cycle */
-	  ndf_blk_expect = 0;
-	  ndf_blk_actual = 0;
-	  for(i = 0; i < captureconf->nport_alive; i++)
-	    {
-	      pthread_mutex_lock(&ndf_port_mutex[i]); 
-	      ndf_blk_actual += ndf_port[i];
-	      ndf_port[i] = 0; 
-	      pthread_mutex_unlock(&ndf_port_mutex[i]);
-	    }
-	  ndf_actual += ndf_blk_actual;
-	  if(rbuf_nblk==1)
-	    {
-	      for(i = 0; i < captureconf->nport_alive; i++)
-		ndf_blk_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
-	    }
-	  else
-	    ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
-	  ndf_expect += ndf_blk_expect;
-	  multilog(runtime_log, LOG_INFO, "%f\t%E\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
-
-	  fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
-	  fflush(stdout);
-	  
-	  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", ndf_actual, ndf_expect);
-	  //fprintf(stdout, "Relative difference of packet number at %f seconds is %E\n\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect));
-	  //fprintf(stdout, "Relative difference of packet number of last ring buffer block is %E\n\n", fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
-
-	  sleep(sleep_sec);
-	  usleep(sleep_usec);
+	  transited = transit[0];
+	  for(i = 1; i < captureconf->nport_alive; i++) // When all ports are on the transit status
+	    //transited = transited && transit[i]; // all happen, take action
+	    transited = transited || transit[i]; // one happens, take action
 	}
+      if(quit)
+	{	  
+	  pthread_exit(NULL);
+	  return NULL;
+	}      
+      rbuf_nblk = ipcbuf_get_write_count(db) + 1;
+	  
+      /* Close current buffer */
+      if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
+	{
+	  multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
+	  fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  
+	  quit = 1;
+	  pthread_exit(NULL);
+	  return NULL;
+	}
+      
+      /*
+	To see if the buffer is full, quit if yes.
+	If we have a reader, there will be at least one buffer which is not full
+      */
+      if(ipcbuf_get_nfull(db) >= (ipcbuf_get_nbufs(db) - 1)) 
+	{	     
+	  multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
+	  fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
+	  
+	  quit = 1;
+	  pthread_exit(NULL);
+	  return NULL;
+	}
+      
+      /* Get new buffer block */
+      cbuf = ipcbuf_get_next_write(db); 
+      if(cbuf == NULL)
+	{
+	  multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
+	  fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+	  quit = 1;
+	  pthread_exit(NULL);
+	  return NULL; 
+	}
+      
+      /* Update reference point */
+      for(i = 0; i < captureconf->nport_alive; i++)
+	{
+	  // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block or be dropped;
+	  // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
+	  
+	  pthread_mutex_lock(&hdr_ref_mutex[i]);
+	  hdr_ref[i].idf += captureconf->rbuf_ndf_chk;
+	  if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)       
+	    {
+	      hdr_ref[i].sec += captureconf->prd;
+	      hdr_ref[i].idf -= captureconf->ndf_chk_prd;
+	    }
+	  pthread_mutex_unlock(&hdr_ref_mutex[i]);
+	}
+      
+      /* To see if we need to copy data from temp buffer into ring buffer */
+      while(transited && (!quit))
+	{
+	  transited = transit[0];
+	  for(i = 1; i < captureconf->nport_alive; i++)
+	    //transited = transited || transit[i]; // all happen, take action
+	    transited = transited && transit[i]; // one happens, take action
+	}      
+      if(quit)
+	{	  
+	  pthread_exit(NULL);
+	  return NULL;
+	}
+ 
+      ntail = 0;
+      for(i = 0; i < captureconf->nport_alive; i++)
+	ntail = (tail[i] > ntail) ? tail[i] : ntail;
+      
+#ifdef DEBUG
+      fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
+#endif
+      
+      for(i = 0; i < ntail; i++)
+	{
+	  tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
+	  if(tbuf[tbuf_loc] == 'Y')
+	    {		  
+	      cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
+	      
+	      //idf = (int)(i / nchk);
+	      //ichk = i - idf * nchk;
+	      //cbuf_loc = (uint64_t)(ichk * captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
+	      
+	      memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
+	      tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
+	      // If we do not do that, we may have too many data frames to copy later
+	    }
+	}
+      for(i = 0; i < captureconf->nport_alive; i++)
+	tail[i] = 0;  // Reset the location of tbuf;
+    	  
+      /* Check the traffic of previous buffer cycle */
+      ndf_blk_expect = 0;
+      ndf_blk_actual = 0;
+      for(i = 0; i < captureconf->nport_alive; i++)
+	{
+	  pthread_mutex_lock(&ndf_port_mutex[i]); 
+	  ndf_blk_actual += ndf_port[i];
+	  ndf_port[i] = 0; 
+	  pthread_mutex_unlock(&ndf_port_mutex[i]);
+	}
+      ndf_actual += ndf_blk_actual;
+      if(rbuf_nblk==1)
+	{
+	  for(i = 0; i < captureconf->nport_alive; i++)
+	    ndf_blk_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
+	}
+      else
+	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
+      ndf_expect += ndf_blk_expect;
+      multilog(runtime_log, LOG_INFO, "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      
+      fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      fflush(stdout);
+      
+      sleep(sleep_sec);
+      usleep(sleep_usec);
     }
   
   /* Exit */
@@ -266,6 +261,7 @@ void *buf_control(void *conf)
     {
       multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
       fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      quit = 1;
       
       pthread_exit(NULL);
       return NULL;
@@ -336,17 +332,12 @@ void *capture_control(void *conf)
 	  if(strstr(command_line, "END-OF-DATA") != NULL)
 	    {
 	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
-	      //fprintf(stdout, "Got END-OF-DATA signal, which happens at \"%s\", line [%d], has to enable eod.\n", __FILE__, __LINE__);
 
 	      ipcbuf_enable_eod(db);
-	      //fprintf(stdout, "IPCBUF_STATE:\t%d\n", db->state);
 	    }
 	  
 	  if(strstr(command_line, "START-OF-DATA") != NULL)
 	    {
-	      //fprintf(stdout, "IPCBUF_IS_WRITING, START-OF-DATA:\t%d\n", ipcbuf_is_writing(db));
-	      //fprintf(stdout, "IPCBUF_IS_WRITER, START-OF-DATA:\t%d\n", ipcbuf_is_writer(db));
-	      
 	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
 	      //fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 

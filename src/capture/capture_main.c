@@ -211,6 +211,7 @@ int main(int argc, char **argv)
       fclose(fp_log);
       return EXIT_FAILURE;
     }
+  //multilog(runtime_log, LOG_INFO, "INIT:\t%E\n", conf.df_res);
   
   /* Do the job */
   threads(&conf);
