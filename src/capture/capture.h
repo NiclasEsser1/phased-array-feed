@@ -47,7 +47,8 @@ typedef struct conf_t
   int nport_alive;
   int nchk_alive_expect[MPORT_CAPTURE];  // For each port;
   int nchk_alive_actual[MPORT_CAPTURE];  // For each port;
-
+  ipcbuf_t *db_data, *db_hdr;
+  
   char ip_dead[MPORT_CAPTURE][MSTR_LEN];
   int port_dead[MPORT_CAPTURE];
   int nport_dead;

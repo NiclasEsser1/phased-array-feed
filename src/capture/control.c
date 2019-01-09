@@ -106,7 +106,6 @@ void *buf_control(void *conf)
   int i, nchk = captureconf->nchk, transited = 0;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ichk, idf;
-  ipcbuf_t *db = (ipcbuf_t *)(captureconf->hdu->data_block);
   uint64_t rbuf_nblk = 0;
   uint64_t ndf_actual = 0, ndf_expect = 0;
   uint64_t ndf_blk_actual = 0, ndf_blk_expect = 0;
@@ -124,18 +123,18 @@ void *buf_control(void *conf)
 	{
 	  transited = transit[0];
 	  for(i = 1; i < captureconf->nport_alive; i++) // When all ports are on the transit status
-	    //transited = transited && transit[i]; // all happen, take action
-	    transited = transited || transit[i]; // one happens, take action
+	    transited = transited && transit[i]; // all happen, take action
+	  //transited = transited || transit[i]; // one happens, take action
 	}
       if(quit)
 	{	  
 	  pthread_exit(NULL);
 	  return NULL;
 	}      
-      rbuf_nblk = ipcbuf_get_write_count(db) + 1;
+      rbuf_nblk = ipcbuf_get_write_count(captureconf->db_data) + 1;
 	  
       /* Close current buffer */
-      if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
+      if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
 	{
 	  multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
 	  fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -149,7 +148,7 @@ void *buf_control(void *conf)
 	To see if the buffer is full, quit if yes.
 	If we have a reader, there will be at least one buffer which is not full
       */
-      if(ipcbuf_get_nfull(db) >= (ipcbuf_get_nbufs(db) - 1)) 
+      if(ipcbuf_get_nfull(captureconf->db_data) >= (ipcbuf_get_nbufs(captureconf->db_data) - 1)) 
 	{	     
 	  multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
 	  fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
@@ -160,7 +159,7 @@ void *buf_control(void *conf)
 	}
       
       /* Get new buffer block */
-      cbuf = ipcbuf_get_next_write(db); 
+      cbuf = ipcbuf_get_next_write(captureconf->db_data); 
       if(cbuf == NULL)
 	{
 	  multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
@@ -192,8 +191,8 @@ void *buf_control(void *conf)
 	{
 	  transited = transit[0];
 	  for(i = 1; i < captureconf->nport_alive; i++)
-	    //transited = transited || transit[i]; // all happen, take action
-	    transited = transited && transit[i]; // one happens, take action
+	    transited = transited || transit[i]; // all happen, take action
+	  //transited = transited && transit[i]; // one happens, take action
 	}      
       if(quit)
 	{	  
@@ -247,7 +246,7 @@ void *buf_control(void *conf)
       else
 	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
       ndf_expect += ndf_blk_expect;
-      multilog(runtime_log, LOG_INFO, "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      multilog(runtime_log, LOG_INFO, "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       
       fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       fflush(stdout);
@@ -257,7 +256,7 @@ void *buf_control(void *conf)
     }
   
   /* Exit */
-  if(ipcbuf_mark_filled(db, captureconf->rbufsz) < 0)
+  if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
     {
       multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
       fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -280,9 +279,9 @@ void *capture_control(void *conf)
   conf_t *captureconf = (conf_t *)conf;
   char command_line[MSTR_LEN], command[MSTR_LEN];
   uint64_t start_buf;
-  ipcbuf_t *db = (ipcbuf_t *)captureconf->hdu->data_block;
   double sec_offset; // Offset from the reference time;
   uint64_t picoseconds_offset; // The sec_offset fraction part in picoseconds
+  int msg_len = 0;
   
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
@@ -314,75 +313,96 @@ void *capture_control(void *conf)
 
   while(!quit)
     {
-      if(recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen) > 0)
+      while(!(msg_len > 0) && !quit)
+	msg_len = recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen);
+      if(quit)
+	{	  
+	  close(sock);
+	  pthread_exit(NULL);
+	  return NULL;
+	}
+      
+      if(strstr(command_line, "END-OF-CAPTURE") != NULL)
+	{	      
+	  multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
+	  //fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
+	  
+	  quit = 1;	      
+	  if(ipcbuf_is_writing(captureconf->db_data))
+	    ipcbuf_enable_eod(captureconf->db_data);
+	  
+	  close(sock);
+	  pthread_exit(NULL);
+	  return NULL;
+	}  
+      if(strstr(command_line, "END-OF-DATA") != NULL)
 	{
-	  if(strstr(command_line, "END-OF-CAPTURE") != NULL)
-	    {	      
-	      multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
-	      //fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
-
-	      quit = 1;	      
-	      if(ipcbuf_is_writing(db))
-		ipcbuf_enable_eod(db);
+	  multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
+	  
+	  ipcbuf_enable_eod(captureconf->db_data);
+	}
+	  
+      if(strstr(command_line, "START-OF-DATA") != NULL)
+	{
+	  multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
+	  //fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
+	  
+	  sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
+	  start_buf = (start_buf > ipcbuf_get_write_count(captureconf->db_data)) ? start_buf : ipcbuf_get_write_count(captureconf->db_data); // To make sure the start buffer is valuable, to get the most recent buffer
+	  //fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(captureconf->db_data));
+	  
+	  multilog(runtime_log, LOG_INFO, "The data is enabled at %"PRIu64" buffer block.\n", start_buf);
+	  //fprintf(stdout, "%"PRIu64"\n", start_buf);
+	  
+	  ipcbuf_enable_sod(captureconf->db_data, start_buf, 0);
+	  
+	  /* To get time stamp for current header */
+	  sec_offset = start_buf * captureconf->blk_res; // Only work with buffer number
+	  picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
+	  
+	  captureconf->picoseconds = picoseconds_offset +captureconf->ref.picoseconds;
+	  captureconf->sec_int = captureconf->ref.sec_int + floor(sec_offset);
+	  if(!(captureconf->picoseconds < 1E12))
+	    {
+	      captureconf->sec_int += 1;
+	      captureconf->picoseconds -= 1E12;
+	    }
+	  strftime (captureconf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&captureconf->sec_int)); // String start time without fraction second 
+	  captureconf->mjd_start = captureconf->sec_int / SECDAY + MJD1970;                         // Float MJD start time without fraction second
+	  for(i = 0; i < MSTR_LEN; i++)
+	    {
+	      if(captureconf->ra[i] == ' ')
+		captureconf->ra[i] = ':';
+	      if(captureconf->dec[i] == ' ')
+		captureconf->dec[i] = ':';
+	    }
+	  
+	  /*
+	    To see if the buffer is full, quit if yes.
+	    If we have a reader, there will be at least one buffer which is not full
+	  */
+	  if(ipcbuf_get_nfull(captureconf->db_hdr) >= (ipcbuf_get_nbufs(captureconf->db_hdr) - 1)) 
+	    {	     
+	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
+	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
 	      
+	      quit = 1;
+	      pthread_exit(NULL);
+	      return NULL;
+	    }
+	  
+	  /* setup dada header here */
+	  if(dada_header(*captureconf))
+	    {		  
+	      quit = 1;
 	      close(sock);
 	      pthread_exit(NULL);
 	      return NULL;
-	    }  
-	  if(strstr(command_line, "END-OF-DATA") != NULL)
-	    {
-	      multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
-
-	      ipcbuf_enable_eod(db);
-	    }
-	  
-	  if(strstr(command_line, "START-OF-DATA") != NULL)
-	    {
-	      multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
-	      //fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
-
-	      sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
-	      start_buf = (start_buf > ipcbuf_get_write_count(db)) ? start_buf : ipcbuf_get_write_count(db); // To make sure the start buffer is valuable, to get the most recent buffer
-	      //fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(db));
-
-	      multilog(runtime_log, LOG_INFO, "The data is enabled at %"PRIu64" buffer block.\n", start_buf);
-	      //fprintf(stdout, "%"PRIu64"\n", start_buf);
-
-	      ipcbuf_enable_sod(db, start_buf, 0);
-	      
-	      /* To get time stamp for current header */
-	      sec_offset = start_buf * captureconf->blk_res; // Only work with buffer number
-	      picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
-	      
-	      captureconf->picoseconds = picoseconds_offset +captureconf->ref.picoseconds;
-	      captureconf->sec_int = captureconf->ref.sec_int + floor(sec_offset);
-	      if(!(captureconf->picoseconds < 1E12))
-	      	{
-	      	  captureconf->sec_int += 1;
-	      	  captureconf->picoseconds -= 1E12;
-	      	}
-	      strftime (captureconf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&captureconf->sec_int)); // String start time without fraction second 
-	      captureconf->mjd_start = captureconf->sec_int / SECDAY + MJD1970;                         // Float MJD start time without fraction second
-	      for(i = 0; i < MSTR_LEN; i++)
-		{
-		  if(captureconf->ra[i] == ' ')
-		    captureconf->ra[i] = ':';
-		  if(captureconf->dec[i] == ' ')
-		    captureconf->dec[i] = ':';
-		}
-	      
-	      /* setup dada header here */
-	      if(dada_header(*captureconf))
-		{		  
-		  quit = 1;
-		  close(sock);
-		  pthread_exit(NULL);
-		  return NULL;
-		}
 	    }
 	}
     }
   
+  quit = 1;
   close(sock);
   pthread_exit(NULL);
   return NULL;

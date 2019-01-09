@@ -40,7 +40,6 @@ pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 int init_buf(conf_t *conf)
 {
   int i, nbufs;
-  ipcbuf_t *db = NULL;
 
   /* Create HDU and check the size of buffer bolck */
   conf->required_pktsz = conf->pktsz - conf->pktoff;
@@ -79,9 +78,10 @@ int init_buf(conf_t *conf)
       dada_hdu_disconnect(conf->hdu);
       return EXIT_FAILURE;
     }
+  conf->db_data = (ipcbuf_t *)(conf->hdu->data_block);
+  conf->db_hdr  = (ipcbuf_t *)(conf->hdu->header_block);
   
-  db = (ipcbuf_t *)conf->hdu->data_block;
-  if(conf->rbufsz != ipcbuf_get_bufsz(db))  // Check the buffer size
+  if(conf->rbufsz != ipcbuf_get_bufsz(conf->db_data))  // Check the buffer size
     {
       multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -99,7 +99,7 @@ int init_buf(conf_t *conf)
 
   if(conf->cpt_ctrl)
     {
-      if(ipcbuf_disable_sod(db) < 0)
+      if(ipcbuf_disable_sod(conf->db_data) < 0)
 	{
 	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -136,7 +136,7 @@ int init_buf(conf_t *conf)
   /* Get the buffer block ready */
   uint64_t block_id = 0;
   uint64_t write_blkid;
-  cbuf = ipcbuf_get_next_write((ipcbuf_t*)conf->hdu->data_block);
+  cbuf = ipcbuf_get_next_write(conf->db_data);
   if(cbuf == NULL)
     {	     
       multilog(runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -214,6 +214,7 @@ void *capture(void *conf)
   ndf_chk_delay[ithread] = idf;
   
   multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, hdr.idf, hdr_ref[ithread].idf, hdr.sec, hdr_ref[ithread].sec, idf, ndf_chk_delay[ithread]);
+  //quit = 1;
   
   while(!quit)
     {
@@ -230,18 +231,22 @@ void *capture(void *conf)
       	}
             
       if(idf < 0) // Discard the data frame if it does not fit to current buffer, also means the reference is already updated;
-	transit[ithread] = 0;
+	{
+	  //multilog(runtime_log, LOG_INFO,  "%"PRId64"\n", idf);
+	  transit[ithread] = 0;
+	}
       else
       	{
 	  if(idf >= captureconf->rbuf_ndf_chk) // Start the buffer block change
 	    {
 	      transit[ithread] = 1; // The reference should be updated very soon
+	      //multilog(runtime_log, LOG_INFO,  "%"PRId64"\n", idf);
 	      
-	      if(idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
-		continue;
-	      else   // Put data into temp buffer
-		//if(idf < (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
-		{
+	      //if(idf >= (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
+		  //continue;
+	      //else   // Put data into temp buffer
+	      if(idf < (captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk)) // Discard the packet which does not fit to temp buffer
+		{ 
 		  tail[ithread] = (uint64_t)((idf - captureconf->rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
 		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
 		  
@@ -291,6 +296,7 @@ void *capture(void *conf)
     }
     
   /* Exit */
+  quit = 1;
   free(df);
   conf = (void *)captureconf;
   close(sock);
@@ -378,7 +384,7 @@ int dada_header(conf_t conf)
   char *hdrbuf = NULL;
   
   /* Register header */
-  hdrbuf = ipcbuf_get_next_write(conf.hdu->header_block);
+  hdrbuf = ipcbuf_get_next_write(conf.db_hdr);
   if(!hdrbuf)
     {
       multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -472,7 +478,7 @@ int dada_header(conf_t conf)
       return EXIT_FAILURE;
     }
   /* donot set header parameters anymore - acqn. doesn't start */
-  if(ipcbuf_mark_filled(conf.hdu->header_block, DADA_HDRSZ) < 0)
+  if(ipcbuf_mark_filled(conf.db_hdr, DADA_HDRSZ) < 0)
     {
       multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
