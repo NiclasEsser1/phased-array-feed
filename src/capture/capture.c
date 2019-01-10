@@ -44,9 +44,9 @@ int init_buf(conf_t *conf)
   int i, nbufs;
 
   /* Create HDU and check the size of buffer bolck */
-  conf->required_pktsz = conf->pktsz - conf->pktoff;
+  conf->required_dfsz = conf->dfsz - conf->dfoff;
   
-  conf->rbufsz = conf->nchk * conf->required_pktsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
+  conf->rbufsz = conf->nchk * conf->required_dfsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
   conf->hdu = dada_hdu_create(runtime_log);
   dada_hdu_set_key(conf->hdu, conf->key);
   if(dada_hdu_connect(conf->hdu) < 0)
@@ -132,7 +132,7 @@ int init_buf(conf_t *conf)
       strftime (conf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&conf->sec_int)); // String start time without fraction second 
       dada_header(*conf);
     }
-  conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
+  conf->tbufsz = (conf->required_dfsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
   tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
   
   /* Get the buffer block ready */
@@ -156,8 +156,8 @@ void *capture(void *conf)
   int sock, ithread, ichk; 
   struct sockaddr_in sa, fromsa;
   socklen_t fromlen;// = sizeof(fromsa);
-  int64_t buf_idf;
-  uint64_t pkt_idf, pkt_sec;
+  int64_t idf_blk;
+  uint64_t idf_prd, df_sec;
   double freq;
   int epoch;
   uint64_t tbuf_loc, cbuf_loc;
@@ -168,13 +168,13 @@ void *capture(void *conf)
   struct timespec start, now;
   uint64_t writebuf, *ptr = NULL;
 
-  register int pktsz = captureconf->pktsz;
-  register int pktoff = captureconf->pktoff;
-  register int required_pktsz = captureconf->required_pktsz;
+  register int dfsz = captureconf->dfsz;
+  register int dfoff = captureconf->dfoff;
+  register int required_dfsz = captureconf->required_dfsz;
   register uint64_t rbuf_ndf_chk = captureconf->rbuf_ndf_chk;
   register uint64_t rbuf_tbuf_ndf_chk = captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk;
   
-  df = (char *)malloc(sizeof(char) * pktsz);
+  df = (char *)malloc(sizeof(char) * dfsz);
   
   /* Get right socker for current thread */
   pthread_mutex_lock(&ithread_mutex);
@@ -202,7 +202,7 @@ void *capture(void *conf)
       return NULL;
     }
 
-  if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+  if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
     {
       multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
       fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -218,33 +218,33 @@ void *capture(void *conf)
   /* Get header information, which will be used to get the location of packets */
   ptr = (uint64_t*)df;
   writebuf = bswap_64(*ptr);
-  pkt_idf = writebuf & 0x00000000ffffffff;
-  pkt_sec = (writebuf & 0x3fffffff00000000) >> 32;
+  idf_prd = writebuf & 0x00000000ffffffff;
+  df_sec = (writebuf & 0x3fffffff00000000) >> 32;
   writebuf = bswap_64(*(ptr + 2));
   freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
   
   pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-  buf_idf = (int64_t)(pkt_idf - hdr_ref[ithread].idf) + ((double)pkt_sec - (double)hdr_ref[ithread].sec) / df_res;
+  idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
   pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-  ndf_chk_delay[ithread] = buf_idf;
+  ndf_chk_delay[ithread] = idf_blk;
 
   ichk = (int)(freq/nchan_chk + ichk0);
   
-  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, pkt_idf, hdr_ref[ithread].idf, pkt_sec, hdr_ref[ithread].sec, pkt_idf, ndf_chk_delay[ithread]);
+  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
 
   clock_gettime(CLOCK_REALTIME, &start);
   while(!quit)
     {
-      if(buf_idf>=0)
+      if(idf_blk>=0)
 	{
-	  if(buf_idf < rbuf_ndf_chk)  // Put data into current ring buffer block
+	  if(idf_blk < rbuf_ndf_chk)  // Put data into current ring buffer block
 	    {
 	      transit[ithread] = 0; // The reference is already updated.
 	      
 	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
-	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
-	      cbuf_loc = (uint64_t)((buf_idf * nchk + ichk) * required_pktsz); // This is in TFTFP order
-	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
+	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
+	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
+	      memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
@@ -253,15 +253,15 @@ void *capture(void *conf)
 	  else
 	    {
 	      transit[ithread] = 1; // The reference should be updated very soon
-	      if(buf_idf < rbuf_tbuf_ndf_chk)
+	      if(idf_blk < rbuf_tbuf_ndf_chk)
 		{		  
-		  tail[ithread] = (uint64_t)((buf_idf - rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
-		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_pktsz + 1));
+		  tail[ithread] = (uint64_t)((idf_blk - rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
+		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_dfsz + 1));
 		  
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
 		  tbuf[tbuf_loc] = 'Y';
-		  memcpy(tbuf + tbuf_loc + 1, df + pktoff, required_pktsz);
+		  memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
 		  
 		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
@@ -277,7 +277,7 @@ void *capture(void *conf)
       elapsed_time += (now.tv_sec - start.tv_sec) + (now.tv_nsec - start.tv_nsec)/1.0E9L;
       start        = now;
       
-      if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+      if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
       	{
       	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
       	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -295,13 +295,13 @@ void *capture(void *conf)
       /* Get header information from bmf packet */    
       ptr = (uint64_t*)df;
       writebuf = bswap_64(*ptr);
-      pkt_idf = writebuf & 0x00000000ffffffff;
-      pkt_sec = (writebuf & 0x3fffffff00000000) >> 32;
+      idf_prd = writebuf & 0x00000000ffffffff;
+      df_sec = (writebuf & 0x3fffffff00000000) >> 32;
       writebuf = bswap_64(*(ptr + 2));
       freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
   
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      buf_idf = (int64_t)(pkt_idf - hdr_ref[ithread].idf) + ((double)pkt_sec - (double)hdr_ref[ithread].sec) / df_res;
+      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
 
       ichk = (int)(freq/nchan_chk + ichk0);
@@ -323,7 +323,7 @@ int init_capture(conf_t *conf)
 
   if(conf->cpt_ctrl)
     sprintf(conf->cpt_ctrl_addr, "%s/capture.socket", conf->dir);  // The file will be in different directory for different beam;
-  
+
   conf->nchk       = 0;
   conf->nchk_alive = 0;
   

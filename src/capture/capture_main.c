@@ -77,11 +77,11 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'b':	  	  
-	  sscanf(optarg, "%d", &conf.pktsz);
+	  sscanf(optarg, "%d", &conf.dfsz);
 	  break;
 
 	case 'c':	  	  
-	  sscanf(optarg, "%d", &conf.pktoff);
+	  sscanf(optarg, "%d", &conf.dfoff);
 	  break;
 
 	case 'd':

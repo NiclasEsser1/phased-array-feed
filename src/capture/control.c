@@ -133,7 +133,30 @@ void *buf_control(void *conf)
 	  return NULL;
 	}
       
+      /* Check the traffic of previous buffer cycle */
       rbuf_nblk = ipcbuf_get_write_count(captureconf->db_data) + 1;
+      ndf_blk_expect = 0;
+      ndf_blk_actual = 0;
+      for(i = 0; i < captureconf->nport_alive; i++)
+	{
+	  pthread_mutex_lock(&ndf_port_mutex[i]); 
+	  ndf_blk_actual += ndf_port[i];
+	  ndf_port[i] = 0; 
+	  pthread_mutex_unlock(&ndf_port_mutex[i]);
+	}
+      ndf_actual += ndf_blk_actual;
+      if(rbuf_nblk==1)
+	{
+	  for(i = 0; i < captureconf->nport_alive; i++)
+	    ndf_blk_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
+	}
+      else
+	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
+      ndf_expect += ndf_blk_expect;
+      multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
+      
+      fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      fflush(stdout);
 	  
       /* Close current buffer */
       if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
@@ -212,48 +235,22 @@ void *buf_control(void *conf)
       
       for(i = 0; i < ntail; i++)
 	{
-	  tbuf_loc = (uint64_t)(i * (captureconf->required_pktsz + 1));	      
+	  tbuf_loc = (uint64_t)(i * (captureconf->required_dfsz + 1));	      
 	  if(tbuf[tbuf_loc] == 'Y')
 	    {		  
-	      cbuf_loc = (uint64_t)(i * captureconf->required_pktsz);  // This is for the TFTFP order temp buffer copy;
+	      cbuf_loc = (uint64_t)(i * captureconf->required_dfsz);  // This is for the TFTFP order temp buffer copy;
 	      
 	      //idf = (int)(i / nchk);
 	      //ichk = i - idf * nchk;
-	      //cbuf_loc = (uint64_t)(ichk * captureconf->rbuf_ndf_chk + idf) * captureconf->required_pktsz;  // This is for the FTFP order temp buffer copy;		
+	      //cbuf_loc = (uint64_t)(ichk * captureconf->rbuf_ndf_chk + idf) * captureconf->required_dfsz;  // This is for the FTFP order temp buffer copy;		
 	      
-	      memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_pktsz);		  
+	      memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, captureconf->required_dfsz);		  
 	      tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
 	      // If we do not do that, we may have too many data frames to copy later
 	    }
 	}
       for(i = 0; i < captureconf->nport_alive; i++)
 	tail[i] = 0;  // Reset the location of tbuf;
-    	  
-      /* Check the traffic of previous buffer cycle */
-      ndf_blk_expect = 0;
-      ndf_blk_actual = 0;
-      for(i = 0; i < captureconf->nport_alive; i++)
-	{
-	  pthread_mutex_lock(&ndf_port_mutex[i]); 
-	  ndf_blk_actual += ndf_port[i];
-	  ndf_port[i] = 0; 
-	  pthread_mutex_unlock(&ndf_port_mutex[i]);
-	}
-      ndf_actual += ndf_blk_actual;
-      if(rbuf_nblk==1)
-	{
-	  for(i = 0; i < captureconf->nport_alive; i++)
-	    ndf_blk_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
-	}
-      else
-	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
-      ndf_expect += ndf_blk_expect;
-      multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
-      //elapsed_time = 0.0;
-      //multilog(runtime_log, LOG_INFO, "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
-      
-      fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
-      fflush(stdout);
       
       sleep(sleep_sec);
       usleep(sleep_usec);
@@ -285,8 +282,24 @@ void *capture_control(void *conf)
   uint64_t start_buf;
   double sec_offset; // Offset from the reference time;
   uint64_t picoseconds_offset; // The sec_offset fraction part in picoseconds
-  int msg_len = 0;
+  int msg_len;
   
+  ///* Create an unix socket for control */
+  //if((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf (stderr, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    
+  //    quit = 1;
+  //    pthread_exit(NULL);
+  //    return NULL;
+  //  }
+  //
+  //setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));
+  //memset(&sa, 0, sizeof(struct sockaddr_un));
+  //sa.sun_family = AF_UNIX;
+  //strncpy(&sa.sun_path[1], captureconf->cpt_ctrl_addr, strlen(captureconf->cpt_ctrl_addr));
+
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
@@ -301,7 +314,9 @@ void *capture_control(void *conf)
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
-  snprintf(sa.sun_path, UNIX_PATH_MAX, "%s", captureconf->cpt_ctrl_addr);
+  strncpy(sa.sun_path, captureconf->cpt_ctrl_addr, strlen(captureconf->cpt_ctrl_addr));
+  
+  multilog(runtime_log, LOG_INFO, "%s\n", captureconf->cpt_ctrl_addr);
   unlink(captureconf->cpt_ctrl_addr);
   
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
@@ -317,8 +332,9 @@ void *capture_control(void *conf)
 
   while(!quit)
     {
+      msg_len = 0;
       while(!(msg_len > 0) && !quit)
-	msg_len = recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen);
+	msg_len = recvfrom(sock, (void *)command_line, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen);      
       if(quit)
 	{	  
 	  close(sock);
@@ -329,7 +345,6 @@ void *capture_control(void *conf)
       if(strstr(command_line, "END-OF-CAPTURE") != NULL)
 	{	      
 	  multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
-	  //fprintf(stdout, "Got END-OF-CAPTURE signal, which happens at \"%s\", line [%d], has to quit.\n", __FILE__, __LINE__);
 	  
 	  quit = 1;	      
 	  if(ipcbuf_is_writing(captureconf->db_data))
@@ -349,15 +364,12 @@ void *capture_control(void *conf)
       if(strstr(command_line, "START-OF-DATA") != NULL)
 	{
 	  multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
-	  //fprintf(stdout, "Got START-OF-DATA signal, which happens at \"%s\", line [%d], has to enable sod.\n", __FILE__, __LINE__);
 	  
 	  sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
 	  start_buf = (start_buf > ipcbuf_get_write_count(captureconf->db_data)) ? start_buf : ipcbuf_get_write_count(captureconf->db_data); // To make sure the start buffer is valuable, to get the most recent buffer
-	  //fprintf(stdout, "NUMBER OF BUF\t%"PRIu64"\n", ipcbuf_get_write_count(captureconf->db_data));
 	  
 	  multilog(runtime_log, LOG_INFO, "The data is enabled at %"PRIu64" buffer block.\n", start_buf);
-	  //fprintf(stdout, "%"PRIu64"\n", start_buf);
-	  
+	  	  
 	  ipcbuf_enable_sod(captureconf->db_data, start_buf, 0);
 	  
 	  /* To get time stamp for current header */
