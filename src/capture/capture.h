@@ -20,7 +20,7 @@
 
 typedef struct ref_t
 {  
-  uint64_t sec, idf; // Reference seconds and idf, from BMF when we start the capture 
+  uint64_t sec, idf_prd; // Reference seconds and idf, from BMF when we start the capture 
   int epoch;
   time_t sec_int;
   uint64_t picoseconds;
@@ -83,11 +83,9 @@ typedef struct conf_t
 
 typedef struct hdr_t
 {
-  int      valid;   // 0 the data frame is not valied, 1 the data frame is valied;
-  uint64_t idf;     // data frame number in one period;
+  uint64_t idf_prd;     // data frame number in one period;
   uint64_t sec;     // Secs from reference epochch at start of period;
   int      epoch;   // Number of half a year from 1st of January, 2000 for the reference epochch;
-  int      beam;    // The id of beam, counting from 0;
   double   freq;    // Frequency of the first chunnal in each block (integer MHz);
 }hdr_t;
 

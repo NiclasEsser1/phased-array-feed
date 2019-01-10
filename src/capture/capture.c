@@ -41,7 +41,7 @@ pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 
 int init_buf(conf_t *conf)
 {
-  int i, nbufs;
+  int i;
 
   /* Create HDU and check the size of buffer bolck */
   conf->required_dfsz = conf->dfsz - conf->dfoff;
@@ -224,13 +224,13 @@ void *capture(void *conf)
   freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
   
   pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-  idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
+  idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
   pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
   ndf_chk_delay[ithread] = idf_blk;
 
   ichk = (int)(freq/nchan_chk + ichk0);
   
-  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
+  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
 
   clock_gettime(CLOCK_REALTIME, &start);
   while(!quit)
@@ -301,7 +301,7 @@ void *capture(void *conf)
       freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
   
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
+      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
 
       ichk = (int)(freq/nchan_chk + ichk0);
@@ -331,7 +331,7 @@ int init_capture(conf_t *conf)
   for(i = 0; i < conf->nport_alive; i++)
     {
       hdr_ref[i].sec = conf->ref.sec;
-      hdr_ref[i].idf = conf->ref.idf;
+      hdr_ref[i].idf_prd = conf->ref.idf_prd;
       conf->nchk       += conf->nchk_alive_expect[i];
       conf->nchk_alive += conf->nchk_alive_actual[i];
     }
@@ -345,8 +345,8 @@ int init_capture(conf_t *conf)
   conf->nchan        = conf->nchk * conf->nchan_chk;
   conf->ichk0        = -(conf->cfreq + 1.0)/conf->nchan_chk + 0.5 * conf->nchk;
   
-  conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf) + conf->ref.sec + SECDAY * conf->ref.epoch;
-  conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf)));
+  conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf_prd) + conf->ref.sec + SECDAY * conf->ref.epoch;
+  conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf_prd)));
 
   conf->tout.tv_sec     = conf->prd;
   conf->tout.tv_usec    = 0;

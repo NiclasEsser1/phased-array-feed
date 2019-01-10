@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'i':
-	  sscanf(optarg, "%d:%"SCNu64":%"SCNu64"", &conf.ref.epoch, &conf.ref.sec, &conf.ref.idf);
+	  sscanf(optarg, "%d:%"SCNu64":%"SCNu64"", &conf.ref.epoch, &conf.ref.sec, &conf.ref.idf_prd);
 	  break;
 	  
 	case 'j':

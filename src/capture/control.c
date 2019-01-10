@@ -202,11 +202,11 @@ void *buf_control(void *conf)
 	  // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
 	  
 	  pthread_mutex_lock(&hdr_ref_mutex[i]);
-	  hdr_ref[i].idf += captureconf->rbuf_ndf_chk;
-	  if(hdr_ref[i].idf >= captureconf->ndf_chk_prd)       
+	  hdr_ref[i].idf_prd += captureconf->rbuf_ndf_chk;
+	  if(hdr_ref[i].idf_prd >= captureconf->ndf_chk_prd)       
 	    {
 	      hdr_ref[i].sec += captureconf->prd;
-	      hdr_ref[i].idf -= captureconf->ndf_chk_prd;
+	      hdr_ref[i].idf_prd -= captureconf->ndf_chk_prd;
 	    }
 	  pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	}
