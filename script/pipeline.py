@@ -14,6 +14,8 @@ import struct
 from subprocess import check_output, PIPE, Popen
 import time
 import shlex
+import parser
+import argparse
 
 # http://on-demand.gputechconf.com/gtc/2015/presentation/S5584-Priyanka-Sah.pdf
 # To do,
@@ -39,6 +41,9 @@ MEMCHECK       = False
 
 #FILE           = True
 FILE           = False
+
+BASEBAND2FILTERBANK = False
+#BASEBAND2FILTERBANK = True
 
 #MULTI          = False
 MULTI          = True
@@ -89,7 +94,7 @@ SEARCH_CONF = {#"nchan_baseband":          336,
                #"rbuf_baseband_ndf_chk": 10240,
                #"rbuf_baseband_nblk":    6,
                "rbuf_baseband_ndf_chk": 16384,
-               "rbuf_baseband_nblk":    2,
+               "rbuf_baseband_nblk":    4,
                "rbuf_baseband_nread":   1,
                
                "rbuf_filterbank_key":       ["dade", "dadg"],
@@ -224,7 +229,7 @@ class Pipeline(object):
             self.state = "error"
             raise PipelineError("Can only run stream_status with ready, starting and running state")
            
-    def acquire_beamid(self, ip, port):
+    def acquire_beamid(self, ip, port, ndf_check_chk):
         """
         To get the beam ID 
         """
@@ -236,19 +241,23 @@ class Pipeline(object):
         socket.setdefaulttimeout(prd)  # Force to timeout after one data frame period
         server_address = (ip, port)
         sock.bind(server_address)
-        
-        try:
-            nbyte, address = sock.recvfrom_into(data, df_pktsz)          
-            data_uint64 = np.fromstring(str(data), 'uint64')
-            hdr_uint64  = np.uint64(struct.unpack("<Q", struct.pack(">Q", data_uint64[2]))[0])
-            beamid      = hdr_uint64 & np.uint64(0x000000000000ffff)
-            sock.close()
-            
-            return beamid
-        except:
-            sock.close()
-            self.state = "error"
+        beamid = []
+        for i in range(ndf_check_chk):
+            try:
+                nbyte, address = sock.recvfrom_into(data, df_pktsz)          
+                data_uint64 = np.fromstring(str(data), 'uint64')
+                hdr_uint64  = np.uint64(struct.unpack("<Q", struct.pack(">Q", data_uint64[2]))[0])
+                beamid.append(hdr_uint64 & np.uint64(0x000000000000ffff))
+            except:
+                sock.close()
+                self.state = "error"
+        sock.close()
 
+        if len(set(beamid))>1:
+            raise PipelineError("Different beams mixed, please check the routing table")
+        
+        return beamid[0]
+    
     def filename_lineno(self):
         """Returns the current file name and line number in our program."""
         cf        = currentframe()
@@ -299,37 +308,6 @@ class Pipeline(object):
         except:
             pass # We only kill running process
         
-    #def connections(self, destination, ndf_check_chk):
-    #    """
-    #    To check the connection of one beam with given ip and port numbers
-    #    """
-    #    nport = len(destination)
-    #    alive = np.zeros(nport, dtype = int)
-    #    nchk_alive = np.zeros(nport, dtype = int)
-    #    
-    #    for i in range(nport):
-    #        ip   = destination[i].split(":")[0]
-    #        port = int(destination[i].split(":")[1])
-    #        alive[i], nchk_alive[i] = self.connection(
-    #            ip, port, ndf_check_chk)
-    #    destination_alive = []   # The destination where we can receive data
-    #    destination_dead   = []   # The destination where we can not receive data
-    #    for i in range(nport):
-    #        ip = destination[i].split(":")[0]
-    #        port = destination[i].split(":")[1]
-    #        nchk_expect = destination[i].split(":")[2]
-    #        nchk_actual = nchk_alive[i]
-    #        if alive[i] == 1:
-    #            destination_alive.append("{}:{}:{}:{}".format(
-    #                ip, port, nchk_expect, nchk_actual))                                                                       
-    #        else:
-    #            destination_dead.append("{}:{}:{}".format(
-    #                ip, port, nchk_expect))
-    #    if (len(destination_alive) == 0): # No alive ports, error
-    #        self.state = "error"
-    #        
-    #    return destination_alive, destination_dead
-    #
     def connections(self, destination, ndf_check_chk):
         """
         To check the connection of one beam with given ip and port numbers
@@ -409,10 +387,10 @@ class Pipeline(object):
                 
         return int(epoch[0].unix/86400.0), sec, idf
     
-    def create_rbuf(self, key, blksz, 
+    def create_rbuf(self, cpu, key, blksz, 
                     nblk, nreader):
-        cmd = "dada_db -l -p -k {:} -b {:} \
-        -n {:} -r {:}".format(key, blksz, nblk, nreader)
+        cmd = "taskset -c {} dada_db -l -p -k {:} -b {:} \
+        -n {:} -r {:}".format(cpu, key, blksz, nblk, nreader)
         print cmd
         
         if EXECUTE:
@@ -572,6 +550,7 @@ class Pipeline(object):
         time.sleep(10)
         if EXECUTE:            
             try:
+                print socket_addr
                 ctrl_socket.sendto(command, socket_addr)
             except:
                 self.state = "error"
@@ -625,14 +604,16 @@ class SearchWithFile(Pipeline):
 
         # Create ring buffers
         threads = []
+        self.ncpu_numa     = SYSTEM_CONF["ncpu_numa"]
         for i in range(self.nprocess):
+            self.dadadb_cpu              = self.numa*ncpu_numa + i*self.ncpu_pipeline + 3
             threads.append(threading.Thread(target = self.create_rbuf,
-                                            args = (self.pipeline_conf["rbuf_baseband_key"][i],
+                                            args = (self,dadadb_cpu, self.pipeline_conf["rbuf_baseband_key"][i],
                                                     self.rbuf_baseband_blksz,
                                                     self.pipeline_conf["rbuf_baseband_nblk"],
                                                     self.pipeline_conf["rbuf_baseband_nread"], )))
             threads.append(threading.Thread(target = self.create_rbuf,
-                                            args = (self.pipeline_conf["rbuf_filterbank_key"][i],
+                                            args = (self.dadadb_cpu, self.pipeline_conf["rbuf_filterbank_key"][i],
                                                     self.rbuf_filterbank_blksz,
                                                     self.pipeline_conf["rbuf_filterbank_nblk"],
                                                     self.pipeline_conf["rbuf_filterbank_nread"], )))
@@ -650,24 +631,24 @@ class SearchWithFile(Pipeline):
         
         self.state = "starting"
         # Start diskdb, baseband2filterbank and heimdall software
-        ncpu_numa     = SYSTEM_CONF["ncpu_numa"]
         threads = []
         for i in range(self.nprocess):
-            self.diskdb_cpu              = self.numa*ncpu_numa + i*self.ncpu_pipeline
-            self.baseband2filterbank_cpu = self.numa*ncpu_numa + i*self.ncpu_pipeline + 1
-            self.heimdall_cpu            = self.numa*ncpu_numa + i*self.ncpu_pipeline + 2
-            self.dbdisk_cpu              = self.numa*ncpu_numa + i*self.ncpu_pipeline + 3
+            self.diskdb_cpu              = self.numa*self.ncpu_numa + i*self.ncpu_pipeline
+            self.baseband2filterbank_cpu = self.numa*self.ncpu_numa + i*self.ncpu_pipeline + 1
+            self.heimdall_cpu            = self.numa*self.ncpu_numa + i*self.ncpu_pipeline + 2
+            self.dbdisk_cpu              = self.numa*self.ncpu_numa + i*self.ncpu_pipeline + 3
             threads.append(threading.Thread(target = self.diskdb,
                                             args = (self.diskdb_cpu,
                                                     self.pipeline_conf["rbuf_baseband_key"][i],
                                                     self.fname, self.pipeline_conf["seek_byte"], )))
-            threads.append(threading.Thread(target = self.baseband2filterbank,
-                                            args = (self.baseband2filterbank_cpu,
-                                                    self.pipeline_conf["rbuf_baseband_key"][i],
-                                                    self.pipeline_conf["rbuf_filterbank_key"][i],
-                                                    self.pipeline_conf["rbuf_baseband_ndf_chk"],
-                                                    self.nrepeat, self.pipeline_conf["nstream"],
-                                                    self.pipeline_conf["ndf_stream"], self.runtime_dir[i], )))
+            if BASEBAND2FILTERBANK:
+                threads.append(threading.Thread(target = self.baseband2filterbank,
+                                                args = (self.baseband2filterbank_cpu,
+                                                        self.pipeline_conf["rbuf_baseband_key"][i],
+                                                        self.pipeline_conf["rbuf_filterbank_key"][i],
+                                                        self.pipeline_conf["rbuf_baseband_ndf_chk"],
+                                                        self.nrepeat, self.pipeline_conf["nstream"],
+                                                        self.pipeline_conf["ndf_stream"], self.runtime_dir[i], )))
             if HEIMDALL:
                 threads.append(threading.Thread(target = self.heimdall,
                                                 args = (self.heimdall_cpu,
@@ -829,14 +810,18 @@ class SearchWithStream(Pipeline):
 
         # Create ring buffers
         threads = []
+        self.ncpu_numa     = SYSTEM_CONF["ncpu_numa"]
         for i in range(self.nprocess):
+            self.dadadb_cpu              = self.numa*self.ncpu_numa +\
+                                           (i + 1)*self.ncpu_pipeline - 1
+                    
             threads.append(threading.Thread(target = self.create_rbuf,
-                                            args = (self.pipeline_conf["rbuf_baseband_key"][i],
+                                            args = (self.dadadb_cpu, self.pipeline_conf["rbuf_baseband_key"][i],
                                                     self.rbuf_baseband_blksz,
                                                     self.pipeline_conf["rbuf_baseband_nblk"],
                                                     self.pipeline_conf["rbuf_baseband_nread"], )))
             threads.append(threading.Thread(target = self.create_rbuf,
-                                            args = (self.pipeline_conf["rbuf_filterbank_key"][i],
+                                            args = (self.dadadb_cpu, self.pipeline_conf["rbuf_filterbank_key"][i],
                                                     self.rbuf_filterbank_blksz,
                                                     self.pipeline_conf["rbuf_filterbank_nblk"],
                                                     self.pipeline_conf["rbuf_filterbank_nread"], )))
@@ -844,10 +829,9 @@ class SearchWithStream(Pipeline):
             thread.start()            
         for thread in threads:
             thread.join()
-
+        
         # Start capture
         port0        = SYSTEM_CONF["port0"]
-        ncpu_numa    = SYSTEM_CONF["ncpu_numa"]
         self.runtime_dir = []
         self.socket_addr = []
         self.ctrl_socket = []
@@ -871,27 +855,30 @@ class SearchWithStream(Pipeline):
             first_alive_ip   = destination_alive[0].split(":")[0]
             first_alive_port = int(destination_alive[0].split(":")[1])
             
-            cpu = self.numa*ncpu_numa + i*self.ncpu_pipeline
+            cpu = self.numa*self.ncpu_numa + i*self.ncpu_pipeline
             destination_alive_cpu = []
             for info in destination_alive:
                 destination_alive_cpu.append("{}:{}".format(info, cpu))
                 cpu += 1
             #print destination_alive_cpu, destination_dead
-            buf_ctrl_cpu = self.numa*ncpu_numa + i*self.ncpu_pipeline + self.nport_beam
-            cpt_ctrl_cpu = self.numa*ncpu_numa + i*self.ncpu_pipeline + self.nport_beam
+            buf_ctrl_cpu = self.numa*self.ncpu_numa + i*self.ncpu_pipeline + self.nport_beam
+            cpt_ctrl_cpu = self.numa*self.ncpu_numa + i*self.ncpu_pipeline + self.nport_beam
             cpt_ctrl     = "1:{}".format(cpt_ctrl_cpu)
             #print cpt_ctrl
-
+            
             #print destination_alive[0].split(":")[0], destination_alive[0].split(":")[1]
             if EXECUTE:
-                beamid = self.acquire_beamid(first_alive_ip, first_alive_port)
+                beamid = self.acquire_beamid(first_alive_ip, first_alive_port, self.pipeline_conf["ndf_check_chk"])
             else:
                 beamid = i
                 
             self.beamid.append(beamid)
             runtime_dir  = "{}/beam{:02}".format(DATA_ROOT, beamid)
-            socket_addr  = "{}/beam{:02}/capture.socket".format(DATA_ROOT, beamid)
+            #socket_addr  = "\0{}/capture.socket".format(runtime_dir)
+            socket_addr  = "{}/capture.socket".format(runtime_dir)
+            
             ctrl_socket  = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            #ctrl_socket  = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.runtime_dir.append(runtime_dir)
             self.socket_addr.append(socket_addr)
             self.ctrl_socket.append(ctrl_socket)
@@ -901,7 +888,7 @@ class SearchWithStream(Pipeline):
             else:
                 refinfo = [0, 0, 0]
                 
-            refinfo = "{}:{}:{}".format(refinfo[0], refinfo[1], refinfo[2])
+            refinfo = "{}:{}:{}".format(refinfo[0], refinfo[1], refinfo[2] + self.pipeline_conf["rbuf_baseband_ndf_chk"]) # Addin one buffer block calm down time
             threads.append(threading.Thread(target = self.capture,
                                             args = (self.pipeline_conf["rbuf_baseband_key"][i],
                                                     destination_alive_cpu,
@@ -909,12 +896,14 @@ class SearchWithStream(Pipeline):
                                                     refinfo, runtime_dir, 
                                                     buf_ctrl_cpu, cpt_ctrl, self.pipeline_conf["bind"],
                                                     self.pipeline_conf["rbuf_baseband_ndf_chk"],
-                                                    self.pipeline_conf["tbuf_filterbank_ndf_chk"], self.pipeline_conf["pad"])))                                                                
+                                                    self.pipeline_conf["tbuf_filterbank_ndf_chk"], self.pipeline_conf["pad"])))
         for thread in threads:
             thread.start()
+            
         self.state = "ready"
         for thread in threads:
             thread.join()
+        self.state = "idle"
         
     def start(self, source_name, ra, dec, start_buf):
         ra  = ra.replace(":", " ")
@@ -926,22 +915,22 @@ class SearchWithStream(Pipeline):
         self.state = "starting"
         
         # Start baseband2filterbank and heimdall software
-        ncpu_numa    = SYSTEM_CONF["ncpu_numa"]
         threads = []
         for i in range(self.nprocess):
-            self.baseband2filterbank_cpu = self.numa*ncpu_numa +\
+            self.baseband2filterbank_cpu = self.numa*self.ncpu_numa +\
                                            (i + 1)*self.ncpu_pipeline - 1
-            self.heimdall_cpu            = self.numa*ncpu_numa +\
+            self.heimdall_cpu            = self.numa*self.ncpu_numa +\
                                             (i + 1)*self.ncpu_pipeline - 1
-            self.dbdisk_cpu              = self.numa*ncpu_numa +\
+            self.dbdisk_cpu              = self.numa*self.ncpu_numa +\
                                            (i + 1)*self.ncpu_pipeline - 1
-            threads.append(threading.Thread(target = self.baseband2filterbank,
-                                            args = (self.baseband2filterbank_cpu,
-                                                    self.pipeline_conf["rbuf_baseband_key"][i],
-                                                    self.pipeline_conf["rbuf_filterbank_key"][i],
-                                                    self.pipeline_conf["rbuf_baseband_ndf_chk"],
-                                                    self.nrepeat, self.pipeline_conf["nstream"],
-                                                    self.pipeline_conf["ndf_stream"], self.runtime_dir[i], )))
+            if BASEBAND2FILTERBANK:
+                threads.append(threading.Thread(target = self.baseband2filterbank,
+                                                args = (self.baseband2filterbank_cpu,
+                                                        self.pipeline_conf["rbuf_baseband_key"][i],
+                                                        self.pipeline_conf["rbuf_filterbank_key"][i],
+                                                        self.pipeline_conf["rbuf_baseband_ndf_chk"],
+                                                        self.nrepeat, self.pipeline_conf["nstream"],
+                                                        self.pipeline_conf["ndf_stream"], self.runtime_dir[i], )))
             
             if HEIMDALL:
                 threads.append(threading.Thread(target = self.heimdall,
@@ -969,6 +958,7 @@ class SearchWithStream(Pipeline):
         self.state = "running"
         for thread in threads:
             thread.join()
+        self.state = "ready"
             
     def stop(self):
         if self.state != "running":
@@ -1094,11 +1084,19 @@ if __name__ == "__main__":
     ra            = "00:00:00.00"   # "HH:MM:SS.SS"
     dec           = "00:00:00.00"   # "DD:MM:SS.SS"
     start_buf     = 0
-    ip            = "10.17.8.1"
 
+    host_id       = check_output("hostname").strip()[-1]
+
+    parser = argparse.ArgumentParser(description='To run the pipeline for my test')
+    parser.add_argument('-a', '--numa', type=int, nargs='+',
+                        help='The ID of numa node')
+    args     = parser.parse_args()
+    numa     = args.numa[0]
+    
+    ip       = "10.17.{}.{}".format(host_id, numa + 1)
+    
     search_mode = SearchWithStreamTwoProcess()
     search_mode.configure(utc_start, freq, ip)
-    
     exit()
     
     if FILE:
@@ -1128,44 +1126,35 @@ if __name__ == "__main__":
             search_mode.configure(utc_start, freq, ip)
     
         def status():
-            run = 0
             while True:
                 if search_mode.state == "ready":
+                    print "\nMonitor it ... \n"
                     while search_mode.state == "ready":
                         print search_mode.stream_status()
-                        #search_mode.stream_status()
                         time.sleep(1)
-                    run += 1
-                if run == 1:
                     break
                 
         def start(source_name, ra, dec, start_buf):
-            run = 0
             while True:
                 if search_mode.state == "ready":
-                    print "\nStart it ...\n"
+                    print "\nStart it ...\n\n\n\n\n"
                     search_mode.start(source_name, ra, dec, start_buf)
-                    run += 1
-                if run == 1:
                     break
                     
         def stop():
-            run = 0
             while True:
-                if search_mode.state == "ready":
+                if search_mode.state == "running":
                     time.sleep(LENGTH)
                     print "\nStop it ...\n"
                     search_mode.stop()
-                    run += 1
-                if run == 1:
                     break
     
-        if EXECUTE:            
+        if EXECUTE:
             threads = []
             threads.append(threading.Thread(target = configure, args = (utc_start, freq, ip, )))
             threads.append(threading.Thread(target = start, args = (source_name, ra, dec, start_buf, )))
-            threads.append(threading.Thread(target = status))
-            threads.append(threading.Thread(target = stop))
+            #threads.append(threading.Thread(target = status))
+            #threads.append(threading.Thread(target = stop))
             for thread in threads:
                 thread.start()            
             for thread in threads:
@@ -1176,5 +1165,5 @@ if __name__ == "__main__":
             search_mode.stream_status()
             search_mode.stop()
         
-        print "\nDeconfigure it ...\n"
-        search_mode.deconfigure()
+        #print "\nDeconfigure it ...\n"
+        #search_mode.deconfigure()

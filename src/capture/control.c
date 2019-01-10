@@ -110,7 +110,7 @@ void *buf_control(void *conf)
   uint64_t rbuf_nblk = 0;
   uint64_t ndf_actual = 0, ndf_expect = 0;
   uint64_t ndf_blk_actual = 0, ndf_blk_expect = 0;
-  double sleep_time = 0.0 * captureconf->blk_res;
+  double sleep_time = 0.5 * captureconf->blk_res;
   unsigned int sleep_sec = (int)sleep_time;
   useconds_t sleep_usec  = 1.0E6 * (sleep_time - sleep_sec);
     
@@ -124,8 +124,8 @@ void *buf_control(void *conf)
 	{
 	  transited = transit[0];
 	  for(i = 1; i < captureconf->nport_alive; i++) // When all ports are on the transit status
-	    transited = transited && transit[i]; // all happen, take action
-	  //transited = transited || transit[i]; // one happens, take action
+	    //transited = transited && transit[i]; // all happen, take action
+	    transited = transited || transit[i]; // one happens, take action
 	}
       if(quit)
 	{	  
@@ -216,8 +216,8 @@ void *buf_control(void *conf)
 	{
 	  transited = transit[0];
 	  for(i = 1; i < captureconf->nport_alive; i++)
-	    transited = transited || transit[i]; // all happen, take action
-	  //transited = transited && transit[i]; // one happens, take action
+	    //transited = transited || transit[i]; // all happen, take action
+	    transited = transited && transit[i]; // one happens, take action
 	}      
       if(quit)
 	{	  

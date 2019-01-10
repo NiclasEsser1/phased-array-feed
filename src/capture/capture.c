@@ -156,7 +156,7 @@ void *capture(void *conf)
   int sock, ithread, ichk; 
   struct sockaddr_in sa, fromsa;
   socklen_t fromlen;// = sizeof(fromsa);
-  int64_t idf_blk;
+  int64_t idf_blk = -1;
   uint64_t idf_prd, df_sec;
   double freq;
   int epoch;
@@ -202,32 +202,42 @@ void *capture(void *conf)
       return NULL;
     }
 
-  if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-    {
-      multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      
-      /* Force to quit if we have time out */
-      quit = 1;	  
-      free(df);
-      conf = (void *)captureconf;
-      pthread_exit(NULL);
-      return NULL;
-    }
-  
-  /* Get header information, which will be used to get the location of packets */
-  ptr = (uint64_t*)df;
-  writebuf = bswap_64(*ptr);
-  idf_prd = writebuf & 0x00000000ffffffff;
-  df_sec = (writebuf & 0x3fffffff00000000) >> 32;
-  writebuf = bswap_64(*(ptr + 2));
-  freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
-  
-  pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-  idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
-  pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-  ndf_chk_delay[ithread] = idf_blk;
+  /*
+    If we start the recvfrom and memcpy simultaneously at the very beginning, it will push the cpu usage to 100%;
+    it does not come down sometimes will cause the capture reports significant packet loss rate;
+    Here assume that the reference information is about one buffer block behind current data frame;
+    the software will receive data frame for a while without writing any data into buffer;
+    which will make sure that the cpu usage does not hit 100% at the beginning;
 
+    NOTE: FOR FUTURE PIPELINE DESIGN, WE MUST ASIGN THE REFERNECE INFORMATION TO A FUTURE VALUE.
+   */
+  while(idf_blk<0)
+    {
+      if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+	{
+	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+	  
+	  /* Force to quit if we have time out */
+	  quit = 1;	  
+	  free(df);
+	  conf = (void *)captureconf;
+	  pthread_exit(NULL);
+	  return NULL;
+	}
+      
+      ptr = (uint64_t*)df;
+      writebuf = bswap_64(*ptr);
+      idf_prd = writebuf & 0x00000000ffffffff;
+      df_sec = (writebuf & 0x3fffffff00000000) >> 32;
+      writebuf = bswap_64(*(ptr + 2));
+      freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
+      
+      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
+      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
+      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
+    }    
+  ndf_chk_delay[ithread] = idf_blk;
   ichk = (int)(freq/nchan_chk + ichk0);
   
   multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
@@ -244,7 +254,7 @@ void *capture(void *conf)
 	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
 	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
 	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
-	      memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
+	      //memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
@@ -261,7 +271,7 @@ void *capture(void *conf)
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
 		  tbuf[tbuf_loc] = 'Y';
-		  memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
+		  //memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
 		  
 		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
@@ -331,7 +341,8 @@ int init_capture(conf_t *conf)
   for(i = 0; i < conf->nport_alive; i++)
     {
       hdr_ref[i].sec = conf->ref.sec;
-      hdr_ref[i].idf_prd = conf->ref.idf_prd;
+      hdr_ref[i].idf_prd = conf->ref.idf_prd + conf->rbuf_ndf_chk;
+      //hdr_ref[i].idf_prd = conf->ref.idf_prd + conf->rbuf_ndf_chk; // To wait the cpu calm down before we record the data;
       conf->nchk       += conf->nchk_alive_expect[i];
       conf->nchk_alive += conf->nchk_alive_actual[i];
     }
