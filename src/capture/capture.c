@@ -23,6 +23,7 @@ char *tbuf = NULL;
 
 int quit = 0;
 int ithread_extern = 0;
+double elapsed_time = 0.0;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
 uint64_t ndf_chk[MCHK_CAPTURE] = {0};
@@ -157,10 +158,9 @@ void *capture(void *conf)
   int64_t idf;
   uint64_t tbuf_loc, cbuf_loc;
   hdr_t hdr;
-  double elapsed_time;
-  struct timespec start, stop;
   int nchk = captureconf->nchk;
-  
+  struct timespec start, now;
+    
   init_hdr(&hdr); 
   
   pktsz          = captureconf->pktsz;
@@ -209,27 +209,29 @@ void *capture(void *conf)
   hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
   
   pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-  acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);	
+  //acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);
+  idf = (int64_t)(hdr.idf - hdr_ref[ithread].idf) + ((double)hdr.sec - (double)hdr_ref[ithread].sec) / captureconf->df_res;
   pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
   ndf_chk_delay[ithread] = idf;
-  
+
+  ichk = (int)(hdr.freq/captureconf->nchan_chk + captureconf->ichk0);
+  //if(acquire_ichk(hdr.freq, captureconf->nchan_chk, captureconf->ichk0, nchk, &ichk))
+  //  {	  
+  //    multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
+  //    fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
+  //    
+  //    quit = 1;
+  //    free(df);
+  //    conf = (void *)captureconf;
+  //    pthread_exit(NULL);
+  //    return NULL;
+  //  }
+            
   multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, hdr.idf, hdr_ref[ithread].idf, hdr.sec, hdr_ref[ithread].sec, idf, ndf_chk_delay[ithread]);
   //quit = 1;
-  
+  clock_gettime(CLOCK_REALTIME, &start);
   while(!quit)
     {
-      if(acquire_ichk(hdr.freq, captureconf->nchan_chk, captureconf->ichk0, nchk, &ichk))
-      	{	  
-      	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
-      	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
-      
-      	  quit = 1;
-      	  free(df);
-      	  conf = (void *)captureconf;
-      	  pthread_exit(NULL);
-      	  return NULL;
-      	}
-            
       if(idf < 0) // Discard the data frame if it does not fit to current buffer, also means the reference is already updated;
 	{
 	  //multilog(runtime_log, LOG_INFO,  "%"PRId64"\n", idf);
@@ -274,7 +276,10 @@ void *capture(void *conf)
 	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
 	    }
 	}
-
+      clock_gettime(CLOCK_REALTIME, &now);
+      elapsed_time += (now.tv_sec - start.tv_sec) + (now.tv_nsec - start.tv_nsec)/1.0E9L;
+      start        = now;
+      
       if(recvfrom(sock, (void *)df, pktsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
       	{
       	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
@@ -287,12 +292,29 @@ void *capture(void *conf)
       	  pthread_exit(NULL);
       	  return NULL;
       	}
+
+      clock_gettime(CLOCK_REALTIME, &start);
       
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets\
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);	
+      //acquire_idf(hdr.idf, hdr.sec, hdr_ref[ithread].idf, hdr_ref[ithread].sec, captureconf->df_res, &idf);
+      idf = (int64_t)(hdr.idf - hdr_ref[ithread].idf) + ((double)hdr.sec - (double)hdr_ref[ithread].sec) / captureconf->df_res;
+      //idf = (int64_t)(idf - idf_ref) + ((double)sec - (double)sec_ref) / df_res;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
+
+      ichk = (int)(hdr.freq/captureconf->nchan_chk + captureconf->ichk0);
+      //if(acquire_ichk(hdr.freq, captureconf->nchan_chk, captureconf->ichk0, nchk, &ichk))
+      //	{	  
+      //	  multilog(runtime_log, LOG_ERR,  "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
+      //	  fprintf(stderr, "Frequency chunk index < 0 || > %d, which happens at \"%s\", line [%d], has to abort.\n", nchk,__FILE__, __LINE__);
+      //
+      //	  quit = 1;
+      //	  free(df);
+      //	  conf = (void *)captureconf;
+      //	  pthread_exit(NULL);
+      //	  return NULL;
+      //	}
     }
     
   /* Exit */

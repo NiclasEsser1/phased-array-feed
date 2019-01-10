@@ -21,6 +21,7 @@ extern multilog_t *runtime_log;
 
 extern char *cbuf;
 extern char *tbuf;
+extern   double elapsed_time;
 
 extern int quit;
 
@@ -112,7 +113,7 @@ void *buf_control(void *conf)
   double sleep_time = 0.0 * captureconf->blk_res;
   unsigned int sleep_sec = (int)sleep_time;
   useconds_t sleep_usec  = 1.0E6 * (sleep_time - sleep_sec);
-
+    
   while(!quit)
     {
       /*
@@ -130,7 +131,8 @@ void *buf_control(void *conf)
 	{	  
 	  pthread_exit(NULL);
 	  return NULL;
-	}      
+	}
+      
       rbuf_nblk = ipcbuf_get_write_count(captureconf->db_data) + 1;
 	  
       /* Close current buffer */
@@ -246,7 +248,9 @@ void *buf_control(void *conf)
       else
 	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
       ndf_expect += ndf_blk_expect;
-      multilog(runtime_log, LOG_INFO, "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
+      //elapsed_time = 0.0;
+      //multilog(runtime_log, LOG_INFO, "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       
       fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       fflush(stdout);
