@@ -159,8 +159,6 @@ int main(int argc, char **argv)
 	}
     }
 
-  //fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", conf.ref.epoch, conf.ref.sec, conf.ref.idf);
-
   /* Setup log interface */
   char fname_log[MSTR_LEN];
   FILE *fp_log = NULL;
@@ -177,11 +175,8 @@ int main(int argc, char **argv)
 
   /* Check the input */
   if((conf.cpt_ctrl == 0) && (source == 0))
-    {
-      //fprintf(stdout, "The target information will not be set.\n");
-      multilog(runtime_log, LOG_WARNING, "The target information will not be set, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-    }
-
+    multilog(runtime_log, LOG_WARNING, "The target information will not be set, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    
   /* To make sure that we are not going to bind all threads to one sigle CPU */
   if(!(conf.cpu_bind == 0))
     {
@@ -211,7 +206,6 @@ int main(int argc, char **argv)
       fclose(fp_log);
       return EXIT_FAILURE;
     }
-  //multilog(runtime_log, LOG_INFO, "INIT:\t%E\n", conf.df_res);
   
   /* Do the job */
   threads(&conf);
