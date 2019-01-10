@@ -21,7 +21,7 @@ extern multilog_t *runtime_log;
 
 extern char *cbuf;
 extern char *tbuf;
-extern   double elapsed_time;
+extern double elapsed_time;
 
 extern int quit;
 

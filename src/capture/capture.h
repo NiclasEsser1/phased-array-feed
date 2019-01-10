@@ -93,8 +93,6 @@ typedef struct hdr_t
 
 int init_capture(conf_t *conf);
 void *capture(void *conf);
-int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, double df_res, int64_t *idf_buf);
-int acquire_ichk(double freq, int nchan_chk, double ichk0, int nchk, int *ichk);
 int init_buf(conf_t *conf);
 int destroy_capture(conf_t conf);
 
@@ -103,11 +101,6 @@ void *capture_control(void *conf);
 int threads(conf_t *conf);
 void *buf_control(void *conf);
 
-int hdr_keys(char *df, hdr_t *hdr);
-uint64_t hdr_idf(char *df);
-uint64_t hdr_sec(char *df);
-double hdr_freq(char *df);
-int init_hdr(hdr_t *hdr);
 int dada_header(conf_t conf);
 
 #endif
