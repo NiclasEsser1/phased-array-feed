@@ -79,6 +79,8 @@ typedef struct conf_t
 
   struct timeval tout;
   uint64_t ndf_chk_prd;
+  
+  int ithread;
 }conf_t;
 
 typedef struct hdr_t

@@ -174,13 +174,16 @@ void *capture(void *conf)
   register uint64_t rbuf_ndf_chk = captureconf->rbuf_ndf_chk;
   register uint64_t rbuf_tbuf_ndf_chk = captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk;
   
-  df = (char *)malloc(sizeof(char) * dfsz);
-  
   /* Get right socker for current thread */
   pthread_mutex_lock(&ithread_mutex);
   ithread = ithread_extern;
   ithread_extern++;
   pthread_mutex_unlock(&ithread_mutex);
+  
+  df = (char *)malloc(sizeof(char) * dfsz);
+
+  multilog(runtime_log, LOG_INFO, "In funtion \nthread id = %ld, %d, %d\n", (long)pthread_self(), captureconf->ithread, ithread);
+  quit = 1;    
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));  

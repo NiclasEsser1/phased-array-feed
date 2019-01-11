@@ -44,19 +44,28 @@ int threads(conf_t *conf)
   pthread_attr_t attr;
   cpu_set_t cpus;
   int nport_alive = conf->nport_alive;
-  
+  conf_t conf_thread[MPORT_CAPTURE];
+    
   for(i = 0; i < nport_alive; i++)
     // Create threads. Capture threads and ring buffer control thread are essential, the capture control thread is created when it is required to;
     // If we create a capture control thread, we can control the start and end of data during runtime, the header of DADA buffer will be setup each time we start the data, which means without rerun the pipeline, we can get multiple capture runs;
     // If we do not create a capture thread, the data will start at the begining and we need to setup the header at that time, we can only do one capture without rerun the pipeline;
     {
+      //conf->ithread = i;
+      //multilog(runtime_log, LOG_INFO, "%d\n", conf->ithread);
+
+      conf_thread[i] = *conf;
+      conf_thread[i].ithread = i;
+      multilog(runtime_log, LOG_INFO, "%d\n", conf_thread[i].ithread);
+      
       if(!(conf->cpu_bind == 0))
 	{
 	  pthread_attr_init(&attr);  
 	  CPU_ZERO(&cpus);
 	  CPU_SET(conf->cpt_cpu[i], &cpus);
 	  pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-	  ret[i] = pthread_create(&thread[i], &attr, capture, (void *)conf);
+	  //ret[i] = pthread_create(&thread[i], &attr, capture, (void *)conf);
+	  ret[i] = pthread_create(&thread[i], &attr, capture, (void *)&conf_thread[i]);
 	  pthread_attr_destroy(&attr);
 	}
       else
@@ -113,7 +122,7 @@ void *buf_control(void *conf)
   double sleep_time = 0.5 * captureconf->blk_res;
   unsigned int sleep_sec = (int)sleep_time;
   useconds_t sleep_usec  = 1.0E6 * (sleep_time - sleep_sec);
-    
+  
   while(!quit)
     {
       /*
@@ -128,7 +137,9 @@ void *buf_control(void *conf)
 	    transited = transited || transit[i]; // one happens, take action
 	}
       if(quit)
-	{	  
+	{
+	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t0...");
+	  
 	  pthread_exit(NULL);
 	  return NULL;
 	}
@@ -163,6 +174,8 @@ void *buf_control(void *conf)
 	{
 	  multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
 	  fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t1...");
 	  
 	  quit = 1;
 	  pthread_exit(NULL);
@@ -177,6 +190,7 @@ void *buf_control(void *conf)
 	{	     
 	  multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
 	  fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
+	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t2...");
 	  
 	  quit = 1;
 	  pthread_exit(NULL);
@@ -189,7 +203,8 @@ void *buf_control(void *conf)
 	{
 	  multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
 	  fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
+	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t3...");
+	  
 	  quit = 1;
 	  pthread_exit(NULL);
 	  return NULL; 
@@ -220,7 +235,8 @@ void *buf_control(void *conf)
 	    transited = transited && transit[i]; // one happens, take action
 	}      
       if(quit)
-	{	  
+	{
+	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t4...");
 	  pthread_exit(NULL);
 	  return NULL;
 	}
@@ -263,10 +279,12 @@ void *buf_control(void *conf)
       fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       quit = 1;
       
+      multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t5...");
       pthread_exit(NULL);
       return NULL;
     }
-
+  
+  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t6...");
   pthread_exit(NULL);
   return NULL;
 }
