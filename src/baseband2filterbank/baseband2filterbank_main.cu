@@ -26,7 +26,8 @@ void usage ()
 	   " -e  The number of streams \n"
 	   " -f  The number of data frame (per frequency chunk) of each stream\n"
 	   " -g  The directory to put log file\n"
-	   " -h  show help\n");
+	   " -h  show help\n"
+	   " -i  Start of the data or not\n");
 }
 
 multilog_t *runtime_log;
@@ -39,7 +40,7 @@ int main(int argc, char *argv[])
   char log_fname[MSTR_LEN];
   
   /* Initial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:")) != -1)
     {
       switch(arg)
 	{
@@ -83,6 +84,10 @@ int main(int argc, char *argv[])
 	  	  
 	case 'g':
 	  sscanf(optarg, "%s", conf.dir);
+	  break;
+	  
+	case 'i':
+	  sscanf(optarg, "%d", &conf.sod);
 	  break;	  
 	}
     }

@@ -21,7 +21,7 @@ extern multilog_t *runtime_log;
 
 extern char *cbuf;
 extern char *tbuf;
-extern double elapsed_time;
+//extern double elapsed_time;
 
 extern int quit;
 
@@ -51,12 +51,8 @@ int threads(conf_t *conf)
     // If we create a capture control thread, we can control the start and end of data during runtime, the header of DADA buffer will be setup each time we start the data, which means without rerun the pipeline, we can get multiple capture runs;
     // If we do not create a capture thread, the data will start at the begining and we need to setup the header at that time, we can only do one capture without rerun the pipeline;
     {
-      //conf->ithread = i;
-      //multilog(runtime_log, LOG_INFO, "%d\n", conf->ithread);
-
       conf_thread[i] = *conf;
       conf_thread[i].ithread = i;
-      multilog(runtime_log, LOG_INFO, "%d\n", conf_thread[i].ithread);
       
       if(!(conf->cpu_bind == 0))
 	{
@@ -164,7 +160,8 @@ void *buf_control(void *conf)
       else
 	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
       ndf_expect += ndf_blk_expect;
-      multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
+      //multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
+      multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       
       fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       fflush(stdout);

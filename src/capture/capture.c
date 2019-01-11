@@ -23,8 +23,7 @@ char *cbuf = NULL;
 char *tbuf = NULL;
 
 int quit = 0;
-int ithread_extern = 0;
-double elapsed_time = 0.0;
+//double elapsed_time = 0.0;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
 uint64_t ndf_chk[MCHK_CAPTURE] = {0};
@@ -33,8 +32,6 @@ int64_t ndf_chk_delay[MCHK_CAPTURE] = {0};
 int transit[MPORT_CAPTURE] = {0};
 uint64_t tail[MPORT_CAPTURE] = {0};
 hdr_t hdr_ref[MPORT_CAPTURE];
-
-pthread_mutex_t ithread_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE]  = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
@@ -54,7 +51,6 @@ int init_buf(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
     
-      pthread_mutex_destroy(&ithread_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
@@ -70,7 +66,6 @@ int init_buf(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
   
-      pthread_mutex_destroy(&ithread_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
@@ -88,7 +83,6 @@ int init_buf(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
         
-      pthread_mutex_destroy(&ithread_mutex);
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
 	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
@@ -106,7 +100,6 @@ int init_buf(conf_t *conf)
 	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  
-	  pthread_mutex_destroy(&ithread_mutex);
 	  for(i = 0; i < MPORT_CAPTURE; i++)
 	    {
 	      pthread_mutex_destroy(&hdr_ref_mutex[i]);
@@ -153,7 +146,7 @@ void *capture(void *conf)
 {
   char *df = NULL;
   conf_t *captureconf = (conf_t *)conf;
-  int sock, ithread, ichk; 
+  int sock, ichk; 
   struct sockaddr_in sa, fromsa;
   socklen_t fromlen;// = sizeof(fromsa);
   int64_t idf_blk = -1;
@@ -173,17 +166,11 @@ void *capture(void *conf)
   register int required_dfsz = captureconf->required_dfsz;
   register uint64_t rbuf_ndf_chk = captureconf->rbuf_ndf_chk;
   register uint64_t rbuf_tbuf_ndf_chk = captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk;
-  
-  /* Get right socker for current thread */
-  pthread_mutex_lock(&ithread_mutex);
-  ithread = ithread_extern;
-  ithread_extern++;
-  pthread_mutex_unlock(&ithread_mutex);
+  register int ithread = captureconf->ithread;
   
   df = (char *)malloc(sizeof(char) * dfsz);
 
   multilog(runtime_log, LOG_INFO, "In funtion \nthread id = %ld, %d, %d\n", (long)pthread_self(), captureconf->ithread, ithread);
-  quit = 1;    
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));  
@@ -245,7 +232,7 @@ void *capture(void *conf)
   
   multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
 
-  clock_gettime(CLOCK_REALTIME, &start);
+  //clock_gettime(CLOCK_REALTIME, &start);
   while(!quit)
     {
       if(idf_blk>=0)
@@ -257,7 +244,7 @@ void *capture(void *conf)
 	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
 	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
 	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
-	      //memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
+	      memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
 	      
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
 	      ndf_port[ithread]++;
@@ -274,7 +261,7 @@ void *capture(void *conf)
 		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
 		  
 		  tbuf[tbuf_loc] = 'Y';
-		  //memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
+		  memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
 		  
 		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
 		  ndf_port[ithread]++;
@@ -286,9 +273,9 @@ void *capture(void *conf)
       else
 	transit[ithread] = 0;
       
-      clock_gettime(CLOCK_REALTIME, &now);
-      elapsed_time += (now.tv_sec - start.tv_sec) + (now.tv_nsec - start.tv_nsec)/1.0E9L;
-      start        = now;
+      //clock_gettime(CLOCK_REALTIME, &now);
+      //elapsed_time += (now.tv_sec - start.tv_sec) + (now.tv_nsec - start.tv_nsec)/1.0E9L;
+      //start        = now;
       
       if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
       	{
@@ -303,7 +290,7 @@ void *capture(void *conf)
       	  return NULL;
       	}
 
-      clock_gettime(CLOCK_REALTIME, &start);
+      //clock_gettime(CLOCK_REALTIME, &start);
 
       /* Get header information from bmf packet */    
       ptr = (uint64_t*)df;
@@ -374,7 +361,6 @@ int destroy_capture(conf_t conf)
 {
   int i;
   
-  pthread_mutex_destroy(&ithread_mutex);
   for(i = 0; i < MPORT_CAPTURE; i++)
     {
       pthread_mutex_destroy(&hdr_ref_mutex[i]);

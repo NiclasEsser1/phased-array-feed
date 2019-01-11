@@ -162,7 +162,7 @@ int init_baseband2filterbank(conf_t *conf)
   
   /* registers the existing host memory range for use by CUDA */
   dada_cuda_dbregister(conf->hdu_in);
-        
+  
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
   if(conf->hdrsz != DADA_HDRSZ)    // This number should match
     {
@@ -204,13 +204,28 @@ int init_baseband2filterbank(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;    
-    }  
+    }
+  dada_cuda_dbregister(conf->hdu_out);
+  
   /* make ourselves the write client */
   if(dada_hdu_lock_write(conf->hdu_out) < 0)
     {
       multilog(runtime_log, LOG_ERR, "open_hdu: could not lock write\n");
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
+    }
+
+  if(!conf->sod)
+    {
+      fprintf(stdout, "The sod of output ring buffer is not enabled\n");
+      if(ipcbuf_disable_sod(conf->db_out) < 0)
+	{
+	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  
+	  dada_hdu_unlock_write(conf->hdu_out);
+	  return EXIT_FAILURE;
+	}
     }
   
   return EXIT_SUCCESS;
@@ -254,6 +269,12 @@ int baseband2filterbank(conf_t conf)
       fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+
+  for(i = 0; i < NCHAN_OUT; i++)
+    {
+      conf.hdat_offs[i] = 1E8;
+      conf.hdat_scl[i]  = 1E6;
+    }
   
   while(!ipcbuf_eod(conf.db_in))
     {      
@@ -262,12 +283,12 @@ int baseband2filterbank(conf_t conf)
       
       /* Get scale of data */
       if(first)
-	{
-	  first = 0;
-	  dat_offs_scl(conf);
-	  for(i = 0; i < NCHAN_OUT; i++)
-	    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
-	}
+      	{
+      	  first = 0;
+      	  dat_offs_scl(conf);
+      	  for(i = 0; i < NCHAN_OUT; i++)
+      	    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+      	}
       
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
@@ -295,13 +316,13 @@ int baseband2filterbank(conf_t conf)
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
-	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	}
-      
+      CudaSynchronizeCall(); // Sync here is for multiple streams
+        
       ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * SCL_DTSZ));
       ipcbuf_mark_cleared(conf.db_in);       
     }
-  
+
   return EXIT_SUCCESS;
 }
 
@@ -404,6 +425,7 @@ int dat_offs_scl(conf_t conf)
     fprintf(fp, "%E\t%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i], conf.hsquare_mean[i]);
       
   fclose(fp);
+
   return EXIT_SUCCESS;
 }
 
@@ -426,14 +448,17 @@ int destroy_baseband2filterbank(conf_t conf)
   cudaFree(conf.ddat_scl);
   
   dada_hdu_unlock_write(conf.hdu_out);
+  dada_hdu_disconnect(conf.hdu_out);
   dada_hdu_destroy(conf.hdu_out);
   
   cudaFree(conf.buf_rt1);
   cudaFree(conf.buf_rt2);
 
   dada_cuda_dbunregister(conf.hdu_in);
+  dada_cuda_dbunregister(conf.hdu_out);
   
   dada_hdu_unlock_read(conf.hdu_in);
+  dada_hdu_disconnect(conf.hdu_in);
   dada_hdu_destroy(conf.hdu_in);
 
   free(conf.streams);

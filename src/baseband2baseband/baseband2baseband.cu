@@ -236,7 +236,8 @@ int init_baseband2baseband(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-
+  dada_cuda_dbregister(conf->hdu_out);  // registers the existing host memory range for use by CUDA
+  
   return EXIT_SUCCESS;
 }
 
@@ -342,7 +343,8 @@ int destroy_baseband2baseband(conf_t conf)
   cudaFree(conf.ddat_offs);
   cudaFree(conf.dsquare_mean);
   cudaFree(conf.ddat_scl);
-  
+
+  dada_cuda_dbunregister(conf.hdu_out);  
   dada_hdu_unlock_write(conf.hdu_out);
   dada_hdu_disconnect(conf.hdu_out);
   dada_hdu_destroy(conf.hdu_out);

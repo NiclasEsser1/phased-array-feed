@@ -56,7 +56,7 @@ inline void __cudaSynchronizeCall(const char *file, const int line)
   if(cudaSuccess != err)
     {
       fprintf(stderr, "cudaSynchronizeCall() with sync failed at %s:%i : %s\n",
-	       file, line, cudaGetErrorString(err));
+  	       file, line, cudaGetErrorString(err));
       exit(-1);
     }
 #endif

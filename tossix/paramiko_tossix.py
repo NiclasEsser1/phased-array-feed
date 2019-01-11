@@ -5,7 +5,7 @@ import time
 import argparse
 import os
 
-class TossixControl(object):
+class RemoteControl(object):
     def __init__(self):
         pass
     
@@ -42,19 +42,22 @@ if __name__ == "__main__":
     username = "pulsar"
     ip       = "134.104.74.36"
     
-    tossix = TossixControl()
+    tossix = RemoteControl()
     
     tossix.connect(ip, username, bufsz)
 
     tossix.control("bash\n", 1)
+    tossix.control(". /home/pulsar/aaron/askap-trunk/initaskap.sh", 1)
     tossix.control(". /home/pulsar/aaron/askap-trunk/Code/Components/OSL/scripts/osl_init_env.sh", 1)
     tossix.control("cd /home/pulsar/aaron/askap-trunk/Code/Components/OSL/scripts/ade", 1)
-    #tossix.control("python osl_a_metadata_streaming.py", 10) 
+    tossix.control("python osl_a_metadata_streaming.py", 10) 
+    #tossix.control("python osl_a_abf_config_stream.py --alt=4beams --param 'alt.4beams.ade_bmf.stream10G.streamSetup=stream_full_18beams.csv' ", 10)
     #tossix.control("python osl_a_abf_config_stream.py --alt=4beams", 10)
+    tossix.control("python osl_a_abf_config_stream.py --param 'ade_bmf.stream10G.streamSetup=stream_full_18beams.csv' ", 10)
 
-    tossix.control("python osl_a_adx_get_coarse_spectra.py", 10)
-    tossix.control("y", 1)
-    tossix.control("scp coarse_spectra.png pulsar@pacifix0:{}".format(os.getcwd()), 1)
+    #tossix.control("python osl_a_adx_get_coarse_spectra.py", 10)
+    #tossix.control("y", 1)
+    #tossix.control("scp coarse_spectra.png pulsar@pacifix0:{}".format(os.getcwd()), 1)
 
-    os.system("display coarse_spectra.png")
+    #os.system("display coarse_spectra.png")
     tossix.disconnect()

@@ -164,6 +164,7 @@ int init_baseband2power(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+  dada_cuda_dbregister(conf->hdu_out);
   
   /* Register header */
   if(register_header(conf))
@@ -194,6 +195,7 @@ int destroy_baseband2power(conf_t conf)
   dada_hdu_disconnect(conf.hdu_in);
   dada_hdu_destroy(conf.hdu_in);
 
+  dada_cuda_dbunregister(conf.hdu_out);
   dada_hdu_unlock_write(conf.hdu_out);
   dada_hdu_disconnect(conf.hdu_out);
   dada_hdu_destroy(conf.hdu_out);

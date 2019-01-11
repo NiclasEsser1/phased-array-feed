@@ -57,7 +57,8 @@ typedef struct conf_t
   int stream_ndf_chk;
   int nstream;
   float sclndim;
-
+  int sod;
+  
   int nrun_blk;
   char dir[MSTR_LEN];
   char utc_start[MSTR_LEN];

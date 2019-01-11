@@ -200,6 +200,7 @@ int init_baseband2spectral(conf_t *conf)
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
+  dada_cuda_dbregister(conf->hdu_in);
   
   return EXIT_SUCCESS;
 }
@@ -306,7 +307,8 @@ int destroy_baseband2spectral(conf_t conf)
       CudaSafeCall(cudaStreamDestroy(conf.streams[i]));
       CufftSafeCall(cufftDestroy(conf.fft_plans[i]));
     }
-  
+
+  dada_cuda_dbunregister(conf.hdu_out);
   dada_hdu_unlock_write(conf.hdu_out);
   dada_hdu_destroy(conf.hdu_out);
 
