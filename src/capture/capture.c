@@ -17,468 +17,278 @@
 #include "capture.h"
 #include "multilog.h"
 
-extern multilog_t *runtime_log;
-
-char *cbuf = NULL;
-char *tbuf = NULL;
-
-int quit = 0;
-//double elapsed_time = 0.0;
-
-uint64_t ndf_port[MPORT_CAPTURE] = {0};
-uint64_t ndf_chk[MCHK_CAPTURE] = {0};
-int64_t ndf_chk_delay[MCHK_CAPTURE] = {0};
-
-int transit[MPORT_CAPTURE] = {0};
-uint64_t tail[MPORT_CAPTURE] = {0};
-hdr_t hdr_ref[MPORT_CAPTURE];
-
-pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE]  = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-
-int init_buf(conf_t *conf)
+int initialize_capture(int argc, char **argv, configuration_t *configuration)
 {
-  int i;
+  /* Parse the input arguments */
+  parse_arguments(argc, argv, configuration);
+  
+  /* Initialize ring buffer and temporary buffer */
+  initialize_buffer(configuration);
+  
+  return EXIT_SUCCESS;
+}
 
-  /* Create HDU and check the size of buffer bolck */
-  conf->required_dfsz = conf->dfsz - conf->dfoff;
-  
-  conf->rbufsz = conf->nchk * conf->required_dfsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
-  conf->hdu = dada_hdu_create(runtime_log);
-  dada_hdu_set_key(conf->hdu, conf->key);
-  if(dada_hdu_connect(conf->hdu) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-    
-      for(i = 0; i < MPORT_CAPTURE; i++)
-	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-	}
-      
-      dada_hdu_destroy(conf->hdu);
-      return EXIT_FAILURE;    
-    }
-  
-  if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client
-    {
-      multilog(runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-  
-      for(i = 0; i < MPORT_CAPTURE; i++)
-	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-	}
-      
-      dada_hdu_disconnect(conf->hdu);
-      return EXIT_FAILURE;
-    }
-  conf->db_data = (ipcbuf_t *)(conf->hdu->data_block);
-  conf->db_hdr  = (ipcbuf_t *)(conf->hdu->header_block);
-  
-  if(conf->rbufsz != ipcbuf_get_bufsz(conf->db_data))  // Check the buffer size
-    {
-      multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-        
-      for(i = 0; i < MPORT_CAPTURE; i++)
-	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-	}
-      
-      dada_hdu_unlock_write(conf->hdu);
-      return EXIT_FAILURE;    
-    }
+void usage()
+{
+  fprintf(stdout,
+	  "capture_main - capture PAF BMF raw data from NiC\n"
+	  "\n"
+	  "Usage: paf_capture [options]\n"
+	  " -h Show help\n"
+	  " -a Hexadecimal shared memory key for capture \n"
+	  " -b The size of each beamformer packet, includs the header of it\n"
+	  " -c Start point of beamformer packet to record, to decide record packet header or not\n"
 
-  if(conf->cpt_ctrl)
-    {
-      if(ipcbuf_disable_sod(conf->db_data) < 0)
-	{
-	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  " -d The number of data frames in each period of each frequency chunk\n"
+	  " -e Frequency channels in each chunk\n"
+	  " -f Beamformer streaming period\n"
+
+	  " -g IP adress and port of data arrives, the format of it is \"ip:port:nchunk_expected:nchunk_actual\" \n"
+	  " -i The center frequency of arriving data\n"
+	  " -j Reference information for the current capture, get from BMF packet header, epoch:sec:idf\n"
+	  " -k To directory to record runtime information\n"
 	  
-	  for(i = 0; i < MPORT_CAPTURE; i++)
-	    {
-	      pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	      pthread_mutex_destroy(&ndf_port_mutex[i]);
-	    }
-      
-	  dada_hdu_unlock_write(conf->hdu);
+	  " -l The number of data frames in each buffer block of each frequency chunk\n"
+	  " -m The number of data frames in each temp buffer of each frequency chunk\n"
+
+	  " -n The name of header template for PSRDADA\n"
+	  " -o The name of instrument \n"
+	  );
+}
+
+int parse_arguments(int argc, char **argv, configuration_t *configuration)
+{  
+  int arg;
+  int nparam_expect = 9;
+  int nparam_actual = 0;
+
+  /* Parse the input and check it */
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:")) != -1)
+    {
+      switch(arg)
+	{
+	case 'h':
+	  usage();
 	  return EXIT_FAILURE;
-	}
-    }
-  else
-    {
-      for(i = 0; i < MSTR_LEN; i++)
-	{
-	  if(conf->ra[i] == ' ')
-	    conf->ra[i] = ':';
-	  if(conf->dec[i] == ' ')
-	    conf->dec[i] = ':';
-	}
-      conf->sec_int     = conf->ref.sec_int;
-      conf->picoseconds = conf->ref.picoseconds;
-      conf->mjd_start   = conf->sec_int / SECDAY + MJD1970;                       // Float MJD start time without fraction second
-      strftime (conf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&conf->sec_int)); // String start time without fraction second 
-      dada_header(*conf);
-    }
-  conf->tbufsz = (conf->required_dfsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
-  tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
-  
-  /* Get the buffer block ready */
-  uint64_t block_id = 0;
-  uint64_t write_blkid;
-  cbuf = ipcbuf_get_next_write(conf->db_data);
-  if(cbuf == NULL)
-    {	     
-      multilog(runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  return EXIT_SUCCESS;
-}
-
-void *capture(void *conf)
-{
-  char *df = NULL;
-  conf_t *captureconf = (conf_t *)conf;
-  int sock, ichk; 
-  struct sockaddr_in sa, fromsa;
-  socklen_t fromlen;// = sizeof(fromsa);
-  int64_t idf_blk = -1;
-  uint64_t idf_prd, df_sec;
-  double freq;
-  int epoch;
-  uint64_t tbuf_loc, cbuf_loc;
-  register int nchk = captureconf->nchk;
-  register int nchan_chk = captureconf->nchan_chk;
-  register double ichk0 = captureconf->ichk0;
-  register double df_res = captureconf->df_res;
-  struct timespec start, now;
-  uint64_t writebuf, *ptr = NULL;
-
-  register int dfsz = captureconf->dfsz;
-  register int dfoff = captureconf->dfoff;
-  register int required_dfsz = captureconf->required_dfsz;
-  register uint64_t rbuf_ndf_chk = captureconf->rbuf_ndf_chk;
-  register uint64_t rbuf_tbuf_ndf_chk = captureconf->rbuf_ndf_chk + captureconf->tbuf_ndf_chk;
-  register int ithread = captureconf->ithread;
-  
-  df = (char *)malloc(sizeof(char) * dfsz);
-
-  multilog(runtime_log, LOG_INFO, "In funtion \nthread id = %ld, %d, %d\n", (long)pthread_self(), captureconf->ithread, ithread);
-  
-  sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));  
-  memset(&sa, 0x00, sizeof(sa));
-  sa.sin_family      = AF_INET;
-  sa.sin_port        = htons(captureconf->port_alive[ithread]);
-  sa.sin_addr.s_addr = inet_addr(captureconf->ip_alive[ithread]);
-  
-  if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
-    {
-      multilog(runtime_log, LOG_ERR,  "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      fprintf(stderr, "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      
-      /* Force to quit if we have time out */
-      quit = 1;
-      free(df);
-      conf = (void *)captureconf;
-      pthread_exit(NULL);
-      return NULL;
-    }
-
-  /*
-    If we start the recvfrom and memcpy simultaneously at the very beginning, it will push the cpu usage to 100%;
-    it does not come down sometimes will cause the capture reports significant packet loss rate;
-    Here assume that the reference information is about one buffer block behind current data frame;
-    the software will receive data frame for a while without writing any data into buffer;
-    which will make sure that the cpu usage does not hit 100% at the beginning;
-
-    NOTE: FOR FUTURE PIPELINE DESIGN, WE MUST ASIGN THE REFERNECE INFORMATION TO A FUTURE VALUE.
-   */
-  while(idf_blk<0)
-    {
-      if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-	{
-	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 	  
-	  /* Force to quit if we have time out */
-	  quit = 1;	  
-	  free(df);
-	  conf = (void *)captureconf;
-	  pthread_exit(NULL);
-	  return NULL;
-	}
-      
-      ptr = (uint64_t*)df;
-      writebuf = bswap_64(*ptr);
-      idf_prd = writebuf & 0x00000000ffffffff;
-      df_sec = (writebuf & 0x3fffffff00000000) >> 32;
-      writebuf = bswap_64(*(ptr + 2));
-      freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
-      
-      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
-      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-    }    
-  ndf_chk_delay[ithread] = idf_blk;
-  ichk = (int)(freq/nchan_chk + ichk0);
-  
-  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
-
-  //clock_gettime(CLOCK_REALTIME, &start);
-  while(!quit)
-    {
-      if(idf_blk>=0)
-	{
-	  if(idf_blk < rbuf_ndf_chk)  // Put data into current ring buffer block
+	case 'a':	  	  
+	  if(sscanf(optarg, "%x", &configuration->rbuf_key) != 1)
 	    {
-	      transit[ithread] = 0; // The reference is already updated.
-	      
-	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
-	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
-	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
-	      memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
-	      
-	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
-	      ndf_port[ithread]++;
-	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
+	      fprintf(stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      return EXIT_FAILURE;
 	    }
-	  else
-	    {
-	      transit[ithread] = 1; // The reference should be updated very soon
-	      if(idf_blk < rbuf_tbuf_ndf_chk)
-		{		  
-		  tail[ithread] = (uint64_t)((idf_blk - rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
-		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_dfsz + 1));
-		  
-		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
-		  
-		  tbuf[tbuf_loc] = 'Y';
-		  memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
-		  
-		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
-		  ndf_port[ithread]++;
-		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-		}
-	      
-	    }
+	  nparam_actual++;
+	  break;
+
+	case 'b':
+	  sscanf(optarg, "%d", &configuration->pktsize_bytes);
+	  nparam_actual++;
+	  break;
+
+	case 'c':
+	  sscanf(optarg, "%d", &configuration->offset_pktsize_bytes);
+	  nparam_actual++;
+	  break;
+	  
+	case 'd':
+	  sscanf(optarg, "%"SCNu64"", &configuration->npkt_per_chunk_period);
+	  nparam_actual++;
+	  break;
+	  
+	case 'e':
+	  sscanf(optarg, "%d", &configuration->nchan_per_chunk);
+	  nparam_actual++;
+	  break;
+	  
+	case 'f':
+	  sscanf(optarg, "%d", &configuration->pkt_period_secs);
+	  nparam_actual++;
+	  break;
+	  
+	case 'g':
+	  sscanf(optarg, "%[^:]:%d:%d:%d", configuration->ip, &configuration->port, &configuration->nchunk_expect, &configuration->nchunk_actual);
+	  nparam_actual++;
+	  break;
+
+	case 'i':
+	  sscanf(optarg, "%lf", &configuration->freq);
+	  nparam_actual++;
+	  break;
+
+	case 'j':
+	  sscanf(optarg, "%d:%"SCNu64":%"SCNu64"", &configuration->ref_epoch, &configuration->ref_secs, &configuration->ref_pkt_idx);
+	  nparam_actual++;
+	  break;
+	  
+	case 'k':
+	  sscanf(optarg, "%s", configuration->runtime_dir);
+	  nparam_actual++;
+	  break;
+	  
+	case 'l':
+	  sscanf(optarg, "%"SCNu64"", &configuration->npkt_per_chunk_rbuf);
+	  nparam_actual++;
+	  break;
+	  
+	case 'm':
+	  sscanf(optarg, "%"SCNu64"", &configuration->npkt_per_chunk_tbuf);
+	  nparam_actual++;
+	  break;
+	  
+	case 'n':
+	  sscanf(optarg, "%s", configuration->dada_hdr_fname);
+	  nparam_actual++;
+	  break;
+	  
+	case 'o':
+	  sscanf(optarg, "%s", configuration->instrument_name);
+	  nparam_actual++;
+	  break;
 	}
-      else
-	transit[ithread] = 0;
-      
-      //clock_gettime(CLOCK_REALTIME, &now);
-      //elapsed_time += (now.tv_sec - start.tv_sec) + (now.tv_nsec - start.tv_nsec)/1.0E9L;
-      //start        = now;
-      
-      if(recvfrom(sock, (void *)df, dfsz, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-      	{
-      	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      	  fprintf(stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      
-      	  /* Force to quit if we have time out */
-      	  quit = 1;	  
-      	  free(df);
-      	  conf = (void *)captureconf;
-      	  pthread_exit(NULL);
-      	  return NULL;
-      	}
-
-      //clock_gettime(CLOCK_REALTIME, &start);
-
-      /* Get header information from bmf packet */    
-      ptr = (uint64_t*)df;
-      writebuf = bswap_64(*ptr);
-      idf_prd = writebuf & 0x00000000ffffffff;
-      df_sec = (writebuf & 0x3fffffff00000000) >> 32;
-      writebuf = bswap_64(*(ptr + 2));
-      freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
-  
-      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
-      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-
-      ichk = (int)(freq/nchan_chk + ichk0);
     }
-    
-  /* Exit */
-  quit = 1;
-  free(df);
-  conf = (void *)captureconf;
-  close(sock);
-  pthread_exit(NULL);
-
-  return NULL;
-}
-
-int init_capture(conf_t *conf)
-{
-  int i;
-
-  if(conf->cpt_ctrl)
-    sprintf(conf->cpt_ctrl_addr, "%s/capture.socket", conf->dir);  // The file will be in different directory for different beam;
-
-  conf->nchk       = 0;
-  conf->nchk_alive = 0;
-  
-  /* Init status */
-  for(i = 0; i < conf->nport_alive; i++)
+  if(nparam_actual != nparam_expect)
     {
-      hdr_ref[i].sec = conf->ref.sec;
-      hdr_ref[i].idf_prd = conf->ref.idf_prd + conf->rbuf_ndf_chk;
-      //hdr_ref[i].idf_prd = conf->ref.idf_prd + conf->rbuf_ndf_chk; // To wait the cpu calm down before we record the data;
-      conf->nchk       += conf->nchk_alive_expect[i];
-      conf->nchk_alive += conf->nchk_alive_actual[i];
+      fprintf(stderr, "%d parameters are missing!!!\n", nparam_expect - nparam_actual);
+      usage();
+      return EXIT_FAILURE;
     }
-  for(i = 0; i < conf->nport_dead; i++)
-    conf->nchk       += conf->nchk_dead[i];
-  
-  if(conf->pad == 1)
-    conf->nchk = 48;
-  conf->df_res       = (double)conf->prd/(double)conf->ndf_chk_prd;
-  conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
-  conf->nchan        = conf->nchk * conf->nchan_chk;
-  conf->ichk0        = -(conf->cfreq + 1.0)/conf->nchan_chk + 0.5 * conf->nchk;
-  
-  conf->ref.sec_int     = floor(conf->df_res * conf->ref.idf_prd) + conf->ref.sec + SECDAY * conf->ref.epoch;
-  conf->ref.picoseconds = 1E6 * round(1.0E6 * (conf->prd - floor(conf->df_res * conf->ref.idf_prd)));
 
-  conf->tout.tv_sec     = conf->prd;
-  conf->tout.tv_usec    = 0;
+  /* Do some simple calculations */
+  configuration->nchan_expect         = configuration->nchan_per_chunk * configuration->nchunk_expect;
+  configuration->nchan_actual         = configuration->nchan_per_chunk * configuration->nchunk_actual;
   
-  init_buf(conf);  // Initi ring buffer, must be here;
+  configuration->remind_pktsize_bytes = configuration->pktsize_bytes - configuration->offset_pktsize_bytes;
+  configuration->pkt_tres_secs        = configuration->pkt_period_secs/(double)configuration->npkt_per_chunk_period;
+  configuration->rbuf_tres_secs       = configuration->pkt_tres_secs * configuration->npkt_per_chunk_rbuf;
+  configuration->ref_chunk_idx        = -(configuration->freq + 1.0)/configuration->nchan_per_chunk + 0.5 * configuration->nchan_expect;
+  
+  configuration->int_reftime_secs   = floor(configuration->pkt_tres_secs * configuration->ref_pkt_idx) + configuration->ref_secs + SECDAY * configuration->ref_epoch;
+  configuration->frac_reftime_psecs = 1E6 * round(1.0E6 * (configuration->pkt_period_secs - floor(configuration->pkt_tres_secs * configuration->ref_pkt_idx)));
+  
+  configuration->timeout.tv_sec     = configuration->pkt_period_secs;
+  configuration->timeout.tv_usec    = 0.0;
+  
+  configuration->rbufsize_bytes     = configuration->nchunk_expect * configuration->remind_pktsize_bytes * configuration->npkt_per_chunk_rbuf;
+  configuration->tbufsize_bytes     = configuration->nchunk_expect * configuration->remind_pktsize_bytes * configuration->npkt_per_chunk_tbuf;
+  configuration->tbuf_thred_pkts    = (uint64_t)(0.5 * configuration->nchan_expect * configuration->npkt_per_chunk_tbuf);
+  
+  /* Setup log interface */
+  char fname_log[MAX_STRLEN];
+  FILE *fp_log = NULL;
+  sprintf(fname_log, "%s/capture.log", configuration->runtime_dir);  // The file will be in different directory for different beam;
+  fp_log = fopen(fname_log, "ab+"); 
+  if(fp_log == NULL)
+    {
+      fprintf(stderr, "Can not open log file %s\n", fname_log);
+      return EXIT_FAILURE;
+    }
+
+  /* Log the information so far */
+  configuration->runtime_log = multilog_open("capture", 1);
+  multilog_add(configuration->runtime_log, fp_log);
+  multilog(configuration->runtime_log, LOG_INFO, "CAPTURE START\n\n");
+  multilog(configuration->runtime_log, LOG_INFO, "We are going to capture data from %s:%d.\n", configuration->ip, configuration->port);
+  multilog(configuration->runtime_log, LOG_INFO, "The DADA key for the capture is %x.\n", configuration->rbuf_key);
+  multilog(configuration->runtime_log, LOG_INFO, "The center frequency of the capture is %f.\n", configuration->freq);
+  multilog(configuration->runtime_log, LOG_INFO, "The reference information of the capture is %"PRIu64"%d:%"PRIu64".\n", configuration->ref_epoch, configuration->ref_secs, configuration->ref_pkt_idx);
+  multilog(configuration->runtime_log, LOG_INFO, "The reference time information is %lld:%"PRIu64".\n", (long long)configuration->int_reftime_secs, configuration->frac_reftime_psecs);
+  multilog(configuration->runtime_log, LOG_INFO, "The packet time resolution and ring buffer time resolution are %f and %f seconds.\n", configuration->pkt_tres_secs, configuration->rbuf_tres_secs);
+  multilog(configuration->runtime_log, LOG_INFO, "The reference frequency chunk index is %f.\n", configuration->ref_chunk_idx);  
+  multilog(configuration->runtime_log, LOG_INFO, "The data header template of the capture is %s.\n", configuration->dada_hdr_fname);
+  multilog(configuration->runtime_log, LOG_INFO, "The instrucment name will be %s in the DADA header.\n", configuration->instrument_name);
+  multilog(configuration->runtime_log, LOG_INFO, "The beamformer packet size is %d bytes, but the data we record will offset by %d bytes.\n", configuration->pktsize_bytes, configuration->offset_pktsize_bytes);
+  multilog(configuration->runtime_log, LOG_INFO, "%d bytes of each beamformer packet will be recorded.\n", configuration->remind_pktsize_bytes);
+  multilog(configuration->runtime_log, LOG_INFO, "%d frequency chunks are expected, but we can only get %d frequency chunks.\n", configuration->nchunk_expect, configuration->nchunk_actual);
+  multilog(configuration->runtime_log, LOG_INFO, "%d frequency channels are expected, but we can only get %d frequency channels.\n", configuration->nchan_expect, configuration->nchan_actual);
+  multilog(configuration->runtime_log, LOG_INFO, "The stream period is %d seconds.\n", configuration->pkt_period_secs);
+  multilog(configuration->runtime_log, LOG_INFO, "%"PRIu64" of packets in each period for each frequency chunk.\n", configuration->npkt_per_chunk_period);  
+  multilog(configuration->runtime_log, LOG_INFO, "%"PRIu64" of packets in each ring buffer block for each frequency chunk.\n", configuration->npkt_per_chunk_rbuf);
+  multilog(configuration->runtime_log, LOG_INFO, "%"PRIu64" of packets in each temporary buffer for each frequency chunk.\n", configuration->npkt_per_chunk_tbuf);
+  multilog(configuration->runtime_log, LOG_INFO, "The size of ring buffer and temporart buffer are %"PRIu64" and %"PRIu64" bytes.\n\n", configuration->rbufsize_bytes, configuration->tbufsize_bytes);
+  multilog(configuration->runtime_log, LOG_INFO, "The threshold for the buffer change is %"PRIu64" packets.\n\n", configuration->tbuf_thred_pkts);
   
   return EXIT_SUCCESS;
 }
 
-int destroy_capture(conf_t conf)
+int initialize_buffer(configuration_t *configuration)
 {
-  int i;
-  
-  for(i = 0; i < MPORT_CAPTURE; i++)
+  /* Create HDU and check the size of buffer bolck */
+  configuration->hdu = dada_hdu_create(configuration->runtime_log);
+  dada_hdu_set_key(configuration->hdu, configuration->rbuf_key);
+  if(dada_hdu_connect(configuration->hdu) < 0)
     {
-      pthread_mutex_destroy(&hdr_ref_mutex[i]);
-      pthread_mutex_destroy(&ndf_port_mutex[i]);
+      multilog(configuration->runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fclose(configuration->fp_log);
+      dada_hdu_destroy(configuration->hdu);
+      return EXIT_FAILURE;    
+    }
+  
+  /* make ourselves the write client */
+  if(dada_hdu_lock_write(configuration->hdu) < 0) 
+    {
+      multilog(configuration->runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fclose(configuration->fp_log);
+      dada_hdu_disconnect(configuration->hdu);      
+      return EXIT_FAILURE;
+    }
+  configuration->db_data = (ipcbuf_t *)(configuration->hdu->data_block);
+  configuration->db_hdr  = (ipcbuf_t *)(configuration->hdu->header_block);
+
+  /* Check the buffer size */
+  if(configuration->rbufsize_bytes != ipcbuf_get_bufsz(configuration->db_data))  
+    {
+      multilog(configuration->runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fclose(configuration->fp_log);
+      dada_hdu_unlock_write(configuration->hdu);
+      dada_hdu_disconnect(configuration->hdu);
+      dada_hdu_destroy(configuration->hdu);
+      return EXIT_FAILURE;    
     }
 
-  dada_hdu_unlock_write(conf.hdu);
-  dada_hdu_disconnect(conf.hdu);
-  dada_hdu_destroy(conf.hdu);
+  /* Disable start-of-data */
+  if(ipcbuf_disable_sod(configuration->db_data) < 0)
+    {
+      multilog(configuration->runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fclose(configuration->fp_log);
+      dada_hdu_unlock_write(configuration->hdu);
+      dada_hdu_disconnect(configuration->hdu);
+      dada_hdu_destroy(configuration->hdu);
+      return EXIT_FAILURE;
+    }
+
+  /* Create temporary buffer */
+  configuration->tbuf = (char *)malloc(configuration->tbufsize_bytes * sizeof(char));
+  
+  /* Get the first ring buffer block ready */
+  configuration->rbuf = ipcbuf_get_next_write(configuration->db_data);
+  if(configuration->rbuf == NULL)
+    {	     
+      multilog(configuration->runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fclose(configuration->fp_log);
+      dada_hdu_unlock_write(configuration->hdu);
+      dada_hdu_disconnect(configuration->hdu);
+      dada_hdu_destroy(configuration->hdu);
+      return EXIT_FAILURE;
+    }
   
   return EXIT_SUCCESS;
 }
 
-int dada_header(conf_t conf)
+int do_capture(configuration_t configuration)
 {
-  char *hdrbuf = NULL;
-  
-  /* Register header */
-  hdrbuf = ipcbuf_get_next_write(conf.db_hdr);
-  if(!hdrbuf)
-    {
-      multilog(runtime_log, LOG_ERR, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  if(!conf.hfname)
-    {
-      multilog(runtime_log, LOG_ERR, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }  
-  if(fileread(conf.hfname, hdrbuf, DADA_HDRSZ) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  /* Setup DADA header with given values */
-  if(ascii_header_set(hdrbuf, "UTC_START", "%s", conf.utc_start) < 0)  
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  if(ascii_header_set(hdrbuf, "RA", "%s", conf.ra) < 0)  
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  if(ascii_header_set(hdrbuf, "DEC", "%s", conf.dec) < 0)  
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  if(ascii_header_set(hdrbuf, "SOURCE", "%s", conf.source) < 0)  
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", conf.instrument) < 0)  
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  
-  if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, conf.picoseconds) < 0)  
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }    
-  if(ascii_header_set(hdrbuf, "FREQ", "%.6lf", conf.cfreq) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  if(ascii_header_set(hdrbuf, "MJD_START", "%.10lf", conf.mjd_start) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  if(ascii_header_set(hdrbuf, "NCHAN", "%d", conf.nchan) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }  
-  if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &conf.chan_res) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  conf.bw = conf.chan_res * conf.nchan;
-  if(ascii_header_set(hdrbuf, "BW", "%.6lf", conf.bw) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
-  /* donot set header parameters anymore - acqn. doesn't start */
-  if(ipcbuf_mark_filled(conf.db_hdr, DADA_HDRSZ) < 0)
-    {
-      multilog(runtime_log, LOG_ERR, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }
+  return EXIT_SUCCESS;
+}
 
-  return EXIT_SUCCESS;	      
+int destroy_capture(configuration_t configuration)
+{
+  /* Finish the log */
+  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE FINISH\n\n");
+  fclose(configuration.fp_log);
+
+  /* Free hdu */
+  dada_hdu_unlock_write(configuration.hdu);
+  dada_hdu_disconnect(configuration.hdu);
+  dada_hdu_destroy(configuration.hdu);
+  
+  return EXIT_SUCCESS;
 }

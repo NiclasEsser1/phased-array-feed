@@ -33,20 +33,14 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib
 INCLUDE_DIRS = -I/usr/local/include
 
-capture_main:capture_main.o capture.o control.o 
-	$(CC) -o capture_main capture_main.o capture.o control.o $(LIB_DIRS) $(LIBS)
+capture_main:capture_main.o capture.o 
+	$(CC) -o capture_main capture_main.o capture.o $(LIB_DIRS) $(LIBS)
 
 capture_main.o:capture_main.c
 	$(CC) -c capture_main.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 capture.o:capture.c
 	$(CC) -c capture.c $(INCLUDE_DIRS) ${C_FLAGS}
-
-hdr.o:hdr.c
-	$(CC) -c hdr.c $(INCLUDE_DIRS) ${C_FLAGS}
-
-control.o:control.c
-	$(CC) -c control.c $(INCLUDE_DIRS) ${C_FLAGS}	
 
 clean:
 	rm -f *.o *~
