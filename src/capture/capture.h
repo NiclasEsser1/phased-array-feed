@@ -36,8 +36,8 @@ typedef struct configuration_t
   char dada_hdr_fname[MAX_STRLEN];
   char runtime_dir[MAX_STRLEN];
 
-  uint64_t ref_secs, ref_pkt_idx; 
-  int ref_epoch;
+  uint64_t refpkt_secs, refpkt_idx_period; 
+  int refpkt_epoch;
   
   time_t int_reftime_secs;
   uint64_t frac_reftime_psecs;
@@ -46,7 +46,7 @@ typedef struct configuration_t
   FILE *fp_log;
 
   double pkt_tres_secs, rbuf_tres_secs;
-  double ref_chunk_idx;
+  double refchunk_idx;
 
   uint64_t rbufsize_bytes, tbufsize_bytes;
   uint64_t tbuf_thred_pkts;
@@ -54,11 +54,15 @@ typedef struct configuration_t
   char *tbuf, *rbuf;
   ipcbuf_t *db_data, *db_hdr;
   
+  char *pkt;
+  int sock;
+  
   struct timeval timeout;
   
 }configuration_t;
 
 int parse_arguments(int argc, char **argv, configuration_t *configuration);
+int initialize_socket(configuration_t *configuration);
 int initialize_buffer(configuration_t *configuration);
 int initialize_capture(int argc, char **argv, configuration_t *configuration);
 int do_capture(configuration_t configuration);
