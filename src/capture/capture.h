@@ -23,7 +23,7 @@ typedef struct configuration_t
 
   uint64_t npkt_per_chunk_period;
   uint64_t npkt_per_chunk_rbuf, npkt_per_chunk_tbuf;
-
+  
   int port;
   int pkt_period_secs;
   int nchan_per_chunk;
@@ -61,11 +61,12 @@ typedef struct configuration_t
   
 }configuration_t;
 
-int parse_arguments(int argc, char **argv, configuration_t *configuration);
-int initialize_socket(configuration_t *configuration);
-int initialize_buffer(configuration_t *configuration);
 int initialize_capture(int argc, char **argv, configuration_t *configuration);
 int do_capture(configuration_t configuration);
 int destroy_capture(configuration_t configuration);
+
+int parse_arguments(int argc, char **argv, configuration_t *configuration);
+int initialize_socket(configuration_t *configuration);
+int initialize_buffers(configuration_t *configuration);
 
 #endif

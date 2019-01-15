@@ -102,184 +102,110 @@ int do_capture(configuration_t configuration)
   pkt_idx   = (int64_t)(pkt_idx_period - configuration.refpkt_idx_period) + ((double)pkt_secs - (double)configuration.refpkt_secs) / configuration.pkt_tres_secs;
   chunk_idx = (int)(freq/configuration.nchan_per_chunk + configuration.refchunk_idx);
 
-  //multilog(configuration.runtime_log, LOG_INFO, "%f\t%d\t%f\t%d\t%"PRId64"", freq, configuration.nchan_per_chunk, configuration.refchunk_idx, chunk_idx, pkt_idx);
+  multilog(configuration.runtime_log, LOG_INFO, "%f\t%d\t%f\t%d\t%"PRId64"", freq, configuration.nchan_per_chunk, configuration.refchunk_idx, chunk_idx, pkt_idx);
 
   /* Loop to receive data */
   int i;
-  //while(true)
-  for(i = 0; i<250000 * configuration.nchan_expect; i++)
+  while(true)
     {
-      //multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%d\n", pkt_secs, pkt_idx_period, configuration.npkt_per_chunk_rbuf, configuration.npkt_per_chunk_tbuf, pkt_idx, chunk_idx);
+      /* Only keep data in special range */
+      if(pkt_idx>=0)
+	{	  
+      	  if(pkt_idx<configuration.npkt_per_chunk_rbuf) // Data going to ring buffer block
+      	    {
+      	      counter_rbuf ++;
+      	      rbuf_loc = (uint64_t)((pkt_idx * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
+      	      memcpy(configuration.rbuf + rbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
+      	    }
+	  else if((counter_tbuf <= configuration.tbuf_thred_pkts) && ((pkt_idx - configuration.npkt_per_chunk_rbuf) <= configuration.npkt_per_chunk_tbuf)) 
+	    {	      
+	      counter_tbuf ++;
+      	      tbuf_loc = (uint64_t)(((pkt_idx - configuration.npkt_per_chunk_rbuf) * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
+      	      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
+      	      memcpy(configuration.tbuf + tbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);	      
+	    }
+	  else // Trigger the change
+	    {
+	      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"\n", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
+      	      /* Close current ring buffer block */
+      	      if(ipcbuf_mark_filled(configuration.db_data, configuration.rbufsize_bytes) < 0)
+      		{
+      		  multilog(configuration.runtime_log, LOG_ERR, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      		  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
+      		  
+      		  free(configuration.pkt);
+      		  free(configuration.tbuf);
+      		  fclose(configuration.fp_log);
+      		  dada_hdu_destroy(configuration.hdu);
+      		  exit(EXIT_FAILURE);
+      		}
+      	      /*
+      		To see if the buffer is full, quit if yes.
+      		If we have a reader, there will be at least one buffer which is not full
+      	      */
+      	      if(ipcbuf_get_nfull(configuration.db_data) >= (ipcbuf_get_nbufs(configuration.db_data) - 1)) 
+      		{	     
+      		  multilog(configuration.runtime_log, LOG_ERR, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
+      		  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
+      		  
+      		  free(configuration.pkt);
+      		  free(configuration.tbuf);
+      		  fclose(configuration.fp_log);
+      		  dada_hdu_destroy(configuration.hdu);
+      		  exit(EXIT_FAILURE);		  
+      		}
+      
+      	      /* Get new ring buffer block and copy temporary memory into it */
+      	      configuration.rbuf = ipcbuf_get_next_write(configuration.db_data); 
+      	      if(configuration.rbuf == NULL)
+      		{
+      		  multilog(configuration.runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      		  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
+      		  
+      		  free(configuration.pkt);
+      		  free(configuration.tbuf);
+      		  fclose(configuration.fp_log);
+      		  dada_hdu_destroy(configuration.hdu);
+      		  exit(EXIT_FAILURE);
+      		}
+      	      memcpy(configuration.rbuf, configuration.tbuf, configuration.tbufsize_bytes);
+      	      
+      	      /* Update reference point */
+      	      configuration.refpkt_idx_period += configuration.npkt_per_chunk_rbuf;
+      	      if(configuration.refpkt_idx_period >= configuration.npkt_per_chunk_period)       
+      		{
+      		  configuration.refpkt_secs       += configuration.pkt_period_secs;
+      		  configuration.refpkt_idx_period -= configuration.npkt_per_chunk_period;
+      		}
+      
+      	      /* Check the traffic status */
+      	      elapsed_time += configuration.rbuf_tres_secs;
+      	      npkt_actual_per_blk = counter_rbuf + counter_tbuf;
+      	      npkt_expect  += npkt_expect_per_blk;
+      	      npkt_actual  += npkt_actual_per_blk;
+      	      
+      	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"", elapsed_time, counter_rbuf, counter_tbuf);
+      	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"", elapsed_time, npkt_expect, npkt_actual, npkt_actual_per_blk, npkt_expect_per_blk);
+      	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, loss rate in previous buffer block is %E, loss rate from beginning is %E", elapsed_time, 1.0 - npkt_actual_per_blk/(double)npkt_expect_per_blk, 1.0 - npkt_actual/(double)npkt_expect);
+      	      
+      	      counter_tbuf = 0;
+      	      counter_rbuf = 0;
+      	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"\n", elapsed_time, counter_rbuf, counter_tbuf);
+	    }
+	}
       
       /* Receive a packet */
       if(recvfrom(configuration.sock, (void *)configuration.pkt, configuration.pktsize_bytes, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-	{      
-	  multilog(configuration.runtime_log, LOG_ERR,  "Time out, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
-	  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
-	  
-	  free(configuration.pkt);
-	  free(configuration.tbuf);
-	  fclose(configuration.fp_log);
-	  dada_hdu_destroy(configuration.hdu);
-	  exit(EXIT_FAILURE);
-	}
-      
-      /* index of packet and frequency chunks */
-      ptr      = (uint64_t*)configuration.pkt;
-      writebuf = bswap_64(*ptr);
-      pkt_idx_period  = writebuf & 0x00000000ffffffff;
-      pkt_secs = (writebuf & 0x3fffffff00000000) >> 32;
-      writebuf = bswap_64(*(ptr + 2));
-      freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
-      
-      //configuration.refpkt_idx_period = pkt_idx_period;
-      pkt_idx   = (int64_t)(pkt_idx_period - configuration.refpkt_idx_period) + ((double)pkt_secs - (double)configuration.refpkt_secs) / configuration.pkt_tres_secs;
-      chunk_idx = (int)(freq/configuration.nchan_per_chunk + configuration.refchunk_idx);
-      
-      ///* Only keep data in special range */
-      ////if((configuration.npkt_per_chunk_rbuf + configuration.npkt_per_chunk_tbuf)>pkt_idx>=0)
-      //if((pkt_idx>=0) && (pkt_idx < npkt_per_chunk_buf))
-      //	{
-      //	  if(pkt_idx<configuration.npkt_per_chunk_rbuf) // Data going to ring buffer block
-      //	    {
-      //	      //multilog(configuration.runtime_log, LOG_INFO, "%f\t%d\t%f\t%d\t%"PRId64"", freq, configuration.nchan_per_chunk, configuration.refchunk_idx, chunk_idx, pkt_idx);
-      //	      
-      //	      counter_rbuf ++;
-      //	      rbuf_loc = (uint64_t)((pkt_idx * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
-      //	      memcpy(configuration.rbuf + rbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
-      //	    }
-      //	  else   // Data going to temporary buffer
-      //	    {
-      //	      counter_tbuf ++;
-      //	      tbuf_loc = (uint64_t)(((pkt_idx - configuration.npkt_per_chunk_rbuf) * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
-      //	      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"", pkt_secs, pkt_idx_period, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, configuration.npkt_per_chunk_tbuf, counter_tbuf);
-      //	      
-      //	      if(tbuf_loc<0)
-      //		{
-      //		  multilog(configuration.runtime_log, LOG_INFO, "HERE");
-      //		  exit(EXIT_FAILURE);
-      //		}
-      //	      memcpy(configuration.tbuf + tbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
-      //	    }
-      //
-      //	  if(counter_tbuf > configuration.tbuf_thred_pkts) // Trigger the change
-      //	    {
-      //	      exit(EXIT_FAILURE);
-      //	      
-      //	      //multilog(configuration.runtime_log, LOG_INFO, "HERE\n");
-      //	      /* Close current ring buffer block */
-      //	      if(ipcbuf_mark_filled(configuration.db_data, configuration.rbufsize_bytes) < 0)
-      //		{
-      //		  multilog(configuration.runtime_log, LOG_ERR, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      //		  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
-      //		  
-      //		  free(configuration.pkt);
-      //		  free(configuration.tbuf);
-      //		  fclose(configuration.fp_log);
-      //		  dada_hdu_destroy(configuration.hdu);
-      //		  exit(EXIT_FAILURE);
-      //		}
-      //	      /*
-      //		To see if the buffer is full, quit if yes.
-      //		If we have a reader, there will be at least one buffer which is not full
-      //	      */
-      //	      if(ipcbuf_get_nfull(configuration.db_data) >= (ipcbuf_get_nbufs(configuration.db_data) - 1)) 
-      //		{	     
-      //		  multilog(configuration.runtime_log, LOG_ERR, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
-      //		  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
-      //		  
-      //		  free(configuration.pkt);
-      //		  free(configuration.tbuf);
-      //		  fclose(configuration.fp_log);
-      //		  dada_hdu_destroy(configuration.hdu);
-      //		  exit(EXIT_FAILURE);		  
-      //		}
-      //
-      //	      /* Get new ring buffer block and copy temporary memory into it */
-      //	      configuration.rbuf = ipcbuf_get_next_write(configuration.db_data); 
-      //	      if(configuration.rbuf == NULL)
-      //		{
-      //		  multilog(configuration.runtime_log, LOG_ERR, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      //		  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
-      //		  
-      //		  free(configuration.pkt);
-      //		  free(configuration.tbuf);
-      //		  fclose(configuration.fp_log);
-      //		  dada_hdu_destroy(configuration.hdu);
-      //		  exit(EXIT_FAILURE);
-      //		}
-      //	      memcpy(configuration.rbuf, configuration.tbuf, configuration.tbufsize_bytes);
-      //	      
-      //	      /* Update reference point */
-      //	      configuration.refpkt_idx_period += configuration.npkt_per_chunk_rbuf;
-      //	      if(configuration.refpkt_idx_period >= configuration.npkt_per_chunk_period)       
-      //		{
-      //		  configuration.refpkt_secs       += configuration.pkt_period_secs;
-      //		  configuration.refpkt_idx_period -= configuration.npkt_per_chunk_period;
-      //		}
-      //
-      //	      /* Check the traffic status */
-      //	      elapsed_time += configuration.rbuf_tres_secs;
-      //	      npkt_actual_per_blk = counter_rbuf + counter_tbuf;
-      //	      npkt_expect  += npkt_expect_per_blk;
-      //	      npkt_actual  += npkt_actual_per_blk;
-      //	      
-      //	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"", elapsed_time, counter_rbuf, counter_tbuf);
-      //	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"", elapsed_time, npkt_expect, npkt_actual, npkt_actual_per_blk, npkt_expect_per_blk);
-      //	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, loss rate in previous buffer block is %E, loss rate from beginning is %E", elapsed_time, 1.0 - npkt_actual_per_blk/(double)npkt_expect_per_blk, 1.0 - npkt_actual/(double)npkt_expect);
-      //	      
-      //	      counter_tbuf = 0;
-      //	      counter_rbuf = 0;
-      //	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"\n", elapsed_time, counter_rbuf, counter_tbuf);
-      //	    }
-      //	}
-      //
-      ///* Receive a packet */
-      //if(recvfrom(configuration.sock, (void *)configuration.pkt, configuration.pktsize_bytes, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-      //	{      
-      //	  multilog(configuration.runtime_log, LOG_ERR,  "Time out, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      //	  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
-      //	  
-      //	  free(configuration.pkt);
-      //	  free(configuration.tbuf);
-      //	  fclose(configuration.fp_log);
-      //	  dada_hdu_destroy(configuration.hdu);
-      //	  exit(EXIT_FAILURE);
-      //	}
-      //
-      ///* index of packet and frequency chunks */
-      //ptr      = (uint64_t*)configuration.pkt;
-      //writebuf = bswap_64(*ptr);
-      //pkt_idx_period  = writebuf & 0x00000000ffffffff;
-      //pkt_secs = (writebuf & 0x3fffffff00000000) >> 32;
-      //writebuf = bswap_64(*(ptr + 2));
-      //freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
-      //
-      //pkt_idx   = (int64_t)(pkt_idx_period - configuration.refpkt_idx_period) + ((double)pkt_secs - (double)configuration.refpkt_secs) / configuration.pkt_tres_secs;
-      //chunk_idx = (int)(freq/configuration.nchan_per_chunk + configuration.refchunk_idx);
-      //
-      //if(chunk_idx<0)
-      //multilog(configuration.runtime_log, LOG_INFO, "CHUNK IDX IS WRONG\n\n");
-    }
-
-  configuration.refpkt_secs       = pkt_secs;      
-  configuration.refpkt_idx_period = pkt_idx_period;
-  for(i = 0; i<100000; i++)
-    {
-      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%d\t%f\n", pkt_secs, pkt_idx_period, configuration.npkt_per_chunk_rbuf, configuration.npkt_per_chunk_tbuf, pkt_idx, chunk_idx, ((double)pkt_secs - (double)configuration.refpkt_secs) / configuration.pkt_tres_secs);
-      
-      /* Receive a packet */
-      if(recvfrom(configuration.sock, (void *)configuration.pkt, configuration.pktsize_bytes, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-	{      
-	  multilog(configuration.runtime_log, LOG_ERR,  "Time out, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
-	  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
-	  
-	  free(configuration.pkt);
-	  free(configuration.tbuf);
-	  fclose(configuration.fp_log);
-	  dada_hdu_destroy(configuration.hdu);
-	  exit(EXIT_FAILURE);
-	}
+      	{      
+      	  multilog(configuration.runtime_log, LOG_ERR,  "Time out, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      	  multilog(configuration.runtime_log, LOG_INFO, "CAPTURE ABORT\n\n");
+      	  
+      	  free(configuration.pkt);
+      	  free(configuration.tbuf);
+      	  fclose(configuration.fp_log);
+      	  dada_hdu_destroy(configuration.hdu);
+      	  exit(EXIT_FAILURE);
+      	}
       
       /* index of packet and frequency chunks */
       ptr      = (uint64_t*)configuration.pkt;
@@ -291,6 +217,9 @@ int do_capture(configuration_t configuration)
       
       pkt_idx   = (int64_t)(pkt_idx_period - configuration.refpkt_idx_period) + ((double)pkt_secs - (double)configuration.refpkt_secs) / configuration.pkt_tres_secs;
       chunk_idx = (int)(freq/configuration.nchan_per_chunk + configuration.refchunk_idx);
+      
+      if(chunk_idx<0)
+	multilog(configuration.runtime_log, LOG_INFO, "CHUNK IDX IS WRONG\n\n");
     }
   
   return EXIT_SUCCESS;
