@@ -525,7 +525,8 @@ int initialize_socket(configuration_t *configuration)
 {
   struct sockaddr_in sa, fromsa;
   configuration->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  setsockopt(configuration->sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&configuration->timeout, sizeof(configuration->timeout));  
+  //configuration->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_UDP);
+  //setsockopt(configuration->sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&configuration->timeout, sizeof(configuration->timeout));  
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(configuration->port);
