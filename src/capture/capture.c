@@ -230,8 +230,11 @@ void *capture(void *conf)
   ndf_chk_delay[ithread] = idf_blk;
   ichk = (int)(freq/nchan_chk + ichk0);
   
-  multilog(runtime_log, LOG_INFO, "%s\t%d\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\t%"PRId64"\n\n\n", captureconf->ip_alive[ithread], captureconf->port_alive[ithread], ithread, idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, idf_prd, ndf_chk_delay[ithread]);
+  multilog(runtime_log, LOG_INFO, "%d\t%s\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n\n\n", ithread, captureconf->ip_alive[ithread], captureconf->port_alive[ithread], idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, ndf_chk_delay[ithread]);
 
+  hdr_ref[ithread].idf_prd = idf_prd;
+  hdr_ref[ithread].sec = df_sec;
+  
   //clock_gettime(CLOCK_REALTIME, &start);
   while(!quit)
     {
@@ -240,7 +243,6 @@ void *capture(void *conf)
 	  if(idf_blk < rbuf_ndf_chk)  // Put data into current ring buffer block
 	    {
 	      transit[ithread] = 0; // The reference is already updated.
-	      
 	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
 	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
 	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
@@ -252,6 +254,7 @@ void *capture(void *conf)
 	    }
 	  else
 	    {
+	      //multilog(runtime_log, LOG_INFO, "HERE");
 	      transit[ithread] = 1; // The reference should be updated very soon
 	      if(idf_blk < rbuf_tbuf_ndf_chk)
 		{		  
