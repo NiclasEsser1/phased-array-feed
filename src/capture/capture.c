@@ -117,16 +117,16 @@ int do_capture(configuration_t configuration)
       	      rbuf_loc = (uint64_t)((pkt_idx * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
       	      memcpy(configuration.rbuf + rbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
       	    }
-	  else if((counter_tbuf <= configuration.tbuf_thred_pkts) && ((pkt_idx - configuration.npkt_per_chunk_rbuf) <= configuration.npkt_per_chunk_tbuf)) 
+	  else if((counter_tbuf <= configuration.tbuf_thred_pkts) && (pkt_idx < configuration.npkt_per_chunk_rbuf + configuration.npkt_per_chunk_tbuf)) 
 	    {	      
 	      counter_tbuf ++;
       	      tbuf_loc = (uint64_t)(((pkt_idx - configuration.npkt_per_chunk_rbuf) * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
-      	      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
+      	      //multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
       	      memcpy(configuration.tbuf + tbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);	      
 	    }
 	  else // Trigger the change
 	    {
-	      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"\n", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
+	      multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
       	      /* Close current ring buffer block */
       	      if(ipcbuf_mark_filled(configuration.db_data, configuration.rbufsize_bytes) < 0)
       		{
@@ -191,6 +191,21 @@ int do_capture(configuration_t configuration)
       	      counter_tbuf = 0;
       	      counter_rbuf = 0;
       	      multilog(configuration.runtime_log, LOG_INFO, "%f seconds, %"PRIu64"\t%"PRIu64"\n", elapsed_time, counter_rbuf, counter_tbuf);
+
+	      /* put the packet which triggers the change into memory */
+	      pkt_idx   = (int64_t)(pkt_idx_period - configuration.refpkt_idx_period) + ((double)pkt_secs - (double)configuration.refpkt_secs) / configuration.pkt_tres_secs;
+	      if(pkt_idx<configuration.npkt_per_chunk_rbuf) // Data going to ring buffer block
+		{
+		  counter_rbuf ++;
+		  rbuf_loc = (uint64_t)((pkt_idx * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
+		  memcpy(configuration.rbuf + rbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
+		}
+	      else if(pkt_idx < (configuration.npkt_per_chunk_tbuf + configuration.npkt_per_chunk_rbuf))
+		{	      
+		  counter_tbuf ++;
+		  tbuf_loc = (uint64_t)(((pkt_idx - configuration.npkt_per_chunk_rbuf) * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
+		  memcpy(configuration.tbuf + tbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);	      
+		}
 	    }
 	}
       
@@ -400,7 +415,7 @@ int parse_arguments(int argc, char **argv, configuration_t *configuration)
   multilog(configuration->runtime_log, LOG_INFO, "%"PRIu64" of packets in each temporary buffer for each frequency chunk.", configuration->npkt_per_chunk_tbuf);
   multilog(configuration->runtime_log, LOG_INFO, "The size of ring buffer and tempoary buffer are %"PRIu64" and %"PRIu64" bytes.", configuration->rbufsize_bytes, configuration->tbufsize_bytes);
   multilog(configuration->runtime_log, LOG_INFO, "The threshold for the buffer change is %"PRIu64" packets.\n\n", configuration->tbuf_thred_pkts);
-  
+
   return EXIT_SUCCESS;
 }
 
