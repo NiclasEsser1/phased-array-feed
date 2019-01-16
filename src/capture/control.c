@@ -65,11 +65,15 @@ int threads(conf_t *conf)
 	  pthread_attr_destroy(&attr);
 	}
       else
-	ret[i] = pthread_create(&thread[i], NULL, capture, (void *)conf);
+	//ret[i] = pthread_create(&thread[i], NULL, capture, (void *)conf);
+	ret[i] = pthread_create(&thread[i], &attr, capture, (void *)&conf_thread[i]);
     }
 
   if(!(conf->cpu_bind == 0)) 
-    {
+    {      
+      conf_thread[i] = *conf;
+      conf_thread[i].ithread = i;
+      
       pthread_attr_init(&attr);
       CPU_ZERO(&cpus);
       CPU_SET(conf->rbuf_ctrl_cpu, &cpus);      
@@ -132,6 +136,7 @@ void *buf_control(void *conf)
 	    //transited = transited && transit[i]; // all happen, take action
 	    transited = transited || transit[i]; // one happens, take action
 	}
+      multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t0");
       if(quit)
 	{
 	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t0...");
@@ -224,6 +229,7 @@ void *buf_control(void *conf)
 	}
       
       /* To see if we need to copy data from temp buffer into ring buffer */
+      multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t1");
       while(transited && (!quit))
 	{
 	  transited = transit[0];
@@ -237,7 +243,8 @@ void *buf_control(void *conf)
 	  pthread_exit(NULL);
 	  return NULL;
 	}
- 
+      multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t2");
+
       ntail = 0;
       for(i = 0; i < captureconf->nport_alive; i++)
 	ntail = (tail[i] > ntail) ? tail[i] : ntail;
