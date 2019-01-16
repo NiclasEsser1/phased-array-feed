@@ -115,14 +115,14 @@ int do_capture(configuration_t configuration)
       	    {
       	      counter_rbuf ++;
       	      rbuf_loc = (uint64_t)((pkt_idx * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
-      	      memcpy(configuration.rbuf + rbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
+      	      //memcpy(configuration.rbuf + rbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);
       	    }
 	  else if((counter_tbuf <= configuration.tbuf_thred_pkts) && (pkt_idx < configuration.npkt_per_chunk_rbuf + configuration.npkt_per_chunk_tbuf)) 
 	    {	      
 	      counter_tbuf ++;
       	      tbuf_loc = (uint64_t)(((pkt_idx - configuration.npkt_per_chunk_rbuf) * configuration.nchunk_expect + chunk_idx) * configuration.remind_pktsize_bytes);
       	      //multilog(configuration.runtime_log, LOG_INFO, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\t%"PRIu64"\t%"PRIu64"", pkt_secs, pkt_idx_period, chunk_idx, tbuf_loc, pkt_idx - configuration.npkt_per_chunk_rbuf, counter_tbuf);     	      
-      	      memcpy(configuration.tbuf + tbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);	      
+      	      //memcpy(configuration.tbuf + tbuf_loc, configuration.pkt + configuration.offset_pktsize_bytes, configuration.remind_pktsize_bytes);	      
 	    }
 	  else // Trigger the change
 	    {
