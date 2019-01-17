@@ -260,8 +260,11 @@ int baseband2filterbank(conf_t conf)
   gridsize_detect_add_scale            = conf.gridsize_detect_add_scale ;
   blocksize_detect_add_scale           = conf.blocksize_detect_add_scale ;
   gridsize_swap_select_transpose       = conf.gridsize_swap_select_transpose;   
-  blocksize_swap_select_transpose      = conf.blocksize_swap_select_transpose;  
-       
+  blocksize_swap_select_transpose      = conf.blocksize_swap_select_transpose;
+  
+  fprintf(stdout, "BASEBAND2FILTERBANK_READY\n");  // Ready to take data from ring buffer, just before the header thing
+  fflush(stdout);
+    
   /* Register header */
   if(register_header(&conf))
     {
@@ -269,15 +272,9 @@ int baseband2filterbank(conf_t conf)
       fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-
-  for(i = 0; i < NCHAN_OUT; i++)
-    {
-      conf.hdat_offs[i] = 1E8;
-      conf.hdat_scl[i]  = 1E6;
-    }
   
   while(!ipcbuf_eod(conf.db_in))
-    {      
+    {
       conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
       conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
       
@@ -288,7 +285,8 @@ int baseband2filterbank(conf_t conf)
       	  dat_offs_scl(conf);
       	  for(i = 0; i < NCHAN_OUT; i++)
       	    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
-      	}
+	}
+      multilog (runtime_log, LOG_INFO, "HERE inside baseband2filterbank\n");
       
       for(i = 0; i < conf.nrun_blk; i ++)
 	{
@@ -300,7 +298,7 @@ int baseband2filterbank(conf_t conf)
 	      bufrt2_offset = j * conf.bufrt2_offset;
 	      dbufout_offset = j * conf.dbufout_offset;
 	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
-		      
+	      
 	      /* Copy data into device */
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
 	      
@@ -374,6 +372,7 @@ int dat_offs_scl(conf_t conf)
   //cufftComplex temp_out[temp_out_len];
   for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
     {
+      //multilog (runtime_log, LOG_INFO, "HERE inside baseband2filterbank\n");
       for (j = 0; j < conf.nstream; j++)
 	{
 	  hbufin_offset = j * conf.hbufin_offset + i;

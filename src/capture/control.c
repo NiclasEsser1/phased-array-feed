@@ -136,7 +136,7 @@ void *buf_control(void *conf)
 	    //transited = transited && transit[i]; // all happen, take action
 	    transited = transited || transit[i]; // one happens, take action
 	}
-      multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t0");
+      //multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t0");
       if(quit)
 	{
 	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t0...");
@@ -168,7 +168,7 @@ void *buf_control(void *conf)
       //multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
       multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       
-      fprintf(stdout, "%f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      fprintf(stdout, "CAPTURE_STATUS %f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       fflush(stdout);
 	  
       /* Close current buffer */
@@ -229,7 +229,7 @@ void *buf_control(void *conf)
 	}
       
       /* To see if we need to copy data from temp buffer into ring buffer */
-      multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t1");
+      //multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t1");
       while(transited && (!quit))
 	{
 	  transited = transit[0];
@@ -243,7 +243,7 @@ void *buf_control(void *conf)
 	  pthread_exit(NULL);
 	  return NULL;
 	}
-      multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t2");
+      //multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t2");
 
       ntail = 0;
       for(i = 0; i < captureconf->nport_alive; i++)
@@ -352,6 +352,9 @@ void *capture_control(void *conf)
       return NULL;
     }
 
+  fprintf(stdout, "CAPTURE_READY\n");
+  //fflush(stdout);
+  
   while(!quit)
     {
       msg_len = 0;

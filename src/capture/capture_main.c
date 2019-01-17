@@ -26,7 +26,7 @@ void usage()
 	  " -g Frequency channels in each chunk\n"
 	  " -h Show help\n"
 	  " -i Reference information for the current capture, get from BMF packet header, epoch:sec:idf\n"
-	  " -j Which directory to put log file\n"
+	  " -j Which directory to put runtime file\n"
 	  " -k The CPU for buf control thread\n"
 	  " -l The setup for the capture control, the format of it is \"cpt_ctrl:cpt_ctrl_cpu\"\n"
 	  " -m Bind thread to CPU or not\n"
@@ -189,7 +189,6 @@ int main(int argc, char **argv)
 	}
       if(i == conf.nport_alive)
 	{
-	  //fprintf(stdout, "We can not bind all threads into one single CPU, has to abort!\n");
 	  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  return EXIT_FAILURE;
 	}

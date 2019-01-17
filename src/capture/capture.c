@@ -233,7 +233,7 @@ void *capture(void *conf)
   multilog(runtime_log, LOG_INFO, "%d\t%s\t%d\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRId64"\n\n\n", ithread, captureconf->ip_alive[ithread], captureconf->port_alive[ithread], idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, ndf_chk_delay[ithread]);
 
   hdr_ref[ithread].idf_prd = idf_prd;
-  hdr_ref[ithread].sec = df_sec;
+  hdr_ref[ithread].sec     = df_sec;
   
   //clock_gettime(CLOCK_REALTIME, &start);
   while(!quit)

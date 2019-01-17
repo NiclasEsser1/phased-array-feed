@@ -20,8 +20,8 @@
 #define NCHK_BEAM             48   // How many frequency chunks we will receive, we should read the number from metadata
 #define NCHAN_CHK             7
 #define NSAMP_DF              128
-#define NPOL_IN             2
-#define NDIM_IN              2
+#define NPOL_IN               2
+#define NDIM_IN               2
 #define NCHAN_IN              (NCHK_BEAM * NCHAN_CHK)
 
 #define NBYTE_RT              8    // cudaComplex
@@ -31,14 +31,12 @@
 #define OSAMP_RATEI           0.84375
 #define CUFFT_RANK            1
 
-#define CUFFT_NX             64
-#define CUFFT_MOD            27              // Set to remove oversampled data
+#define CUFFT_NX             128
+#define CUFFT_MOD            108              // Set to remove oversampled data
 #define NCHAN_KEEP_CHAN      (int)(CUFFT_NX * OSAMP_RATEI)
-//#define NCHAN_OUT            512            // Final number of channels for search mode
-#define NCHAN_OUT            1024            // Final number of channels for search mode
+#define NCHAN_OUT            512            // Final number of channels for search mode
 #define NCHAN_KEEP_BAND      16384           // a good number which is divisible by NCHAN_OUT
 #define NCHAN_EDGE           (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
-//#define NSAMP_AVE            (int)(NCHAN_KEEP_BAND / NCHAN_OUT)
 
 #define NCHAN_RATEI          (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND) 
 
