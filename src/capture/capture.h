@@ -17,25 +17,22 @@
 #define MCHK_CAPTURE  48
 #define SECDAY        86400.0
 #define MJD1970       40587.0
+#define DFSZ          7232
+#define NCHAN_CHK     7
+#define PRD           27
+#define NDF_CHK_PRD   250000
 
-typedef struct ref_t
-{  
-  uint64_t sec, idf_prd; // Reference seconds and idf, from BMF when we start the capture 
-  int epoch;
-  time_t sec_int;
-  uint64_t picoseconds;
-}ref_t;
-  
 typedef struct conf_t
 {
-  ref_t ref;
+  FILE *logfile;
+  
   key_t key;
   dada_hdu_t *hdu;
   
   uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
 
   int pad;
-  int dfsz, dfoff, required_dfsz;
+  int dfoff, required_dfsz;
   int cpt_cpu[MPORT_CAPTURE];
   int rbuf_ctrl_cpu, cpt_ctrl_cpu;
   int cpt_ctrl;
@@ -56,29 +53,28 @@ typedef struct conf_t
 
   char instrument[MSTR_LEN];
   double cfreq;
-  int nchan, nchan_chk, nchk, nchk_alive;    // Frequency chunks of current capture, including all alive chunks and dead chunks
+  int nchan, nchk, nchk_alive;    // Frequency chunks of current capture, including all alive chunks and dead chunks
   
   char hfname[MSTR_LEN];
 
-  int prd;
   char dir[MSTR_LEN];
   double df_res;  // time resolution of each data frame, for start time determination;
   double blk_res; // time resolution of each buffer block, for start time determination;
 
-  //int ichk0;
   double ichk0;
   uint64_t rbufsz, tbufsz;
 
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
   
   double chan_res, bw;
-  time_t sec_int;
-  uint64_t picoseconds;
+  uint64_t sec_ref, idf_prd_ref;
+  int epoch_ref;
+  time_t sec_int, sec_int_ref;
+  uint64_t picoseconds, picoseconds_ref;
   char utc_start[MSTR_LEN];
   double mjd_start;
 
   struct timeval tout;
-  uint64_t ndf_chk_prd;
   
   int ithread;
 }conf_t;

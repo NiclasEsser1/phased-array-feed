@@ -13,15 +13,12 @@
 #include <sys/socket.h>
 #include <linux/un.h>
 
-#include "multilog.h"
 #include "ipcbuf.h"
 #include "capture.h"
-
-extern multilog_t *runtime_log;
+#include "log.h"
 
 extern char *cbuf;
 extern char *tbuf;
-//extern double elapsed_time;
 
 extern int quit;
 
@@ -36,6 +33,7 @@ extern hdr_t hdr_ref[MPORT_CAPTURE];
 
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t log_mutex;
 
 int threads(conf_t *conf)
 {
@@ -60,12 +58,10 @@ int threads(conf_t *conf)
 	  CPU_ZERO(&cpus);
 	  CPU_SET(conf->cpt_cpu[i], &cpus);
 	  pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-	  //ret[i] = pthread_create(&thread[i], &attr, capture, (void *)conf);
 	  ret[i] = pthread_create(&thread[i], &attr, capture, (void *)&conf_thread[i]);
 	  pthread_attr_destroy(&attr);
 	}
       else
-	//ret[i] = pthread_create(&thread[i], NULL, capture, (void *)conf);
 	ret[i] = pthread_create(&thread[i], &attr, capture, (void *)&conf_thread[i]);
     }
 
@@ -108,10 +104,6 @@ int threads(conf_t *conf)
 
 void *buf_control(void *conf)
 {
-  /* 
-     The software does not quit when sometime too many temp packets?
-     Stuck at the buffer get?
-   */
   conf_t *captureconf = (conf_t *)conf;
   int i, nchk = captureconf->nchk, transited = 0;
   uint64_t cbuf_loc, tbuf_loc, ntail;
@@ -136,10 +128,12 @@ void *buf_control(void *conf)
 	    //transited = transited && transit[i]; // all happen, take action
 	    transited = transited || transit[i]; // one happens, take action
 	}
-      //multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t0");
+      
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Just after buffer transit state change");
       if(quit)
 	{
-	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t0...");
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Quit just after the buffer transit state change");
+	  paf_log_close(captureconf->logfile);
 	  
 	  pthread_exit(NULL);
 	  return NULL;
@@ -165,19 +159,18 @@ void *buf_control(void *conf)
       else
 	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
       ndf_expect += ndf_blk_expect;
-      //multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect), elapsed_time);
-      multilog(runtime_log, LOG_INFO,  "%s\t%d\t%f\t%E\t%E\n", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "%s starts from port %d, packet loss rate %d %f %E %E", captureconf->ip_alive[0], captureconf->port_alive[0], rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Packets counters, %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"", ndf_actual, ndf_expect, ndf_blk_actual, ndf_blk_expect);
       
-      fprintf(stdout, "CAPTURE_STATUS %f %f %f\n", rbuf_nblk * captureconf->blk_res, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect));
+      fprintf(stdout, "CAPTURE_STATUS %f %f %f\n", rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
       fflush(stdout);
 	  
       /* Close current buffer */
       if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
 	{
-	  multilog(runtime_log, LOG_ERR, "close_buffer failed, has to abort.\n");
-	  fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t1...");
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  paf_log_close(captureconf->logfile);
 	  
 	  quit = 1;
 	  pthread_exit(NULL);
@@ -189,10 +182,9 @@ void *buf_control(void *conf)
 	If we have a reader, there will be at least one buffer which is not full
       */
       if(ipcbuf_get_nfull(captureconf->db_data) >= (ipcbuf_get_nbufs(captureconf->db_data) - 1)) 
-	{	     
-	  multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
-	  fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
-	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t2...");
+	{
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "buffers are all full, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
+	  paf_log_close(captureconf->logfile);
 	  
 	  quit = 1;
 	  pthread_exit(NULL);
@@ -203,9 +195,8 @@ void *buf_control(void *conf)
       cbuf = ipcbuf_get_next_write(captureconf->db_data); 
       if(cbuf == NULL)
 	{
-	  multilog(runtime_log, LOG_ERR, "open_buffer failed, has to abort.\n");
-	  fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t3...");
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  paf_log_close(captureconf->logfile);
 	  
 	  quit = 1;
 	  pthread_exit(NULL);
@@ -220,16 +211,16 @@ void *buf_control(void *conf)
 	  
 	  pthread_mutex_lock(&hdr_ref_mutex[i]);
 	  hdr_ref[i].idf_prd += captureconf->rbuf_ndf_chk;
-	  if(hdr_ref[i].idf_prd >= captureconf->ndf_chk_prd)       
+	  if(hdr_ref[i].idf_prd >= NDF_CHK_PRD)
 	    {
-	      hdr_ref[i].sec += captureconf->prd;
-	      hdr_ref[i].idf_prd -= captureconf->ndf_chk_prd;
+	      hdr_ref[i].sec += PRD;
+	      hdr_ref[i].idf_prd -= NDF_CHK_PRD;
 	    }
 	  pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	}
       
       /* To see if we need to copy data from temp buffer into ring buffer */
-      //multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t1");
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Just before the second transit state change");
       while(transited && (!quit))
 	{
 	  transited = transit[0];
@@ -239,20 +230,17 @@ void *buf_control(void *conf)
 	}      
       if(quit)
 	{
-	  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t4...");
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Quit just after the second transit state change");
+
 	  pthread_exit(NULL);
 	  return NULL;
 	}
-      //multilog(runtime_log, LOG_INFO,  "BUF CONTROL CHANGE:\t2");
 
       ntail = 0;
       for(i = 0; i < captureconf->nport_alive; i++)
 	ntail = (tail[i] > ntail) ? tail[i] : ntail;
       
-#ifdef DEBUG
-      fprintf(stdout, "Temp copy:\t%"PRIu64" positions need to be checked.\n", ntail);
-#endif
-      
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "The location of the last packet in temp buffer is %"PRIu64"", ntail);
       for(i = 0; i < ntail; i++)
 	{
 	  tbuf_loc = (uint64_t)(i * (captureconf->required_dfsz + 1));	      
@@ -279,16 +267,16 @@ void *buf_control(void *conf)
   /* Exit */
   if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
     {
-      multilog(runtime_log, LOG_ERR, "close_buffer: ipcbuf_mark_filled failed, has to abort.\n");
-      fprintf(stderr, "close_buffer: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-      quit = 1;
+      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      paf_log_close(captureconf->logfile);
       
-      multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t5...");
+      quit = 1;
+
       pthread_exit(NULL);
       return NULL;
     }
   
-  multilog(runtime_log, LOG_INFO,  "BUF CONTROL QUIT:\t6...");
+  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Normale quit of buffer control thread");
   pthread_exit(NULL);
   return NULL;
 }
@@ -306,27 +294,11 @@ void *capture_control(void *conf)
   uint64_t picoseconds_offset; // The sec_offset fraction part in picoseconds
   int msg_len;
   
-  ///* Create an unix socket for control */
-  //if((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-  //  {
-  //    multilog(runtime_log, LOG_ERR, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    fprintf (stderr, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    
-  //    quit = 1;
-  //    pthread_exit(NULL);
-  //    return NULL;
-  //  }
-  //
-  //setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));
-  //memset(&sa, 0, sizeof(struct sockaddr_un));
-  //sa.sun_family = AF_UNIX;
-  //strncpy(&sa.sun_path[1], captureconf->cpt_ctrl_addr, strlen(captureconf->cpt_ctrl_addr));
-
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
-      multilog(runtime_log, LOG_ERR, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Can not create file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      paf_log_close(captureconf->logfile);
       
       quit = 1;
       pthread_exit(NULL);
@@ -337,14 +309,14 @@ void *capture_control(void *conf)
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
   strncpy(sa.sun_path, captureconf->cpt_ctrl_addr, strlen(captureconf->cpt_ctrl_addr));
-  
-  multilog(runtime_log, LOG_INFO, "%s\n", captureconf->cpt_ctrl_addr);
   unlink(captureconf->cpt_ctrl_addr);
+  
+  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, captureconf->cpt_ctrl_addr);
   
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
     {
-      multilog(runtime_log, LOG_ERR, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Can not bind to file socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Can not bind to file socket, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+      paf_log_close(captureconf->logfile);
       
       quit = 1;
       close(sock);
@@ -352,8 +324,8 @@ void *capture_control(void *conf)
       return NULL;
     }
 
-  fprintf(stdout, "CAPTURE_READY\n");
-  //fflush(stdout);
+  fprintf(stdout, "CAPTURE_READY\n"); // Tell other process that the capture is ready
+  fflush(stdout);
   
   while(!quit)
     {
@@ -368,8 +340,8 @@ void *capture_control(void *conf)
 	}
       
       if(strstr(command_line, "END-OF-CAPTURE") != NULL)
-	{	      
-	  multilog(runtime_log, LOG_INFO, "Got END-OF-CAPTURE signal, has to quit.\n");
+	{
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Got END-OF-CAPTURE signal, has to quit");      
 	  
 	  quit = 1;	      
 	  if(ipcbuf_is_writing(captureconf->db_data))
@@ -380,29 +352,28 @@ void *capture_control(void *conf)
 	  return NULL;
 	}  
       if(strstr(command_line, "END-OF-DATA") != NULL)
-	{
-	  multilog(runtime_log, LOG_INFO, "Got END-OF-DATA signal, has to enable eod.\n");
-	  
+	{	  
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Got END-OF-DATA signal, has to enable eod");
+      	  
 	  ipcbuf_enable_eod(captureconf->db_data);
 	}
 	  
       if(strstr(command_line, "START-OF-DATA") != NULL)
-	{
-	  multilog(runtime_log, LOG_INFO, "Got START-OF-DATA signal, has to enable sod.\n");
+	{	  
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Got START-OF-DATA signal, has to enable sod");
 	  
 	  sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
 	  start_buf = (start_buf > ipcbuf_get_write_count(captureconf->db_data)) ? start_buf : ipcbuf_get_write_count(captureconf->db_data); // To make sure the start buffer is valuable, to get the most recent buffer
-	  
-	  multilog(runtime_log, LOG_INFO, "The data is enabled at %"PRIu64" buffer block.\n", start_buf);
-	  	  
+
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "The data is enabled at %"PRIu64" buffer block", start_buf);
 	  ipcbuf_enable_sod(captureconf->db_data, start_buf, 0);
 	  
 	  /* To get time stamp for current header */
 	  sec_offset = start_buf * captureconf->blk_res; // Only work with buffer number
 	  picoseconds_offset = 1E6 * (round(1.0E6 * (sec_offset - floor(sec_offset))));
 	  
-	  captureconf->picoseconds = picoseconds_offset +captureconf->ref.picoseconds;
-	  captureconf->sec_int = captureconf->ref.sec_int + floor(sec_offset);
+	  captureconf->picoseconds = picoseconds_offset +captureconf->picoseconds_ref;
+	  captureconf->sec_int = captureconf->sec_int_ref + floor(sec_offset);
 	  if(!(captureconf->picoseconds < 1E12))
 	    {
 	      captureconf->sec_int += 1;
@@ -423,9 +394,9 @@ void *capture_control(void *conf)
 	    If we have a reader, there will be at least one buffer which is not full
 	  */
 	  if(ipcbuf_get_nfull(captureconf->db_hdr) >= (ipcbuf_get_nbufs(captureconf->db_hdr) - 1)) 
-	    {	     
-	      multilog(runtime_log, LOG_ERR, "buffers are all full, has to abort.\n");
-	      fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort..\n", __FILE__, __LINE__);
+	    {
+	      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "buffers are all full, has to abort");
+	      paf_log_close(captureconf->logfile);
 	      
 	      quit = 1;
 	      pthread_exit(NULL);
