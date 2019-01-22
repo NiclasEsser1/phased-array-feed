@@ -17,19 +17,19 @@
 #include "capture.h"
 #include "log.h"
 
-extern char *cbuf;
-extern char *tbuf;
+extern char    *cbuf;
+extern char    *tbuf;
 
-extern int quit;
+extern int      quit;
 
 extern uint64_t ndf_port[MPORT_CAPTURE];
 extern uint64_t ndf_chk[MCHK_CAPTURE];
-extern int64_t ndf_chk_delay[MCHK_CAPTURE];
+extern int64_t  ndf_chk_delay[MCHK_CAPTURE];
 
-extern int transit[MPORT_CAPTURE];
+extern int      transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
 
-extern hdr_t hdr_ref[MPORT_CAPTURE];
+extern hdr_t    hdr_ref[MPORT_CAPTURE];
 
 extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
@@ -210,12 +210,14 @@ void *buf_control(void *conf)
 	  // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
 	  
 	  pthread_mutex_lock(&hdr_ref_mutex[i]);
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Start to change the reference information %"PRIu64" %"PRIu64"", hdr_ref[i].sec, hdr_ref[i].idf_prd);
 	  hdr_ref[i].idf_prd += captureconf->rbuf_ndf_chk;
 	  if(hdr_ref[i].idf_prd >= NDF_CHK_PRD)
 	    {
 	      hdr_ref[i].sec += PRD;
 	      hdr_ref[i].idf_prd -= NDF_CHK_PRD;
 	    }
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Finish the change of reference information %"PRIu64" %"PRIu64"", hdr_ref[i].sec, hdr_ref[i].idf_prd);
 	  pthread_mutex_unlock(&hdr_ref_mutex[i]);
 	}
       

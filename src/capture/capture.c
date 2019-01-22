@@ -17,18 +17,18 @@
 #include "capture.h"
 #include "log.h"
 
-char *cbuf = NULL;
-char *tbuf = NULL;
+char     *cbuf = NULL;
+char     *tbuf = NULL;
 
-int quit = 0;
+int      quit = 0;
 
 uint64_t ndf_port[MPORT_CAPTURE] = {0};
 uint64_t ndf_chk[MCHK_CAPTURE] = {0};
-int64_t ndf_chk_delay[MCHK_CAPTURE] = {0};
+int64_t  ndf_chk_delay[MCHK_CAPTURE] = {0};
 
-int transit[MPORT_CAPTURE] = {0};
+int      transit[MPORT_CAPTURE] = {0};
 uint64_t tail[MPORT_CAPTURE] = {0};
-hdr_t hdr_ref[MPORT_CAPTURE];
+hdr_t    hdr_ref[MPORT_CAPTURE];
 
 pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE]  = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
@@ -227,14 +227,25 @@ void *capture(void *conf)
       df_sec = (writebuf & 0x3fffffff00000000) >> 32;
       writebuf = bswap_64(*(ptr + 2));
       freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
-      
+
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
       idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
     }    
   ndf_chk_delay[ithread] = idf_blk;
   ichk = (int)(freq/NCHAN_CHK + ichk0);
-  
+  if (ichk<0 || ichk > (captureconf->nchk-1))
+    {      
+      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", captureconf->nchk, __FILE__, __LINE__);
+      
+      /* Force to quit if we have time out */
+      quit = 1;	  
+      free(df);
+      paf_log_close(captureconf->logfile);
+      conf = (void *)captureconf;
+      pthread_exit(NULL);
+      return NULL;
+    }
   paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "%d %s %d %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRId64"", ithread, captureconf->ip_alive[ithread], captureconf->port_alive[ithread], idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, ndf_chk_delay[ithread]);
 
   hdr_ref[ithread].idf_prd = idf_prd;
@@ -307,6 +318,18 @@ void *capture(void *conf)
       pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
 
       ichk = (int)(freq/NCHAN_CHK + ichk0);
+      if (ichk<0 || ichk > (captureconf->nchk-1))
+	{      
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", captureconf->nchk, __FILE__, __LINE__);
+	  
+	  /* Force to quit if we have time out */
+	  quit = 1;	  
+	  free(df);
+	  paf_log_close(captureconf->logfile);
+	  conf = (void *)captureconf;
+	  pthread_exit(NULL);
+	  return NULL;
+	}
     }
     
   /* Exit */
@@ -342,6 +365,7 @@ int init_capture(conf_t *conf)
   
   if(conf->pad == 1)
     conf->nchk = 48;
+  
   conf->df_res       = (double)PRD/(double)NDF_CHK_PRD;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;
   conf->nchan        = conf->nchk * NCHAN_CHK;

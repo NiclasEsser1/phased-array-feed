@@ -8,8 +8,8 @@
 #include "capture.h"
 #include "log.h"
 
-extern uint64_t ndf_port[MPORT_CAPTURE];
-extern uint64_t ndf_chk[MCHK_CAPTURE];
+extern uint64_t        ndf_port[MPORT_CAPTURE];
+extern uint64_t        ndf_chk[MCHK_CAPTURE];
 extern pthread_mutex_t log_mutex;
 
 void usage()
