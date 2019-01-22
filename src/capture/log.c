@@ -23,11 +23,15 @@ FILE *paf_log_open(char *fname, char *mode)
 
 int paf_log_add(FILE *fp, char *type, int flush, pthread_mutex_t mutex, const char *format, ...)
 {
-  struct tm *local;
+  struct tm *local = NULL;
   time_t rawtime;
-  char buffer[MSTR_LEN];
+  char buffer[MSTR_LEN] = {'\0'};
   va_list args;
-  
+
+  /* Get current time */
+  time(&rawtime);
+  local = localtime(&rawtime);
+
   /* Get real message */
   va_start(args, format);
   vsprintf(buffer, format, args);
@@ -35,8 +39,6 @@ int paf_log_add(FILE *fp, char *type, int flush, pthread_mutex_t mutex, const ch
   
   /* Write to log file */
   pthread_mutex_lock(&mutex);
-  time(&rawtime);
-  local = localtime(&rawtime);
   fprintf(fp, "[%s] %s\t%s\n", strtok(asctime(local), "\n"), type, buffer);
   pthread_mutex_unlock(&mutex);
   

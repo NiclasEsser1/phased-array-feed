@@ -22,16 +22,15 @@ char     *tbuf = NULL;
 
 int      quit = 0;
 
-uint64_t ndf_port[MPORT_CAPTURE] = {0};
-uint64_t ndf_chk[MCHK_CAPTURE] = {0};
-int64_t  ndf_chk_delay[MCHK_CAPTURE] = {0};
+uint64_t ndf[MPORT_CAPTURE] = {0};
 
 int      transit[MPORT_CAPTURE] = {0};
 uint64_t tail[MPORT_CAPTURE] = {0};
-hdr_t    hdr_ref[MPORT_CAPTURE];
+uint64_t df_sec_ref[MPORT_CAPTURE];
+uint64_t idf_prd_ref[MPORT_CAPTURE]; 
 
-pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE]  = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t ref_mutex[MPORT_CAPTURE]  = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t ndf_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int init_buf(conf_t *conf)
@@ -50,8 +49,8 @@ int init_buf(conf_t *conf)
       
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
+	  pthread_mutex_destroy(&ref_mutex[i]);
+	  pthread_mutex_destroy(&ndf_mutex[i]);
 	}
       
       pthread_mutex_destroy(&log_mutex);
@@ -67,8 +66,8 @@ int init_buf(conf_t *conf)
       
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
+	  pthread_mutex_destroy(&ref_mutex[i]);
+	  pthread_mutex_destroy(&ndf_mutex[i]);
 	}
       pthread_mutex_destroy(&log_mutex);
       
@@ -86,8 +85,8 @@ int init_buf(conf_t *conf)
       
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
+	  pthread_mutex_destroy(&ref_mutex[i]);
+	  pthread_mutex_destroy(&ndf_mutex[i]);
 	}
       
       pthread_mutex_destroy(&log_mutex);
@@ -105,8 +104,8 @@ int init_buf(conf_t *conf)
 	  	  
 	  for(i = 0; i < MPORT_CAPTURE; i++)
 	    {
-	      pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	      pthread_mutex_destroy(&ndf_port_mutex[i]);
+	      pthread_mutex_destroy(&ref_mutex[i]);
+	      pthread_mutex_destroy(&ndf_mutex[i]);
 	    }
 	  
 	  pthread_mutex_destroy(&log_mutex);
@@ -118,13 +117,6 @@ int init_buf(conf_t *conf)
     }
   else
     {
-      for(i = 0; i < MSTR_LEN; i++)
-	{
-	  if(conf->ra[i] == ' ')
-	    conf->ra[i] = ':';
-	  if(conf->dec[i] == ' ')
-	    conf->dec[i] = ':';
-	}
       conf->sec_int     = conf->sec_int_ref;
       conf->picoseconds = conf->picoseconds_ref;
       conf->mjd_start   = conf->sec_int / SECDAY + MJD1970;                       // Float MJD start time without fraction second
@@ -186,7 +178,7 @@ void *capture(void *conf)
   
   if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
     {
-      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Can not bind to %s:%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Can not bind to %s;%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
             
       /* Force to quit if we have time out */
       quit = 1;
@@ -197,104 +189,11 @@ void *capture(void *conf)
       return NULL;
     }
 
-  /*
-    If we start the recvfrom and memcpy simultaneously at the very beginning, it will push the cpu usage to 100%;
-    it does not come down sometimes will cause the capture reports significant packet loss rate;
-    Here assume that the reference information is about one buffer block behind current data frame;
-    the software will receive data frame for a while without writing any data into buffer;
-    which will make sure that the cpu usage does not hit 100% at the beginning;
-
-    NOTE: FOR FUTURE PIPELINE DESIGN, WE MUST ASIGN THE REFERNECE INFORMATION TO A FUTURE VALUE.
-   */
-  while(idf_blk<0)
-    {
-      if(recvfrom(sock, (void *)df, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
-	{
-	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-	  	  
-	  /* Force to quit if we have time out */
-	  quit = 1;	  
-	  free(df);
-	  paf_log_close(captureconf->logfile);
-	  conf = (void *)captureconf;
-	  pthread_exit(NULL);
-	  return NULL;
-	}
-      
-      ptr = (uint64_t*)df;
-      writebuf = bswap_64(*ptr);
-      idf_prd = writebuf & 0x00000000ffffffff;
-      df_sec = (writebuf & 0x3fffffff00000000) >> 32;
-      writebuf = bswap_64(*(ptr + 2));
-      freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
-
-      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
-      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-    }    
-  ndf_chk_delay[ithread] = idf_blk;
-  ichk = (int)(freq/NCHAN_CHK + ichk0);
-  if (ichk<0 || ichk > (captureconf->nchk-1))
-    {      
-      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", captureconf->nchk, __FILE__, __LINE__);
-      
-      /* Force to quit if we have time out */
-      quit = 1;	  
-      free(df);
-      paf_log_close(captureconf->logfile);
-      conf = (void *)captureconf;
-      pthread_exit(NULL);
-      return NULL;
-    }
-  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "%d %s %d %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRId64"", ithread, captureconf->ip_alive[ithread], captureconf->port_alive[ithread], idf_prd, hdr_ref[ithread].idf_prd, df_sec, hdr_ref[ithread].sec, ndf_chk_delay[ithread]);
-
-  hdr_ref[ithread].idf_prd = idf_prd;
-  hdr_ref[ithread].sec     = df_sec;
-  
   while(!quit)
     {
-      if(idf_blk>=0)
-	{
-	  if(idf_blk < rbuf_ndf_chk)  // Put data into current ring buffer block
-	    {
-	      transit[ithread] = 0; // The reference is already updated.
-	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
-	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
-	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
-	      memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
-	      
-	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
-	      ndf_port[ithread]++;
-	      pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-	    }
-	  else
-	    {
-	      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Cross the boundary");
-
-	      transit[ithread] = 1; // The reference should be updated very soon
-	      if(idf_blk < rbuf_tbuf_ndf_chk)
-		{		  
-		  tail[ithread] = (uint64_t)((idf_blk - rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
-		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_dfsz + 1));
-		  
-		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
-		  
-		  tbuf[tbuf_loc] = 'Y';
-		  memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
-		  
-		  pthread_mutex_lock(&ndf_port_mutex[ithread]);
-		  ndf_port[ithread]++;
-		  pthread_mutex_unlock(&ndf_port_mutex[ithread]);
-		}
-	      
-	    }
-	}
-      else
-	transit[ithread] = 0;
-      
       if(recvfrom(sock, (void *)df, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
       	{
-	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Can not receive data from %s:%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Can not receive data from %s;%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 	  
 	  /* Force to quit if we have time out */
       	  quit = 1;	  
@@ -313,10 +212,6 @@ void *capture(void *conf)
       writebuf = bswap_64(*(ptr + 2));
       freq = (double)((writebuf & 0x00000000ffff0000) >> 16);
   
-      pthread_mutex_lock(&hdr_ref_mutex[ithread]);
-      idf_blk = (int64_t)(idf_prd - hdr_ref[ithread].idf_prd) + ((double)df_sec - (double)hdr_ref[ithread].sec) / df_res;
-      pthread_mutex_unlock(&hdr_ref_mutex[ithread]);
-
       ichk = (int)(freq/NCHAN_CHK + ichk0);
       if (ichk<0 || ichk > (captureconf->nchk-1))
 	{      
@@ -330,6 +225,51 @@ void *capture(void *conf)
 	  pthread_exit(NULL);
 	  return NULL;
 	}
+      
+      pthread_mutex_lock(&ref_mutex[ithread]);
+      //idf_blk = (int64_t)(idf_prd - ref[ithread].idf_prd) + ((double)df_sec - (double)ref[ithread].df_sec) / df_res;
+      idf_blk = (int64_t)(idf_prd - idf_prd_ref[ithread]) + ((double)df_sec - (double)df_sec_ref[ithread]) / df_res;
+      
+      pthread_mutex_unlock(&ref_mutex[ithread]);
+
+      if(idf_blk>=0)
+	{
+	  if(idf_blk < rbuf_ndf_chk)  // Put data into current ring buffer block
+	    {
+	      transit[ithread] = 0; // The reference is already updated.
+	      /* Put data into current ring buffer block if it is before rbuf_ndf_chk; */
+	      //cbuf_loc = (uint64_t)((idf + ichk * rbuf_ndf_chk) * required_dfsz);   // This should give us FTTFP (FTFP) order
+	      cbuf_loc = (uint64_t)((idf_blk * nchk + ichk) * required_dfsz); // This is in TFTFP order
+	      memcpy(cbuf + cbuf_loc, df + dfoff, required_dfsz);
+	      
+	      pthread_mutex_lock(&ndf_mutex[ithread]);
+	      ndf[ithread]++;
+	      pthread_mutex_unlock(&ndf_mutex[ithread]);
+	    }
+	  else
+	    {
+	      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Cross the boundary");
+
+	      transit[ithread] = 1; // The reference should be updated very soon
+	      if(idf_blk < rbuf_tbuf_ndf_chk)
+		{		  
+		  tail[ithread] = (uint64_t)((idf_blk - rbuf_ndf_chk) * nchk + ichk); // This is in TFTFP order
+		  tbuf_loc      = (uint64_t)(tail[ithread] * (required_dfsz + 1));
+		  
+		  tail[ithread]++;  // Otherwise we will miss the last available data frame in tbuf;
+		  
+		  tbuf[tbuf_loc] = 'Y';
+		  memcpy(tbuf + tbuf_loc + 1, df + dfoff, required_dfsz);
+		  
+		  pthread_mutex_lock(&ndf_mutex[ithread]);
+		  ndf[ithread]++;
+		  pthread_mutex_unlock(&ndf_mutex[ithread]);
+		}
+	      
+	    }
+	}
+      else
+	transit[ithread] = 0;
     }
     
   /* Exit */
@@ -355,10 +295,10 @@ int init_capture(conf_t *conf)
   /* Init status */
   for(i = 0; i < conf->nport_alive; i++)
     {
-      hdr_ref[i].sec = conf->sec_ref;
-      hdr_ref[i].idf_prd = conf->idf_prd_ref + conf->rbuf_ndf_chk;
-      conf->nchk       += conf->nchk_alive_expect[i];
-      conf->nchk_alive += conf->nchk_alive_actual[i];
+      df_sec_ref[i]  = conf->df_sec0;
+      idf_prd_ref[i] = conf->idf_prd0 + conf->rbuf_ndf_chk;
+      conf->nchk        += conf->nchk_alive_expect[i];
+      conf->nchk_alive  += conf->nchk_alive_actual[i];
     }
   for(i = 0; i < conf->nport_dead; i++)
     conf->nchk       += conf->nchk_dead[i];
@@ -371,8 +311,8 @@ int init_capture(conf_t *conf)
   conf->nchan        = conf->nchk * NCHAN_CHK;
   conf->ichk0        = -(conf->cfreq + 1.0)/NCHAN_CHK + 0.5 * conf->nchk;
   
-  conf->sec_int_ref     = floor(conf->df_res * conf->idf_prd_ref) + conf->sec_ref + SECDAY * conf->epoch_ref;
-  conf->picoseconds_ref = 1E6 * round(1.0E6 * (PRD - floor(conf->df_res * conf->idf_prd_ref)));
+  conf->sec_int_ref     = floor(conf->df_res * conf->idf_prd0) + conf->df_sec0 + SECDAY * conf->epoch0;
+  conf->picoseconds_ref = 1E6 * round(1.0E6 * (PRD - floor(conf->df_res * conf->idf_prd0)));
 
   conf->tout.tv_sec     = PRD;
   conf->tout.tv_usec    = 0;
@@ -388,8 +328,8 @@ int destroy_capture(conf_t conf)
   
   for(i = 0; i < MPORT_CAPTURE; i++)
     {
-      pthread_mutex_destroy(&hdr_ref_mutex[i]);
-      pthread_mutex_destroy(&ndf_port_mutex[i]);
+      pthread_mutex_destroy(&ref_mutex[i]);
+      pthread_mutex_destroy(&ndf_mutex[i]);
     }
   
   pthread_mutex_destroy(&log_mutex);

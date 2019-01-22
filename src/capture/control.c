@@ -19,20 +19,16 @@
 
 extern char    *cbuf;
 extern char    *tbuf;
-
 extern int      quit;
 
-extern uint64_t ndf_port[MPORT_CAPTURE];
-extern uint64_t ndf_chk[MCHK_CAPTURE];
-extern int64_t  ndf_chk_delay[MCHK_CAPTURE];
-
+extern uint64_t ndf[MPORT_CAPTURE];
 extern int      transit[MPORT_CAPTURE];
 extern uint64_t tail[MPORT_CAPTURE];
+extern uint64_t df_sec_ref[MPORT_CAPTURE];
+extern uint64_t idf_prd_ref[MPORT_CAPTURE]; 
 
-extern hdr_t    hdr_ref[MPORT_CAPTURE];
-
-extern pthread_mutex_t hdr_ref_mutex[MPORT_CAPTURE];
-extern pthread_mutex_t ndf_port_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t ref_mutex[MPORT_CAPTURE];
+extern pthread_mutex_t ndf_mutex[MPORT_CAPTURE];
 extern pthread_mutex_t log_mutex;
 
 int threads(conf_t *conf)
@@ -145,16 +141,16 @@ void *buf_control(void *conf)
       ndf_blk_actual = 0;
       for(i = 0; i < captureconf->nport_alive; i++)
 	{
-	  pthread_mutex_lock(&ndf_port_mutex[i]); 
-	  ndf_blk_actual += ndf_port[i];
-	  ndf_port[i] = 0; 
-	  pthread_mutex_unlock(&ndf_port_mutex[i]);
+	  pthread_mutex_lock(&ndf_mutex[i]); 
+	  ndf_blk_actual += ndf[i];
+	  ndf[i] = 0; 
+	  pthread_mutex_unlock(&ndf_mutex[i]);
 	}
       ndf_actual += ndf_blk_actual;
       if(rbuf_nblk==1)
 	{
 	  for(i = 0; i < captureconf->nport_alive; i++)
-	    ndf_blk_expect += (captureconf->rbuf_ndf_chk - ndf_chk_delay[i]) * captureconf->nchk_alive_actual[i];
+	    ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive_actual[i];
 	}
       else
 	ndf_blk_expect += captureconf->rbuf_ndf_chk * captureconf->nchk_alive; // Only for current buffer
@@ -164,8 +160,10 @@ void *buf_control(void *conf)
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Packets counters, %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"", ndf_actual, ndf_expect, ndf_blk_actual, ndf_blk_expect);
       
       fprintf(stdout, "CAPTURE_STATUS %f %f %f\n", rbuf_nblk * captureconf->blk_res, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Before fflush stdout");
       fflush(stdout);
-	  
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Before mark filled");
+      
       /* Close current buffer */
       if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
 	{
@@ -176,6 +174,7 @@ void *buf_control(void *conf)
 	  pthread_exit(NULL);
 	  return NULL;
 	}
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Mark filled done");
       
       /*
 	To see if the buffer is full, quit if yes.
@@ -190,9 +189,11 @@ void *buf_control(void *conf)
 	  pthread_exit(NULL);
 	  return NULL;
 	}
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Available buffer block check done");
       
       /* Get new buffer block */
-      cbuf = ipcbuf_get_next_write(captureconf->db_data); 
+      cbuf = ipcbuf_get_next_write(captureconf->db_data);
+      paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Get next write done");
       if(cbuf == NULL)
 	{
 	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -209,16 +210,16 @@ void *buf_control(void *conf)
 	  // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block or be dropped;
 	  // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
 	  
-	  pthread_mutex_lock(&hdr_ref_mutex[i]);
-	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Start to change the reference information %"PRIu64" %"PRIu64"", hdr_ref[i].sec, hdr_ref[i].idf_prd);
-	  hdr_ref[i].idf_prd += captureconf->rbuf_ndf_chk;
-	  if(hdr_ref[i].idf_prd >= NDF_CHK_PRD)
+	  pthread_mutex_lock(&ref_mutex[i]);
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Start to change the reference information %"PRIu64" %"PRIu64"", df_sec_ref[i], idf_prd_ref[i]);
+	  idf_prd_ref[i] += captureconf->rbuf_ndf_chk;
+	  if(idf_prd_ref[i] >= NDF_CHK_PRD)
 	    {
-	      hdr_ref[i].sec += PRD;
-	      hdr_ref[i].idf_prd -= NDF_CHK_PRD;
+	      df_sec_ref[i]  += PRD;
+	      idf_prd_ref[i] -= NDF_CHK_PRD;
 	    }
-	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Finish the change of reference information %"PRIu64" %"PRIu64"", hdr_ref[i].sec, hdr_ref[i].idf_prd);
-	  pthread_mutex_unlock(&hdr_ref_mutex[i]);
+	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Finish the change of reference information %"PRIu64" %"PRIu64"", df_sec_ref[i], idf_prd_ref[i]);
+	  pthread_mutex_unlock(&ref_mutex[i]);
 	}
       
       /* To see if we need to copy data from temp buffer into ring buffer */
@@ -361,10 +362,10 @@ void *capture_control(void *conf)
 	}
 	  
       if(strstr(command_line, "START-OF-DATA") != NULL)
-	{	  
+	{
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Got START-OF-DATA signal, has to enable sod");
 	  
-	  sscanf(command_line, "%[^:]:%[^:]:%[^:]:%[^:]:%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
+	  sscanf(command_line, "%[^;];%[^;];%[^;];%[^;];%"SCNu64"", command, captureconf->source, captureconf->ra, captureconf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
 	  start_buf = (start_buf > ipcbuf_get_write_count(captureconf->db_data)) ? start_buf : ipcbuf_get_write_count(captureconf->db_data); // To make sure the start buffer is valuable, to get the most recent buffer
 
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "The data is enabled at %"PRIu64" buffer block", start_buf);
@@ -383,13 +384,6 @@ void *capture_control(void *conf)
 	    }
 	  strftime (captureconf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&captureconf->sec_int)); // String start time without fraction second 
 	  captureconf->mjd_start = captureconf->sec_int / SECDAY + MJD1970;                         // Float MJD start time without fraction second
-	  for(i = 0; i < MSTR_LEN; i++)
-	    {
-	      if(captureconf->ra[i] == ' ')
-		captureconf->ra[i] = ':';
-	      if(captureconf->dec[i] == ' ')
-		captureconf->dec[i] = ':';
-	    }
 	  
 	  /*
 	    To see if the buffer is full, quit if yes.

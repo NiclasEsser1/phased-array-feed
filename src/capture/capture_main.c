@@ -8,8 +8,6 @@
 #include "capture.h"
 #include "log.h"
 
-extern uint64_t        ndf_port[MPORT_CAPTURE];
-extern uint64_t        ndf_chk[MCHK_CAPTURE];
 extern pthread_mutex_t log_mutex;
 
 void usage()
@@ -43,8 +41,8 @@ int main(int argc, char **argv)
   /* Initial part */
   int i, arg, source = 0;
   conf_t conf;
-  char command_line[MSTR_LEN];
-    
+  char command_line[MSTR_LEN] = {'\0'};
+  
   conf.nport_alive   = 0;
   conf.nport_dead    = 0;
   conf.rbuf_ctrl_cpu = 0;
@@ -96,7 +94,7 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'f':
-	  sscanf(optarg, "%d;%"SCNu64";%"SCNu64"", &conf.epoch_ref, &conf.sec_ref, &conf.idf_prd_ref);
+	  sscanf(optarg, "%d;%"SCNu64";%"SCNu64"", &conf.epoch0, &conf.df_sec0, &conf.idf_prd0);
 	  break;
 	  
 	case 'g':
@@ -151,7 +149,8 @@ int main(int argc, char **argv)
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "CAPTURE START");
 
   /* Log the input parameters */
-  for(i = 0; i < argc; i++)
+  strcpy(command_line, argv[0]);
+  for(i = 1; i < argc; i++)
     {
       strcat(command_line, " ");
       strcat(command_line, argv[i]);
@@ -172,7 +171,7 @@ int main(int argc, char **argv)
 	paf_log_add(conf.logfile, "INFO", 1, log_mutex, "    ip %s, port %d, expected frequency chunks %d", conf.ip_alive[i], conf.port_alive[i], conf.nchk_dead[i]);
     }
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The center frequency for the capture is %f MHz", conf.cfreq);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The reference information for the capture is: epoch %d, seconds %"PRIu64" and location of packet in the period %"PRIu64"", conf.epoch_ref, conf.sec_ref, conf.idf_prd_ref);
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The reference information for the capture is: epoch %d, seconds %"PRIu64" and location of packet in the period %"PRIu64"", conf.epoch0, conf.df_sec0, conf.idf_prd0);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Buffer control thread runs on CPU %d", conf.rbuf_ctrl_cpu);
   if(conf.cpt_ctrl)

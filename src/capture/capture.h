@@ -11,81 +11,56 @@
 #include "daemon.h"
 #include "futils.h"
 
-#define MSTR_LEN      1024
-#define MPORT_CAPTURE 16
-#define DADA_HDRSZ    4096
-#define MCHK_CAPTURE  48
-#define SECDAY        86400.0
-#define MJD1970       40587.0
-#define DFSZ          7232
-#define NCHAN_CHK     7
-#define PRD           27
-#define NDF_CHK_PRD   250000
+#define MSTR_LEN       1024
+#define MPORT_CAPTURE  10
+#define DADA_HDRSZ     4096
+#define NCHK_FULL_BAND 48
+#define SECDAY         86400.0
+#define MJD1970        40587.0
+#define DFSZ           7232
+#define NCHAN_CHK      7
+#define PRD            27
+#define NDF_CHK_PRD    250000
 
 typedef struct conf_t
 {
+  int ithread;
   FILE *logfile;
   
   key_t key;
   dada_hdu_t *hdu;
-  
-  uint64_t rbuf_ndf_chk, tbuf_ndf_chk;
-
-  int pad;
-  int dfoff, required_dfsz;
-  int cpt_cpu[MPORT_CAPTURE];
-  int rbuf_ctrl_cpu, cpt_ctrl_cpu;
-  int cpt_ctrl;
-  char cpt_ctrl_addr[MSTR_LEN];
-  int cpu_bind;
-  
-  char ip_alive[MPORT_CAPTURE][MSTR_LEN];
-  int port_alive[MPORT_CAPTURE];
-  int nport_alive;
-  int nchk_alive_expect[MPORT_CAPTURE];  // For each port;
-  int nchk_alive_actual[MPORT_CAPTURE];  // For each port;
   ipcbuf_t *db_data, *db_hdr;
   
-  char ip_dead[MPORT_CAPTURE][MSTR_LEN];
-  int port_dead[MPORT_CAPTURE];
-  int nport_dead;
-  int nchk_dead[MPORT_CAPTURE];
-
-  char instrument[MSTR_LEN];
-  double cfreq;
-  int nchan, nchk, nchk_alive;    // Frequency chunks of current capture, including all alive chunks and dead chunks
+  uint64_t rbuf_ndf_chk, tbuf_ndf_chk, rbufsz, tbufsz;
   
-  char hfname[MSTR_LEN];
-
-  char dir[MSTR_LEN];
-  double df_res;  // time resolution of each data frame, for start time determination;
-  double blk_res; // time resolution of each buffer block, for start time determination;
-
-  double ichk0;
-  uint64_t rbufsz, tbufsz;
-
+  int pad;
+  int dfoff, required_dfsz;
+  int cpt_cpu[MPORT_CAPTURE], rbuf_ctrl_cpu, cpt_ctrl_cpu, cpt_ctrl, cpu_bind;
+  char cpt_ctrl_addr[MSTR_LEN];
+  
+  char ip_alive[MPORT_CAPTURE][MSTR_LEN], ip_dead[MPORT_CAPTURE][MSTR_LEN];;
+  int port_alive[MPORT_CAPTURE], port_dead[MPORT_CAPTURE];
+  int nport_alive, nport_dead;
+  int nchk_alive_expect[MPORT_CAPTURE], nchk_alive_actual[MPORT_CAPTURE], nchk_dead[MPORT_CAPTURE];;  // For each port;
+  int nchan, nchk, nchk_alive;
+  
+  char dir[MSTR_LEN], hfname[MSTR_LEN], instrument[MSTR_LEN];
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
   
-  double chan_res, bw;
-  uint64_t sec_ref, idf_prd_ref;
-  int epoch_ref;
-  time_t sec_int, sec_int_ref;
+  double cfreq, chan_res, bw;
+  double df_res, blk_res;  // time resolution of each data frame and ring buffer block, for start time determination;
+  double ichk0;
+
+  int epoch0;                       // Number of days from 1970
+  time_t sec_int, sec_int_ref;      // int seconds from 1970
+  uint64_t df_sec0, idf_prd0; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
   uint64_t picoseconds, picoseconds_ref;
+  
   char utc_start[MSTR_LEN];
   double mjd_start;
 
   struct timeval tout;
-  
-  int ithread;
 }conf_t;
-
-typedef struct hdr_t
-{
-  uint64_t idf_prd;     // data frame number in one period;
-  uint64_t sec;     // Secs from reference epochch at start of period;
-  int      epoch;   // Number of half a year from 1st of January, 2000 for the reference epochch;
-  double   freq;    // Frequency of the first chunnal in each block (integer MHz);
-}hdr_t;
 
 int init_capture(conf_t *conf);
 void *capture(void *conf);
