@@ -16,7 +16,6 @@
 #include "constants.h"
 
 #define NBYTE_RT   8
-#define MAX_RAND       1000
 
 extern "C" void usage ()
 {

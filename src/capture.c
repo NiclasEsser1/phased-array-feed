@@ -303,7 +303,7 @@ int init_capture(conf_t *conf)
     conf->nchk       += conf->nchk_dead[i];
   
   if(conf->pad == 1)
-    conf->nchk = 48;
+    conf->nchk = NCHK_FULL_BAND;
   
   conf->df_res       = (double)PRD/(double)NDF_CHK_PRD;
   conf->blk_res      = conf->df_res * (double)conf->rbuf_ndf_chk;

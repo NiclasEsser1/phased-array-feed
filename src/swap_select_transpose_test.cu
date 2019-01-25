@@ -41,7 +41,8 @@ int main(int argc, char *argv[])
   int stream_ndf_chk, cufft_nx, cufft_mod;
   int nchan_keep_band, nchan_keep_chan, nchan_edge;
   dim3 grid_size, block_size;
-  uint64_t nsamp_in, nsamp_out, npol_in, npol_out, idx_in, idx_out, loc;
+  uint64_t nsamp_in, nsamp_out, npol_in, npol_out, idx_in, idx_out;
+  int64_t loc;
   cufftComplex *data = NULL, *h_result = NULL, *g_result = NULL, *g_in = NULL, *g_out = NULL;
   
   /* Read in parameters */
@@ -57,7 +58,7 @@ int main(int argc, char *argv[])
 	case 'a':	  
 	  if (sscanf (optarg, "%d", &nchk_in) != 1)
 	    {
-	      fprintf (stderr, "Could not get nchk_in, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf (stderr, "Could not get nchk_in, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
@@ -65,7 +66,7 @@ int main(int argc, char *argv[])
 	case 'b':	  
 	  if (sscanf (optarg, "%d", &stream_ndf_chk) != 1)
 	    {
-	      fprintf (stderr, "Could not get stream_ndf_chk, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf (stderr, "Could not get stream_ndf_chk, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
 	case 'c':	  
 	  if (sscanf (optarg, "%d", &cufft_nx) != 1)
 	    {
-	      fprintf (stderr, "Could not get cufft_nx, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf (stderr, "Could not get cufft_nx, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
@@ -81,7 +82,7 @@ int main(int argc, char *argv[])
 	case 'd':	  
 	  if (sscanf (optarg, "%d", &nchan_keep_band) != 1)
 	    {
-	      fprintf (stderr, "Could not get nchan_keep_band, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf (stderr, "Could not get nchan_keep_band, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
@@ -119,6 +120,7 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * sizeof(cufftComplex)));
 
   /* Prepare the data */
+  srand(time(NULL));
   for(i = 0; i < nchan_in; i++)
     {
       for(j = 0; j < stream_ndf_chk * NSAMP_DF / cufft_nx; j++)

@@ -10,17 +10,9 @@
 #include "ascii_header.h"
 #include "daemon.h"
 #include "futils.h"
+#include "constants.h"
 
-#define MSTR_LEN       1024
 #define MPORT_CAPTURE  10
-#define DADA_HDRSZ     4096
-#define NCHK_FULL_BAND 48
-#define SECDAY         86400.0
-#define MJD1970        40587.0
-#define DFSZ           7232
-#define NCHAN_CHK      7
-#define PRD            27
-#define NDF_CHK_PRD    250000
 
 typedef struct conf_t
 {

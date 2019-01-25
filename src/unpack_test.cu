@@ -17,7 +17,6 @@
 #include "constants.h"
 
 #define NBYTE_RT  8
-#define MAX_RAND       1000
 
 extern "C" void usage ()
 {
@@ -30,7 +29,7 @@ extern "C" void usage ()
 	   " -h  show help\n");
 }
 
-// ./unpack_test -a 1024 -b 33 
+// ./unpack_test -a 1024 -b 48
 int main(int argc, char *argv[])
 {
   int i, j, k, l;
@@ -84,16 +83,16 @@ int main(int argc, char *argv[])
   fprintf(stdout, "nsamp is %"PRIu64", %"PRIu64", %"PRIu64"\n", nsamp, npol, ndata);
   
   /* Create buffer */
-  //CudaSafeCall(cudaMallocHost((void **)&data,     nsamp * sizeof(int64_t)));
   CudaSafeCall(cudaMallocHost((void **)&data_int16, ndata * sizeof(int16_t)));
   CudaSafeCall(cudaMalloc((void **)&g_in,           nsamp * sizeof(int64_t)));
   CudaSafeCall(cudaMallocHost((void **)&h_result,   npol * sizeof(cufftComplex)));
   CudaSafeCall(cudaMallocHost((void **)&g_result,   npol * sizeof(cufftComplex)));
   CudaSafeCall(cudaMalloc((void **)&g_out,          npol * sizeof(cufftComplex)));
 
-  /* Prepare data */ 
+  /* Prepare data */
+  srand(time(NULL));
   for(i = 0; i < ndata; i++)
-    data_int16[i] = (int16_t)(rand()/(float)(RAND_MAX/(float)MAX_RAND));//tmp_f;
+    data_int16[i] = (int16_t)(rand()/(float)(RAND_MAX/(float)MAX_RAND));
   data_int64 = (int64_t *)data_int16;
   
   /* calculate on CPU*/

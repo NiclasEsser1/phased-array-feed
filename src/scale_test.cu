@@ -85,7 +85,6 @@ int main(int argc, char *argv[])
       while (h_mean[i] < h_offs[i] * h_offs[i])
 	h_mean[i] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
       h_scl[i]  = SCL_NSIG * sqrt(h_mean[i] - h_offs[i] * h_offs[i])/SCL_UINT8;
-      fprintf(stdout, "%f\n", h_mean[i] - h_offs[i] * h_offs[i]);
     }
 
   /* Calculate on GPU */
@@ -98,7 +97,7 @@ int main(int argc, char *argv[])
 
   /* Check the result */
   for(i = 0; i < nchan; i++)
-    fprintf(stdout, "%f\t%f\t%f\n", g_result_scl[i] - h_scl[i], g_result_scl[i], h_scl[i]);
+    fprintf(stdout, "%E\t%f\t%f\n", g_result_scl[i] - h_scl[i], g_result_scl[i], h_scl[i]);
   //fprintf(stdout, "%f\t%f\t%f\n", h_offs[i], h_mean[i], h_scl[i]);
   
   /* Free memory */

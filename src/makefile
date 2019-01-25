@@ -28,10 +28,37 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include 
 
-all: capture_main baseband2filterbank_main dada2filterbank_main clean
+all: capture_main baseband2filterbank_main dada2filterbank_main reduce6_test reduce7_test reduce8_test scale_test accumulate_test unpack_test swap_select_transpose_test clean
 
 capture_main:capture_main.o capture.o log.o
 	$(CC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
+
+dada2filterbank_main:dada2filterbank_main.o dada2filterbank.o log.o
+	$(CC) -o dada2filterbank_main dada2filterbank_main.o dada2filterbank.o log.o $(LIB_DIRS) $(LIBS)
+
+baseband2filterbank_main:baseband2filterbank_main.o baseband2filterbank.o kernel.o log.o
+	$(NVCC) -o baseband2filterbank_main baseband2filterbank_main.o baseband2filterbank.o kernel.o log.o $(LIB_DIRS) $(LIBS)
+
+reduce6_test:reduce6_test.o kernel.o 
+	$(NVCC) -o reduce6_test reduce6_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+reduce7_test:reduce7_test.o kernel.o 
+	$(NVCC) -o reduce7_test reduce7_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+reduce8_test:reduce8_test.o kernel.o 
+	$(NVCC) -o reduce8_test reduce8_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+scale_test:scale_test.o kernel.o 
+	$(NVCC) -o scale_test scale_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+accumulate_test:accumulate_test.o kernel.o 
+	$(NVCC) -o accumulate_test accumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+unpack_test:unpack_test.o kernel.o 
+	$(NVCC) -o unpack_test unpack_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+swap_select_transpose_test:swap_select_transpose_test.o kernel.o 
+	$(NVCC) -o swap_select_transpose_test swap_select_transpose_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 capture_main.o:capture_main.c
 	$(CC) -c capture_main.c $(INCLUDE_DIRS) ${C_FLAGS}
@@ -39,29 +66,41 @@ capture_main.o:capture_main.c
 capture.o:capture.c
 	$(CC) -c capture.c $(INCLUDE_DIRS) ${C_FLAGS}
 
-dada2filterbank_main:dada2filterbank_main.o dada2filterbank.o log.o
-	$(CC) -o dada2filterbank_main dada2filterbank_main.o dada2filterbank.o log.o $(LIB_DIRS) $(LIBS)
+baseband2filterbank_main.o:baseband2filterbank_main.cu
+	$(NVCC) -c baseband2filterbank_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+baseband2filterbank.o:baseband2filterbank.cu
+	$(NVCC) -c baseband2filterbank.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+reduce6_test.o:reduce6_test.cu
+	$(NVCC) -c reduce6_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+reduce7_test.o:reduce7_test.cu
+	$(NVCC) -c reduce7_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+reduce8_test.o:reduce8_test.cu
+	$(NVCC) -c reduce8_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+scale_test.o:scale_test.cu
+	$(NVCC) -c scale_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+swap_select_transpose_test.o:swap_select_transpose_test.cu
+	$(NVCC) -c swap_select_transpose_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+accumulate_test.o:accumulate_test.cu
+	$(NVCC) -c accumulate_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+unpack_test.o:unpack_test.cu
+	$(NVCC) -c unpack_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+kernel.o:kernel.cu
+	$(NVCC) -c kernel.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 dada2filterbank_main.o:dada2filterbank_main.c
 	$(CC) -c dada2filterbank_main.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 dada2filterbank.o:dada2filterbank.c
 	$(CC) -c dada2filterbank.c $(INCLUDE_DIRS) ${C_FLAGS}
-
-baseband2filterbank_main:cudautil.o kernel.o baseband2filterbank_main.o baseband2filterbank.o log.o
-	$(NVCC) -o baseband2filterbank_main cudautil.o kernel.o baseband2filterbank_main.o baseband2filterbank.o log.o $(LIB_DIRS) $(LIBS) 
-
-baseband2filterbank_main.o:baseband2filterbank_main.cu
-	$(NVCC) -c baseband2filterbank_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
-
-kernel.o:kernel.cu
-	$(NVCC) -c kernel.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
-
-cudautil.o:cudautil.cu
-	$(NVCC) -c cudautil.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
-
-baseband2filterbank.o:baseband2filterbank.cu
-	$(NVCC) -c baseband2filterbank.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 log.o:log.c
 	$(CC) -c log.c $(INCLUDE_DIRS) ${C_FLAGS}

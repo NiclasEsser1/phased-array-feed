@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 	{
 	case 'h':
 	  usage();
-	  fprintf (stderr, "BASEBAND2FILTERBANK_ERROR:\tno input\n",  __FILE__, __LINE__);
+	  fprintf (stderr, "BASEBAND2FILTERBANK_ERROR:\tno input, which happens at \"%s\", line [%d].\n",  __FILE__, __LINE__);
 	  exit(EXIT_FAILURE);
 	  
 	case 'a':	  
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 	  break;
 	  	  
 	case 'c':
-	  sscanf(optarg, "%lf", &conf.rbufin_ndf_chk);
+	  sscanf(optarg, "%"SCNu64"", &conf.rbufin_ndf_chk);
 	  break;
 	  
 	case 'd':
@@ -145,8 +145,10 @@ int main(int argc, char *argv[])
   baseband2filterbank(conf);
 
   /* Destroy */
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BEFORE destroy");  
   destroy_baseband2filterbank(conf);
-
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "END destroy");
+  
   /* Destory log interface */  
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
   paf_log_close(conf.logfile);

@@ -60,7 +60,7 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_
 __global__ void swap_select_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan, int nchan_keep_band, int nchan_edge)
 {
   int remainder, loc;
-  uint64_t loc_in, loc_out;
+  int64_t loc_in, loc_out;
   cufftComplex p1, p2;
 
   remainder = (threadIdx.x + cufft_mod)%cufft_nx;
@@ -88,74 +88,77 @@ __global__ void swap_select_transpose_kernel(cufftComplex *dbuf_in, cufftComplex
     }
 }
 
-/* A example of accumulate */
-template <unsigned int blockSize>
-__global__ void reduce6(int *g_idata, int *g_odata, unsigned int n)
-{
-  extern __shared__ int sdata[];
-  unsigned int tid = threadIdx.x;
-  //unsigned int i = blockIdx.x*(blockSize*2) + tid;
-  unsigned int i = blockIdx.x*gridDim.y*(blockSize*2) +
-    blockIdx.y*(blockSize*2) +
-    threadIdx.x;
-  //unsigned int gridSize = blockSize*2*gridDim.x;
-  unsigned int gridSize = (blockSize*2)*gridDim.x*gridDim.y;
+///* A example of accumulate */
+//template <unsigned int blockSize>
+//__global__ void reduce6(int *g_idata, int *g_odata, unsigned int n)
+//{
+//  extern __shared__ int sdata[];
+//  //extern __shared__ cufftComplex sdata[];
+//  unsigned int tid = threadIdx.x;
+//  //unsigned int i = blockIdx.x*(blockSize*2) + tid;
+//  unsigned int i = blockIdx.x*gridDim.y*(blockSize*2) +
+//    blockIdx.y*(blockSize*2) +
+//    threadIdx.x;
+//  //unsigned int gridSize = blockSize*2*gridDim.x;
+//  unsigned int gridSize = (blockSize*2)*gridDim.x*gridDim.y;
+//
+//  sdata[tid] = 0;
+//  
+//  while (i < n)
+//    {
+//      sdata[tid] += g_idata[i] + g_idata[i+blockSize];
+//      i += gridSize;
+//    }
+//  __syncthreads();
+//  
+//  if (blockSize >= 1024)
+//    if (tid < 512)
+//      sdata[tid] += sdata[tid + 512];
+//  __syncthreads();
+//  
+//  if (blockSize >= 512)
+//    if (tid < 256)
+//      sdata[tid] += sdata[tid + 256];
+//  __syncthreads();
+//
+//  if (blockSize >= 256)
+//    if (tid < 128)
+//      sdata[tid] += sdata[tid + 128];
+//  __syncthreads();
+//
+//  if (blockSize >= 128)
+//    if (tid < 64)
+//      sdata[tid] += sdata[tid + 64];
+//  __syncthreads();
+//    
+//  if (tid < 32)
+//    {
+//      if (blockSize >= 64)
+//	sdata[tid] += sdata[tid + 32];
+//      if (blockSize >= 32)
+//	sdata[tid] += sdata[tid + 16];
+//      if (blockSize >= 16)
+//	sdata[tid] += sdata[tid + 8];
+//      if (blockSize >= 8)
+//	sdata[tid] += sdata[tid + 4];
+//      if (blockSize >= 4)
+//	sdata[tid] += sdata[tid + 2];  
+//      if (blockSize >= 2)
+//	sdata[tid] += sdata[tid + 1];
+//    }
+//  
+//  if (tid == 0)
+//    //g_odata[blockIdx.x] = sdata[0];
+//    g_odata[blockIdx.x * gridDim.y + blockIdx.y] = sdata[0];
+//}
+//
 
-  sdata[tid] = 0;
-  
-  while (i < n)
-    {
-      sdata[tid] += g_idata[i] + g_idata[i+blockSize];
-      i += gridSize;
-    }
-  __syncthreads();
-  
-  if (blockSize >= 1024)
-    if (tid < 512)
-      sdata[tid] += sdata[tid + 512];
-  __syncthreads();
-  
-  if (blockSize >= 512)
-    if (tid < 256)
-      sdata[tid] += sdata[tid + 256];
-  __syncthreads();
-
-  if (blockSize >= 256)
-    if (tid < 128)
-      sdata[tid] += sdata[tid + 128];
-  __syncthreads();
-
-  if (blockSize >= 128)
-    if (tid < 64)
-      sdata[tid] += sdata[tid + 64];
-  __syncthreads();
-    
-  if (tid < 32)
-    {
-      if (blockSize >= 64)
-	sdata[tid] += sdata[tid + 32];
-      if (blockSize >= 32)
-	sdata[tid] += sdata[tid + 16];
-      if (blockSize >= 16)
-	sdata[tid] += sdata[tid + 8];
-      if (blockSize >= 8)
-	sdata[tid] += sdata[tid + 4];
-      if (blockSize >= 4)
-	sdata[tid] += sdata[tid + 2];  
-      if (blockSize >= 2)
-	sdata[tid] += sdata[tid + 1];
-    }
-  
-  if (tid == 0)
-    g_odata[blockIdx.x] = sdata[0];
-}
-    
 /*
   This kernel accumulates all elements in each channel
 */
 __global__ void accumulate_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out)
 {
-  extern __shared__ cufftComplex accumulate_sdata[];
+  extern volatile __shared__ cufftComplex accumulate_sdata[];
   uint64_t tid, loc, s;
   
   tid = threadIdx.x;
@@ -179,12 +182,15 @@ __global__ void accumulate_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out)
 
   /* write result of this block to global mem */
   if (tid == 0)
-    dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = accumulate_sdata[0];
+    {
+      dbuf_out[blockIdx.x * gridDim.y + blockIdx.y].x = accumulate_sdata[0].x;
+      dbuf_out[blockIdx.x * gridDim.y + blockIdx.y].y = accumulate_sdata[0].y;
+    }
 }
 
 /*
   This kernel calculate the mean of samples and the mean of sample square 
- */
+*/
 __global__ void mean_kernel(cufftComplex *buf_in, uint64_t offset_in, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim)
 {
   int i;
@@ -207,10 +213,10 @@ __global__ void mean_kernel(cufftComplex *buf_in, uint64_t offset_in, float *dda
 /*
   This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
 */
-__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl)
+__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_uint8)
 {
-  uint64_t loc_freq = threadIdx.x;
-  ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_UINT8;
+  uint64_t loc_freq  = threadIdx.x;
+  ddat_scl[loc_freq] = scl_nsig * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / scl_uint8;
 }
 
 /*
