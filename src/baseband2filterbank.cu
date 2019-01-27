@@ -98,16 +98,20 @@ int init_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
+
+  CudaSafeCall(cudaMalloc((void **)&conf->mean_scale_d, conf->nchan_out * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMemset((void *)conf->mean_scale_d, 0, conf->nchan_out * sizeof(cufftComplex)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMallocHost((void **)&conf->mean_scale_h, conf->nchan_out * sizeof(cufftComplex)));
   
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, conf->nchan_out * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, conf->nchan_out * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, conf->nchan_out * sizeof(float)));
-  CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, conf->nchan_out * sizeof(float)));   // We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, conf->nchan_out * sizeof(float)));// We have to clear the memory for this parameter
-  
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
+  //CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, conf->nchan_out * sizeof(float)));
+  //CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, conf->nchan_out * sizeof(float)));
+  //CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, conf->nchan_out * sizeof(float)));
+  //CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, conf->nchan_out * sizeof(float)));   // We have to clear the memory for this parameter
+  //CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, conf->nchan_out * sizeof(float)));// We have to clear the memory for this parameter
+  //
+  //CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
+  //CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
+  //CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
 
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->stream_ndf_chk;
@@ -340,7 +344,8 @@ int baseband2filterbank(conf_t conf)
 	      swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan, conf.nchan_keep_band, conf.nchan_edge);
 	      CHECK_LAUNCH_ERROR();
 	      
-	      detect_faccumulate_scale_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);
+	      //detect_faccumulate_scale_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);
+	      detect_faccumulate_scale_kernel1<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.mean_scale_d);
 	      CHECK_LAUNCH_ERROR();
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
@@ -471,53 +476,90 @@ int dat_offs_scl(conf_t conf)
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
       //mean_kernel<<<gridsize_mean, blocksize_mean>>>(conf.buf_rt2, conf.bufrt2_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim);
+      //switch (blocksize_accumulate.x)
+      //  {
+      //  case 1024:
+      //    reduce8_kernel<1024><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 512:
+      //    reduce8_kernel< 512><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 256:
+      //    reduce8_kernel< 256><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 128:
+      //    reduce8_kernel< 128><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 64:
+      //    reduce8_kernel<  64><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 32:
+      //    reduce8_kernel<  32><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 16:
+      //    reduce8_kernel<  16><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 8:
+      //    reduce8_kernel<   8><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 4:
+      //    reduce8_kernel<   4><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 2:
+      //    reduce8_kernel<   2><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  case 1:
+      //    reduce8_kernel<   1><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+      //    break;
+      //  }
+      //CHECK_LAUNCH_ERROR();
+      
       switch (blocksize_accumulate.x)
         {
         case 1024:
-          reduce8_kernel<1024><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<1024><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 512:
-          reduce8_kernel< 512><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel< 512><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 256:
-          reduce8_kernel< 256><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel< 256><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 128:
-          reduce8_kernel< 128><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel< 128><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 64:
-          reduce8_kernel<  64><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<  64><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 32:
-          reduce8_kernel<  32><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<  32><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 16:
-          reduce8_kernel<  16><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<  16><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 8:
-          reduce8_kernel<   8><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   8><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 4:
-          reduce8_kernel<   4><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   4><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 2:
-          reduce8_kernel<   2><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   2><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         case 1:
-          reduce8_kernel<   1><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   1><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
           break;
         }
       CHECK_LAUNCH_ERROR();
     }
   
   /* Get the scale of each chanel */
-  scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl, SCL_NSIG, SCL_UINT8);
+  //scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl, SCL_NSIG, SCL_UINT8);
+  scale2_kernel<<<gridsize_scale, blocksize_scale>>>(conf.mean_scale_d, SCL_NSIG, SCL_UINT8);
   CHECK_LAUNCH_ERROR();
   CudaSynchronizeCall();
   
-  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * conf.nchan_out, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * conf.nchan_out, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * conf.nchan_out, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.mean_scale_h, conf.mean_scale_d, sizeof(cufftComplex) * conf.nchan_out, cudaMemcpyDeviceToHost));
   
   /* Record scale into file */
   sprintf(fname, "%s/%s_scale.txt", conf.dir, conf.utc_start);
@@ -528,7 +570,7 @@ int dat_offs_scl(conf_t conf)
       exit(EXIT_FAILURE);
     }
   for (i = 0; i< conf.nchan_out; i++)
-    fprintf(fp, "%E\t%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i], conf.hsquare_mean[i]);
+    fprintf(fp, "%E\t%E\n", conf.mean_scale_h[i].x, conf.mean_scale_h[i].y);
   fclose(fp);
 
   return EXIT_SUCCESS;
@@ -548,14 +590,18 @@ int destroy_baseband2filterbank(conf_t conf)
   
   cudaFree(conf.dbuf_in);
   cudaFree(conf.dbuf_out);
-  cudaFreeHost(conf.hdat_offs);
-  cudaFreeHost(conf.hsquare_mean);
-  cudaFreeHost(conf.hdat_scl);
-  cudaFree(conf.ddat_offs);
-  cudaFree(conf.dsquare_mean);
-  cudaFree(conf.ddat_scl);
-  cudaFree(conf.buf_rt1);
-  cudaFree(conf.buf_rt2);
+
+  //cudaFreeHost(conf.hdat_offs);
+  //cudaFreeHost(conf.hsquare_mean);
+  //cudaFreeHost(conf.hdat_scl);
+  //cudaFree(conf.ddat_offs);
+  //cudaFree(conf.dsquare_mean);
+
+  cudaFreeHost(conf.mean_scale_h);
+  cudaFree(conf.mean_scale_d);
+  //cudaFree(conf.ddat_scl);
+  //cudaFree(conf.buf_rt1);
+  //cudaFree(conf.buf_rt2);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Free cuda memory done");
   
   dada_cuda_dbunregister(conf.hdu_in);

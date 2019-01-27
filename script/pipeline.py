@@ -23,8 +23,8 @@ log = logging.getLogger("phased-array-feed.paf_pipeline")
 EXECUTE        = True
 #EXECUTE        = False
 
-#NVPROF         = True
-NVPROF         = False
+NVPROF         = True
+#NVPROF         = False
 
 #SOD            = False   # To start filterbank data or not
 SOD            = True   # To start filterbank data or not
@@ -32,8 +32,8 @@ SOD            = True   # To start filterbank data or not
 HEIMDALL       = True   # To run heimdall on filterbank file or not
 #HEIMDALL       = False   # To run heimdall on filterbank file or not
 
-MEMCHECK       = True
-#MEMCHECK       = False
+#MEMCHECK       = True
+MEMCHECK       = False
 
 #DBDISK         = True   # To run dbdisk on filterbank file or not
 DBDISK         = False   # To run dbdisk on filterbank file or not

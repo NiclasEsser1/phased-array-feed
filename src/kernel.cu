@@ -220,6 +220,24 @@ __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_
 }
 
 /*
+  This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
+*/
+__global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_uint8)
+{
+  uint64_t loc_freq  = threadIdx.x;
+  ddat_scl[loc_freq] = scl_nsig * sqrtf(mean[loc_freq].y - mean[loc_freq].x * mean[loc_freq].x) / scl_uint8;
+}
+
+/*
+  This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
+*/
+__global__ void scale2_kernel(cufftComplex *mean_scale, float scl_nsig, float scl_uint8)
+{
+  uint64_t loc_freq  = threadIdx.x;
+  mean_scale[loc_freq].y = scl_nsig * sqrtf(mean_scale[loc_freq].y - mean_scale[loc_freq].x * mean_scale[loc_freq].x) / scl_uint8;
+}
+
+/*
   This kernel will detect data, accumulate it in frequency and scale it;
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
@@ -272,6 +290,62 @@ __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *
       else
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8);
 	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8); // Reverse frequency order
+    }
+}
+
+/*
+  This kernel will detect data, accumulate it in frequency and scale it;
+  The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
+ */
+__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *mean_scale)
+{
+  extern __shared__ float scale_sdata[];
+  uint64_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
+  float power;
+  
+  tid = threadIdx.x;
+  loc1 = blockIdx.x * gridDim.y * (blockDim.x * 2) +
+    blockIdx.y * (blockDim.x * 2) +
+    threadIdx.x;
+  loc2 = loc1 + offset_in;
+  
+  loc11 = loc1 + blockDim.x;
+  loc22 = loc2 + blockDim.x;
+  
+  /* Put two polarisation into shared memory at the same time */
+  scale_sdata[tid] =
+    dbuf_in[loc1].x * dbuf_in[loc1].x +
+    dbuf_in[loc11].x * dbuf_in[loc11].x +    
+    dbuf_in[loc1].y * dbuf_in[loc1].y +
+    dbuf_in[loc11].y * dbuf_in[loc11].y +
+    
+    dbuf_in[loc2].x * dbuf_in[loc2].x +
+    dbuf_in[loc22].x * dbuf_in[loc22].x +    
+    dbuf_in[loc2].y * dbuf_in[loc2].y +
+    dbuf_in[loc22].y * dbuf_in[loc22].y;
+
+  __syncthreads();
+
+  /* do reduction in shared mem */
+  for (s=blockDim.x/2; s>0; s>>=1)
+    {
+      if (tid < s)
+	scale_sdata[tid] += scale_sdata[tid + s];
+      __syncthreads();
+    }
+  
+  /* write result of this block to global mem */
+  if (tid == 0)
+    {
+      loc_freq = blockIdx.y;
+      power = scale_sdata[0];
+
+      if(mean_scale[loc_freq].y == 0.0)
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
+      else
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - mean_scale[loc_freq].y) / mean_scale[loc_freq].y + OFFS_UINT8);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - mean_scale[loc_freq].y) / mean_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
     }
 }
 

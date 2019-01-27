@@ -68,8 +68,7 @@ typedef struct conf_t
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   
-  float *ddat_offs, *dsquare_mean, *ddat_scl;
-  float *hdat_offs, *hsquare_mean, *hdat_scl;
+  cufftComplex *mean_scale_d, *mean_scale_h;
   cudaStream_t *streams;
   cufftHandle *fft_plans;
   
