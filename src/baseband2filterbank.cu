@@ -345,8 +345,48 @@ int baseband2filterbank(conf_t conf)
 	      CHECK_LAUNCH_ERROR();
 	      
 	      //detect_faccumulate_scale_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);
-	      detect_faccumulate_scale_kernel1<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.mean_scale_d);
+	      //detect_faccumulate_scale_kernel1<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.mean_scale_d);
+	      	  
+	      switch (blocksize_detect_faccumulate_scale.x)
+		{
+		case 1024:
+		  detect_faccumulate_scale_kernel2<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 512:
+		  detect_faccumulate_scale_kernel2< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 256:
+		  detect_faccumulate_scale_kernel2< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 128:
+		  detect_faccumulate_scale_kernel2< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 64:
+		  detect_faccumulate_scale_kernel2<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 32:
+		  detect_faccumulate_scale_kernel2<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 16:
+		  detect_faccumulate_scale_kernel2<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 8:
+		  detect_faccumulate_scale_kernel2<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 4:
+		  detect_faccumulate_scale_kernel2<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 2:
+		  detect_faccumulate_scale_kernel2<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		case 1:
+		  detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  break;
+		}
 	      CHECK_LAUNCH_ERROR();
+	      
+	      //detect_faccumulate_scale_kernel2<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+	      //CHECK_LAUNCH_ERROR();
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }

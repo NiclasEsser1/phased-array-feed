@@ -20,7 +20,7 @@
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "detect_faccumulate_scale_test - Test the detect_faccumulate_scale kernel \n"
+	   "detect_faccumulate_scale2_test - Test the detect_faccumulate_scale kernel \n"
 	   "\n"
 	   "Usage: detect_faccumulate_scale_test [options]\n"
 	   " -a  Grid size in X, which is number of samples in time\n"
@@ -30,7 +30,7 @@ extern "C" void usage ()
 	   " -h  show help\n");
 }
 
-// ./detect_faccumulate_scale_test -a 512 -b 1 -c 512 -d 1024 
+// ./detect_faccumulate_scale2_test -a 512 -b 1 -c 512 -d 1024 
 int main(int argc, char *argv[])
 {
   int i, j,l, k, arg;
