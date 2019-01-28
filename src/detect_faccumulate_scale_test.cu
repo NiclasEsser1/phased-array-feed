@@ -20,17 +20,16 @@
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "detect_faccumulate_scale2_test - Test the detect_faccumulate_scale kernel \n"
+	   "detect_faccumulate_scale1_test - Test the detect_faccumulate_scale kernel \n"
 	   "\n"
 	   "Usage: detect_faccumulate_scale_test [options]\n"
 	   " -a  Grid size in X, which is number of samples in time\n"
 	   " -b  Grid size in Y, which is number of channels\n"
 	   " -c  Block size in X\n"
-	   " -d  Number of samples to accumulate in each block\n"
 	   " -h  show help\n");
 }
 
-// ./detect_faccumulate_scale2_test -a 512 -b 1 -c 512 -d 1024 
+// ./detect_faccumulate_scale1_test -a 512 -b 1 -c 512
 int main(int argc, char *argv[])
 {
   int i, j,l, k, arg;
@@ -39,12 +38,14 @@ int main(int argc, char *argv[])
   uint64_t nsamp, npol, nout, nchan;
   dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
   float power;
-  cufftComplex *mean_scale_h = NULL, *mean_scale_d = NULL, *g_in = NULL, *data = NULL;
+  cufftComplex  *g_in = NULL, *data = NULL;
+  float *mean_h = NULL, *scale_h = NULL, *mean_d = NULL, *scale_d = NULL;
+    
   uint8_t *g_out = NULL, *g_result = NULL;
   float *h_result = NULL;
   
   /* Read in parameters, the arguments here have the same name  */
-  while((arg=getopt(argc,argv,"a:b:hc:d:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:")) != -1)
     {
       switch(arg)
 	{
@@ -75,18 +76,9 @@ int main(int argc, char *argv[])
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
-	  
-	case 'd':	  
-	  if (sscanf (optarg, "%"SCNu64"", &n_accumulate) != 1)
-	    {
-	      fprintf (stderr, "Does not get n_accumulate, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      exit(EXIT_FAILURE);
-	    }
-	  fprintf(stdout, "n_accumulate is %"PRIu64"\n",  n_accumulate);
-	  break;
 	}
     }
-
+  n_accumulate = 2 * block_x;
   fprintf(stdout, "grid_x is %d, grid_y is %d, block_x is %d and n_accumulate is %"SCNu64"\n", grid_x, grid_y, block_x, n_accumulate);
   
   /* Setup size */
@@ -102,20 +94,22 @@ int main(int argc, char *argv[])
   nchan                                = grid_y;
   
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&mean_scale_h, nchan * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMallocHost((void **)&mean_h, nchan * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&scale_h, nchan * sizeof(float)));  
   CudaSafeCall(cudaMallocHost((void **)&data,  npol * sizeof(cufftComplex)));
   CudaSafeCall(cudaMallocHost((void **)&h_result,  nout * sizeof(float)));
   CudaSafeCall(cudaMallocHost((void **)&g_result,  nout * sizeof(uint8_t)));
   CudaSafeCall(cudaMalloc((void **)&g_out,  nout * sizeof(uint8_t)));
-  CudaSafeCall(cudaMalloc((void **)&mean_scale_d, nchan * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMalloc((void **)&mean_d, nchan * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&scale_d, nchan * sizeof(float)));
   CudaSafeCall(cudaMalloc((void **)&g_in,  npol * sizeof(cufftComplex)));  
     
   /* cauculate on CPU */
   srand(time(NULL));
   for(i = 0; i < nchan; i ++) // Prepare the scale
     {
-      mean_scale_h[i].x = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND)) + 1 ;
-      mean_scale_h[i].y = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND)) * 50000.0;
+      mean_h[i] = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND)) + 1 ;
+      scale_h[i] = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND)) * 50000.0;
     }
   for(i = 0; i < grid_x; i ++) // Prepare the input data
     {
@@ -134,63 +128,18 @@ int main(int argc, char *argv[])
 		  power += (data[idx+l*nsamp].x*data[idx+l*nsamp].x + data[idx+l*nsamp].y*data[idx+l*nsamp].y);
 		}
 	    }
-	  if(mean_scale_h[j].y == 0 )
+	  if(scale_h[j] == 0 )
 	    h_result[i*grid_y+grid_y-j-1] = (power);
 	  else
-	    h_result[i*grid_y+grid_y-j-1] = ((power - mean_scale_h[j].x) / mean_scale_h[j].y + OFFS_UINT8); // Reverse frequency order
+	    h_result[i*grid_y+grid_y-j-1] = ((power - mean_h[j]) / scale_h[j] + OFFS_UINT8); // Reverse frequency order
 	}
     }
     
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(mean_d, mean_h, nchan * sizeof(float), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(scale_d, scale_h, nchan * sizeof(float), cudaMemcpyHostToDevice));
   CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
-    
-  switch (blocksize_detect_faccumulate_scale.x)
-    {
-    case 1024:
-      detect_faccumulate_scale_kernel2<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 512:
-      detect_faccumulate_scale_kernel2< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 256:
-      detect_faccumulate_scale_kernel2< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 128:
-      detect_faccumulate_scale_kernel2< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 64:
-      detect_faccumulate_scale_kernel2<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 32:
-      detect_faccumulate_scale_kernel2<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 16:
-      detect_faccumulate_scale_kernel2<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 8:
-      detect_faccumulate_scale_kernel2<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 4:
-      detect_faccumulate_scale_kernel2<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 2:
-      detect_faccumulate_scale_kernel2<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-      
-    case 1:
-      detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
-      break;
-    }
+  detect_faccumulate_scale_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, mean_d, scale_d);
   CHECK_LAUNCH_ERROR();
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  
@@ -199,12 +148,14 @@ int main(int argc, char *argv[])
     fprintf(stdout, "CPU:\t%f\tGPU:\t%d\t%f\n", h_result[i], g_result[i], g_result[i] - floor(h_result[i]));
   
   /* Free buffer */  
-  CudaSafeCall(cudaFreeHost(mean_scale_h));
+  CudaSafeCall(cudaFreeHost(mean_h));
+  CudaSafeCall(cudaFreeHost(scale_h));
   CudaSafeCall(cudaFreeHost(h_result));
   CudaSafeCall(cudaFreeHost(g_result));
   CudaSafeCall(cudaFreeHost(data));
   CudaSafeCall(cudaFree(g_out));
-  CudaSafeCall(cudaFree(mean_scale_d));
+  CudaSafeCall(cudaFree(scale_d));
+  CudaSafeCall(cudaFree(mean_d));
   CudaSafeCall(cudaFree(g_in));
   
   return EXIT_SUCCESS;

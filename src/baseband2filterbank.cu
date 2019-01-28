@@ -470,8 +470,46 @@ int dat_offs_scl(conf_t conf)
 	  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan, conf.nchan_keep_band, conf.nchan_edge);
 	  CHECK_LAUNCH_ERROR();
 	  
-	  detect_faccumulate_pad_transpose_kernel<<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
+	  switch (blocksize_detect_faccumulate_pad_transpose.x )
+	    {
+	    case 1024:
+	      detect_faccumulate_pad_transpose_kernel1<1024><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;
+	    case 512:
+	      detect_faccumulate_pad_transpose_kernel1< 512><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 256:
+	      detect_faccumulate_pad_transpose_kernel1< 256><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 128:
+	      detect_faccumulate_pad_transpose_kernel1< 128><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 64:
+	      detect_faccumulate_pad_transpose_kernel1<  64><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 32:
+	      detect_faccumulate_pad_transpose_kernel1<  32><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 16:
+	      detect_faccumulate_pad_transpose_kernel1<  16><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 8:
+	      detect_faccumulate_pad_transpose_kernel1<   8><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 4:
+	      detect_faccumulate_pad_transpose_kernel1<   4><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 2:
+	      detect_faccumulate_pad_transpose_kernel1<   2><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;			     
+	    case 1:
+	      detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      break;
+	    }
 	  CHECK_LAUNCH_ERROR();
+	      
+	  //detect_faccumulate_pad_transpose_kernel<<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
+	  //CHECK_LAUNCH_ERROR();
 	  
 	  //accumulate_kernel<<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
 	  	  

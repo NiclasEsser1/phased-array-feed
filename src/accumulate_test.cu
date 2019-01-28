@@ -26,11 +26,10 @@ extern "C" void usage ()
 	   " -a  Grid size in X\n"
 	   " -b  Grid size in Y\n"
 	   " -c  Block size in X\n"
-	   " -d  Number of samples to accumulate in each block\n"
 	   " -h  show help\n");
 }
 
-// ./accumulate_test -a 512 -b 1 -c 512 -d 1024
+// ./accumulate_test -a 512 -b 1 -c 512
 int main(int argc, char *argv[])
 {
   int i, j, arg;
@@ -42,7 +41,7 @@ int main(int argc, char *argv[])
   cufftComplex *h_result = NULL, *g_result = NULL, *data = NULL, *g_in = NULL, *g_out = NULL;
   
   /* Read in parameters, the arguments here have the same name  */
-  while((arg=getopt(argc,argv,"a:b:hc:d:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:")) != -1)
     {
       switch(arg)
 	{
@@ -73,18 +72,9 @@ int main(int argc, char *argv[])
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
-	  
-	case 'd':	  
-	  if (sscanf (optarg, "%"SCNu64"", &n_accumulate) != 1)
-	    {
-	      fprintf (stderr, "Does not get n_accumulate, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      exit(EXIT_FAILURE);
-	    }
-	  fprintf(stdout, "n_accumulate is %"SCNu64"\n",  n_accumulate);
-	  break;
 	}
     }
-
+  n_accumulate = block_x * 2;
   fprintf(stdout, "grid_x is %d, grid_y is %d, block_x is %d and n_accumulate is %"SCNu64"\n", grid_x, grid_y, block_x, n_accumulate);
   
   /* Setup size */
