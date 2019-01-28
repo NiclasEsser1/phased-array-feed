@@ -23,17 +23,17 @@ log = logging.getLogger("phased-array-feed.paf_pipeline")
 EXECUTE        = True
 #EXECUTE        = False
 
-#NVPROF         = True
-NVPROF         = False
+NVPROF         = True
+#NVPROF         = False
 
-#SOD            = False   # To start filterbank data or not
-SOD            = True   # To start filterbank data or not
+SOD            = False   # To start filterbank data or not
+#SOD            = True   # To start filterbank data or not
 
-HEIMDALL       = True   # To run heimdall on filterbank file or not
-#HEIMDALL       = False   # To run heimdall on filterbank file or not
+#HEIMDALL       = True   # To run heimdall on filterbank file or not
+HEIMDALL       = False   # To run heimdall on filterbank file or not
 
-MEMCHECK       = True
-#MEMCHECK       = False
+#MEMCHECK       = True
+MEMCHECK       = False
 
 #DBDISK         = True   # To run dbdisk on filterbank file or not
 DBDISK         = False   # To run dbdisk on filterbank file or not
@@ -62,7 +62,7 @@ PAF_CONFIG = {"instrument_name":    "PAF-BMF",
 }
 
 SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,                 
-                         "rbuf_baseband_nblk":      4,
+                         "rbuf_baseband_nblk":      3,
                          "rbuf_baseband_nread":     1,                 
                          "tbuf_baseband_ndf_chk":   128,
                          
@@ -396,7 +396,7 @@ class SearchFile(Pipeline):
     def baseband2filterbank(self, key_in, key_out, runtime_dir):                            
         software = "{}/src/baseband2filterbank_main".format(PAF_ROOT)
         if NVPROF:
-            cmd = "nvprof "
+            cmd = "nvprof --output-profile "
         else:
             cmd = ""
 
@@ -492,10 +492,12 @@ if __name__ == "__main__":
     args     = parser.parse_args()
     numa     = args.numa[0]    
     ip       = "10.17.{}.{}".format(host_id, numa + 1)
-    fname    = "{}/J1819-1458/J1819-1458_48chunks.dada".format(BASEBAND_ROOT)
+    #fname    = "{}/J1819-1458/J1819-1458_48chunks.dada".format(BASEBAND_ROOT)
+    fname    = "{}/J1819-1458/J1819-1458_33chunks.dada".format(BASEBAND_ROOT)
     
     print "\nCreate pipeline ...\n"
-    search_mode = SearchFile1Beam()
+    #search_mode = SearchFile1Beam()
+    search_mode = SearchFile2Beams()
     
     print "\nConfigure it ...\n"
     search_mode.configure(fname, ip)

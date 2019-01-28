@@ -76,9 +76,9 @@ typedef struct conf_t
   dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
   dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
   dim3 gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose;
-  dim3 gridsize_accumulate, blocksize_accumulate;
-  dim3 gridsize_mean, blocksize_mean;
+  dim3 gridsize_taccumulate, blocksize_taccumulate;
   dim3 gridsize_scale, blocksize_scale;
+  int naccumulate_pad, naccumulate_scale, naccumulate;
 }conf_t; 
 
 int init_baseband2filterbank(conf_t *conf);

@@ -20,7 +20,8 @@ int init_baseband2filterbank(conf_t *conf)
 {
   int i;
   int iembed, istride, idist, oembed, ostride, odist, batch, nx;
-
+  int naccumulate_pow2;
+  
   /* Prepare parameters */
   conf->nrun_blk        = conf->rbufin_ndf_chk / (conf->stream_ndf_chk * conf->nstream);
   conf->nchan_in        = conf->nchk_in * NCHAN_CHK;
@@ -100,8 +101,8 @@ int init_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
 
   CudaSafeCall(cudaMalloc((void **)&conf->mean_scale_d, conf->nchan_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMemset((void *)conf->mean_scale_d, 0, conf->nchan_out * sizeof(cufftComplex)));// We have to clear the memory for this parameter
   CudaSafeCall(cudaMallocHost((void **)&conf->mean_scale_h, conf->nchan_out * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMemset((void *)conf->mean_scale_d, 0, conf->nchan_out * sizeof(cufftComplex)));// We have to clear the memory for this parameter
   
   //CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, conf->nchan_out * sizeof(float)));
   //CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, conf->nchan_out * sizeof(float)));
@@ -134,45 +135,41 @@ int init_baseband2filterbank(conf_t *conf)
 	      conf->gridsize_swap_select_transpose.x, conf->gridsize_swap_select_transpose.y, conf->gridsize_swap_select_transpose.z,
 	      conf->blocksize_swap_select_transpose.x, conf->blocksize_swap_select_transpose.y, conf->blocksize_swap_select_transpose.z);        
 
+  conf->naccumulate_pad = conf->nchan_keep_band/conf->nchan_out;
+  naccumulate_pow2      = (int)pow(2.0, floor(log2((double)conf->naccumulate_pad)));
   conf->gridsize_detect_faccumulate_pad_transpose.x = conf->stream_ndf_chk * NSAMP_DF / conf->cufft_nx;
   conf->gridsize_detect_faccumulate_pad_transpose.y = conf->nchan_out;
   conf->gridsize_detect_faccumulate_pad_transpose.z = 1;
-  conf->blocksize_detect_faccumulate_pad_transpose.x = conf->nchan_keep_band/(2 * conf->nchan_out);
+  conf->blocksize_detect_faccumulate_pad_transpose.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_detect_faccumulate_pad_transpose.y = 1;
   conf->blocksize_detect_faccumulate_pad_transpose.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d)",
+  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
 	      conf->gridsize_detect_faccumulate_pad_transpose.x, conf->gridsize_detect_faccumulate_pad_transpose.y, conf->gridsize_detect_faccumulate_pad_transpose.z,
-	      conf->blocksize_detect_faccumulate_pad_transpose.x, conf->blocksize_detect_faccumulate_pad_transpose.y, conf->blocksize_detect_faccumulate_pad_transpose.z);
-  
+	      conf->blocksize_detect_faccumulate_pad_transpose.x, conf->blocksize_detect_faccumulate_pad_transpose.y, conf->blocksize_detect_faccumulate_pad_transpose.z, conf->naccumulate_pad);
+
+  conf->naccumulate_scale = conf->nchan_keep_band/conf->nchan_out;
+  naccumulate_pow2        = (int)pow(2.0, floor(log2((double)conf->naccumulate_scale)));
   conf->gridsize_detect_faccumulate_scale.x = conf->stream_ndf_chk * NSAMP_DF / conf->cufft_nx;
   conf->gridsize_detect_faccumulate_scale.y = conf->nchan_out;
   conf->gridsize_detect_faccumulate_scale.z = 1;
-  conf->blocksize_detect_faccumulate_scale.x = conf->nchan_keep_band/(2 * conf->nchan_out);
+  conf->blocksize_detect_faccumulate_scale.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_detect_faccumulate_scale.y = 1;
   conf->blocksize_detect_faccumulate_scale.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d)",
+  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
 	      conf->gridsize_detect_faccumulate_scale.x, conf->gridsize_detect_faccumulate_scale.y, conf->gridsize_detect_faccumulate_scale.z,
-	      conf->blocksize_detect_faccumulate_scale.x, conf->blocksize_detect_faccumulate_scale.y, conf->blocksize_detect_faccumulate_scale.z);
-  
-  conf->gridsize_accumulate.x = conf->nchan_out;
-  conf->gridsize_accumulate.y = 1;
-  conf->gridsize_accumulate.z = 1;
-  conf->blocksize_accumulate.x = conf->stream_ndf_chk * NSAMP_DF / (conf->cufft_nx * 2); 
-  conf->blocksize_accumulate.y = 1;
-  conf->blocksize_accumulate.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_accumulate.x, conf->gridsize_accumulate.y, conf->gridsize_accumulate.z,
-	      conf->blocksize_accumulate.x, conf->blocksize_accumulate.y, conf->blocksize_accumulate.z);
-  
-  conf->gridsize_mean.x = 1; 
-  conf->gridsize_mean.y = 1; 
-  conf->gridsize_mean.z = 1;
-  conf->blocksize_mean.x = conf->nchan_out;
-  conf->blocksize_mean.y = 1;
-  conf->blocksize_mean.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of mean kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_mean.x, conf->gridsize_mean.y, conf->gridsize_mean.z,
-	      conf->blocksize_mean.x, conf->blocksize_mean.y, conf->blocksize_mean.z);
+	      conf->blocksize_detect_faccumulate_scale.x, conf->blocksize_detect_faccumulate_scale.y, conf->blocksize_detect_faccumulate_scale.z, conf->naccumulate_scale);
+
+  conf->naccumulate = conf->stream_ndf_chk * NSAMP_DF / conf->cufft_nx; 
+  naccumulate_pow2  = (int)pow(2.0, floor(log2((double)conf->naccumulate)));
+  conf->gridsize_taccumulate.x = conf->nchan_out;
+  conf->gridsize_taccumulate.y = 1;
+  conf->gridsize_taccumulate.z = 1;
+  conf->blocksize_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
+  conf->blocksize_taccumulate.y = 1;
+  conf->blocksize_taccumulate.z = 1;
+  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+	      conf->gridsize_taccumulate.x, conf->gridsize_taccumulate.y, conf->gridsize_taccumulate.z,
+	      conf->blocksize_taccumulate.x, conf->blocksize_taccumulate.y, conf->blocksize_taccumulate.z, conf->naccumulate);
   
   conf->gridsize_scale.x = 1;
   conf->gridsize_scale.y = 1;
@@ -350,44 +347,40 @@ int baseband2filterbank(conf_t conf)
 	      switch (blocksize_detect_faccumulate_scale.x)
 		{
 		case 1024:
-		  detect_faccumulate_scale_kernel2<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 512:
-		  detect_faccumulate_scale_kernel2< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 256:
-		  detect_faccumulate_scale_kernel2< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 128:
-		  detect_faccumulate_scale_kernel2< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 64:
-		  detect_faccumulate_scale_kernel2<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 32:
-		  detect_faccumulate_scale_kernel2<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 16:
-		  detect_faccumulate_scale_kernel2<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 8:
-		  detect_faccumulate_scale_kernel2<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 4:
-		  detect_faccumulate_scale_kernel2<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 2:
-		  detect_faccumulate_scale_kernel2<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		case 1:
-		  detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
+		  detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		}
-	      CHECK_LAUNCH_ERROR();
-	      
-	      //detect_faccumulate_scale_kernel2<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, blocksize_detect_faccumulate_scale.x*2, conf.mean_scale_d);
-	      //CHECK_LAUNCH_ERROR();
-	      
+	      CHECK_LAUNCH_ERROR();	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	}
@@ -427,8 +420,7 @@ int dat_offs_scl(conf_t conf)
 
   dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
   dim3 gridsize_scale, blocksize_scale;  
-  dim3 gridsize_mean, blocksize_mean;
-  dim3 gridsize_accumulate, blocksize_accumulate;
+  dim3 gridsize_taccumulate, blocksize_taccumulate;
   dim3 gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose;
   
   char fname[MSTR_LEN];
@@ -437,12 +429,10 @@ int dat_offs_scl(conf_t conf)
   gridsize_unpack                 = conf.gridsize_unpack;
   blocksize_unpack                = conf.blocksize_unpack;
   	         	
-  gridsize_accumulate             = conf.gridsize_accumulate;	       
-  blocksize_accumulate            = conf.blocksize_accumulate;
+  gridsize_taccumulate             = conf.gridsize_taccumulate;	       
+  blocksize_taccumulate            = conf.blocksize_taccumulate;
   gridsize_scale                  = conf.gridsize_scale;	       
   blocksize_scale                 = conf.blocksize_scale;	         		           
-  gridsize_mean                   = conf.gridsize_mean;	       
-  blocksize_mean                  = conf.blocksize_mean;
   gridsize_swap_select_transpose  = conf.gridsize_swap_select_transpose;   
   blocksize_swap_select_transpose = conf.blocksize_swap_select_transpose;
   gridsize_detect_faccumulate_pad_transpose         = conf.gridsize_detect_faccumulate_pad_transpose ;
@@ -462,7 +452,6 @@ int dat_offs_scl(conf_t conf)
 
 	  /* Unpack raw data into cufftComplex array */
 	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-	  //CudaSafeCall(cudaMemcpyAsync(temp_out, &conf.buf_rt1[bufrt1_offset + (NCHAN_CHK - 1) * NSAMP_DF * conf.stream_ndf_chk], temp_out_len * sizeof(cufftComplex), cudaMemcpyDeviceToHost, conf.streams[j]));
 	  CHECK_LAUNCH_ERROR();
 	  
 	  /* Do forward FFT */
@@ -473,166 +462,83 @@ int dat_offs_scl(conf_t conf)
 	  switch (blocksize_detect_faccumulate_pad_transpose.x )
 	    {
 	    case 1024:
-	      detect_faccumulate_pad_transpose_kernel1<1024><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<1024><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;
 	    case 512:
-	      detect_faccumulate_pad_transpose_kernel1< 512><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1< 512><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 256:
-	      detect_faccumulate_pad_transpose_kernel1< 256><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1< 256><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 128:
-	      detect_faccumulate_pad_transpose_kernel1< 128><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1< 128><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 64:
-	      detect_faccumulate_pad_transpose_kernel1<  64><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<  64><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 32:
-	      detect_faccumulate_pad_transpose_kernel1<  32><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<  32><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 16:
-	      detect_faccumulate_pad_transpose_kernel1<  16><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<  16><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 8:
-	      detect_faccumulate_pad_transpose_kernel1<   8><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<   8><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 4:
-	      detect_faccumulate_pad_transpose_kernel1<   4><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<   4><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 2:
-	      detect_faccumulate_pad_transpose_kernel1<   2><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<   2><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;			     
 	    case 1:
-	      detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, blocksize_detect_faccumulate_pad_transpose.x * 2);
+	      detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;
 	    }
 	  CHECK_LAUNCH_ERROR();
-	      
-	  //detect_faccumulate_pad_transpose_kernel<<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
-	  //CHECK_LAUNCH_ERROR();
-	  
-	  //accumulate_kernel<<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
-	  	  
-	  //switch (blocksize_accumulate.x)
-	  //  {
-	  //  case 1024:
-	  //    reduce6_kernel<1024><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 512:
-	  //    reduce6_kernel< 512><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 256:
-	  //    reduce6_kernel< 256><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 128:
-	  //    reduce6_kernel< 128><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 64:
-	  //    reduce6_kernel<  64><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 32:
-	  //    reduce6_kernel<  32><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 16:
-	  //    reduce6_kernel<  16><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 8:
-	  //    reduce6_kernel<   8><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 4:
-	  //    reduce6_kernel<   4><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 2:
-	  //    reduce6_kernel<   2><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  case 1:
-	  //    reduce6_kernel<   1><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], blocksize_accumulate.x * 2);
-	  //    break;
-	  //  }
-	  //CHECK_LAUNCH_ERROR();
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
-
-      //mean_kernel<<<gridsize_mean, blocksize_mean>>>(conf.buf_rt2, conf.bufrt2_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim);
-      //switch (blocksize_accumulate.x)
-      //  {
-      //  case 1024:
-      //    reduce8_kernel<1024><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 512:
-      //    reduce8_kernel< 512><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 256:
-      //    reduce8_kernel< 256><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 128:
-      //    reduce8_kernel< 128><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 64:
-      //    reduce8_kernel<  64><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 32:
-      //    reduce8_kernel<  32><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 16:
-      //    reduce8_kernel<  16><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 8:
-      //    reduce8_kernel<   8><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 4:
-      //    reduce8_kernel<   4><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 2:
-      //    reduce8_kernel<   2><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  case 1:
-      //    reduce8_kernel<   1><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.ddat_offs, conf.dsquare_mean, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
-      //    break;
-      //  }
-      //CHECK_LAUNCH_ERROR();
       
-      switch (blocksize_accumulate.x)
+      switch (blocksize_taccumulate.x)
         {
         case 1024:
-          reduce9_kernel<1024><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<1024><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 512:
-          reduce9_kernel< 512><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel< 512><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 256:
-          reduce9_kernel< 256><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel< 256><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 128:
-          reduce9_kernel< 128><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel< 128><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 64:
-          reduce9_kernel<  64><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<  64><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 32:
-          reduce9_kernel<  32><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<  32><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 16:
-          reduce9_kernel<  16><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<  16><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 8:
-          reduce9_kernel<   8><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   8><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 4:
-          reduce9_kernel<   4><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   4><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 2:
-          reduce9_kernel<   2><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   2><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         case 1:
-          reduce9_kernel<   1><<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, blocksize_accumulate.x * 2, conf.nstream, conf.sclndim);
+          reduce9_kernel<   1><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         }
       CHECK_LAUNCH_ERROR();
     }
   
   /* Get the scale of each chanel */
-  //scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl, SCL_NSIG, SCL_UINT8);
   scale2_kernel<<<gridsize_scale, blocksize_scale>>>(conf.mean_scale_d, SCL_NSIG, SCL_UINT8);
   CHECK_LAUNCH_ERROR();
   CudaSynchronizeCall();
@@ -668,18 +574,9 @@ int destroy_baseband2filterbank(conf_t conf)
   
   cudaFree(conf.dbuf_in);
   cudaFree(conf.dbuf_out);
-
-  //cudaFreeHost(conf.hdat_offs);
-  //cudaFreeHost(conf.hsquare_mean);
-  //cudaFreeHost(conf.hdat_scl);
-  //cudaFree(conf.ddat_offs);
-  //cudaFree(conf.dsquare_mean);
-
   cudaFreeHost(conf.mean_scale_h);
   cudaFree(conf.mean_scale_d);
-  //cudaFree(conf.ddat_scl);
-  //cudaFree(conf.buf_rt1);
-  //cudaFree(conf.buf_rt2);
+
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Free cuda memory done");
   
   dada_cuda_dbunregister(conf.hdu_in);
