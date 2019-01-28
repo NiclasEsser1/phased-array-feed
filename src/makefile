@@ -28,7 +28,7 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include 
 
-all: capture_main baseband2filterbank_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test scale_test scale1_test scale2_test accumulate_test unpack_test swap_select_transpose_test clean
+all: capture_main baseband2filterbank_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test scale_test scale1_test scale2_test accumulate_test unpack_test swap_select_transpose_test detect_faccumulate_scale2_test clean
 
 capture_main:capture_main.o capture.o log.o
 	$(CC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
@@ -69,6 +69,9 @@ unpack_test:unpack_test.o kernel.o
 swap_select_transpose_test:swap_select_transpose_test.o kernel.o 
 	$(NVCC) -o swap_select_transpose_test swap_select_transpose_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
+detect_faccumulate_scale2_test:detect_faccumulate_scale2_test.o kernel.o 
+	$(NVCC) -o detect_faccumulate_scale2_test detect_faccumulate_scale2_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
 capture_main.o:capture_main.c
 	$(CC) -c capture_main.c $(INCLUDE_DIRS) ${C_FLAGS}
 
@@ -80,6 +83,9 @@ baseband2filterbank_main.o:baseband2filterbank_main.cu
 
 baseband2filterbank.o:baseband2filterbank.cu
 	$(NVCC) -c baseband2filterbank.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+detect_faccumulate_scale2_test.o:detect_faccumulate_scale2_test.cu
+	$(NVCC) -c detect_faccumulate_scale2_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 reduce6_test.o:reduce6_test.cu
 	$(NVCC) -c reduce6_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}

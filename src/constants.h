@@ -23,7 +23,8 @@ extern "C" {
   
 #define CUFFT_RANK     1
 
-#define MAX_RAND       1000
+  //#define MAX_RAND       1000
+#define MAX_RAND       255
   
 #endif
 

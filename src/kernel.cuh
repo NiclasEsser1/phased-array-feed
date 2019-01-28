@@ -7,6 +7,7 @@
 #include <cuda.h>
 #include <cufft.h>
 #include <inttypes.h>
+#include "baseband2filterbank.cuh"
 
 /* For raw data unpack to get ready for forward FFT */
 __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_t offset_out);
@@ -460,7 +461,7 @@ __global__ void reduce8_kernel(cufftComplex *dbuf_in, float *ddat_offs, float *d
 
 // reduce8 + cufftComplex output
 template <unsigned int blockSize>
-__global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *mean, uint64_t offset_in, uint64_t n_accumulate, int nstream, float scl_ndim)
+__global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *mean_scale, uint64_t offset_in, uint64_t n_accumulate, int nstream, float scl_ndim)
 {
   extern volatile __shared__ cufftComplex sdata[];
   int j;
@@ -587,8 +588,110 @@ __global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *mean, uint64
   
   if (tid == 0)
     {
-      mean[blockIdx.x * gridDim.y + blockIdx.y].x += sdata[0].x/scl_ndim;
-      mean[blockIdx.x * gridDim.y + blockIdx.y].y += sdata[0].y/scl_ndim;
+      mean_scale[blockIdx.x * gridDim.y + blockIdx.y].x += sdata[0].x/scl_ndim;
+      mean_scale[blockIdx.x * gridDim.y + blockIdx.y].y += sdata[0].y/scl_ndim;
+    }
+}
+
+/*
+  This kernel will detect data, accumulate it in frequency and scale it;
+  The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
+ */
+template <unsigned int blockSize>
+__global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, uint64_t n_accumulate, cufftComplex *mean_scale)
+{
+  extern volatile __shared__ float scale_sdata[];
+  uint64_t i   = threadIdx.x;
+  uint64_t tid = i;
+  uint64_t loc;
+  int loc_freq;
+  float power;
+
+  scale_sdata[tid] = 0;
+  while (i < n_accumulate)
+    {
+      loc = blockIdx.x*gridDim.y*n_accumulate + blockIdx.y*n_accumulate + i;
+      scale_sdata[tid] += (dbuf_in[loc].x*dbuf_in[loc].x +
+			   dbuf_in[loc].y*dbuf_in[loc].y +
+			   dbuf_in[loc + offset_in].x*dbuf_in[loc + offset_in].x +
+			   dbuf_in[loc + offset_in].y*dbuf_in[loc + offset_in].y);			   
+      i += blockSize;
+    }  
+  __syncthreads();
+
+  if (blockSize >= 1024)
+    {
+      if (tid < 512)
+	scale_sdata[tid] += scale_sdata[tid + 512];
+    }
+  __syncthreads();
+  
+  if (blockSize >= 512)
+    {
+      if (tid < 256)
+	scale_sdata[tid] += scale_sdata[tid + 256];
+    }
+  __syncthreads();
+
+  if (blockSize >= 256)
+    {
+      if (tid < 128)
+	scale_sdata[tid] += scale_sdata[tid + 128];
+    }
+  __syncthreads();
+
+  if (blockSize >= 128)
+    {
+      if (tid < 64)
+	scale_sdata[tid] += scale_sdata[tid + 64];
+    }
+  __syncthreads();
+    
+  if (tid < 32)
+    {
+      if (blockSize >= 64)
+	{
+	  if (tid < 32)
+	    scale_sdata[tid] += scale_sdata[tid + 32];
+	}
+      if (blockSize >= 32)
+	{
+	  if (tid < 16)
+	    scale_sdata[tid] += scale_sdata[tid + 16];
+	}
+      if (blockSize >= 16)
+	{
+	  if (tid < 8)
+	    scale_sdata[tid] += scale_sdata[tid + 8];
+	}
+      if (blockSize >= 8)
+	{
+	  if (tid < 4)
+	    scale_sdata[tid] += scale_sdata[tid + 4];
+	}
+      if (blockSize >= 4)
+	{
+	  if (tid < 2)
+	    scale_sdata[tid] += scale_sdata[tid + 2];
+	}
+      if (blockSize >= 2)
+	{
+	  if (tid < 1)
+	    scale_sdata[tid] += scale_sdata[tid + 1];
+	}
+    }
+  
+  if (tid == 0)
+    {
+      loc_freq = blockIdx.y;
+      power = scale_sdata[0];
+
+      if(mean_scale[loc_freq].y == 0.0)
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
+      else
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
     }
 }
 

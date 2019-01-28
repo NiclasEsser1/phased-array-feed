@@ -243,7 +243,7 @@ __global__ void scale2_kernel(cufftComplex *mean_scale, float scl_nsig, float sc
  */
 __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, float *ddat_offs, float *ddat_scl)
 {
-  extern __shared__ float scale_sdata[];
+  extern volatile __shared__ float scale_sdata[];
   uint64_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
   float power;
   
@@ -299,7 +299,7 @@ __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *
  */
 __global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *mean_scale)
 {
-  extern __shared__ float scale_sdata[];
+  extern volatile __shared__ float scale_sdata[];
   uint64_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
   float power;
   
@@ -344,8 +344,8 @@ __global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t 
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
 	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
       else
-	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - mean_scale[loc_freq].y) / mean_scale[loc_freq].y + OFFS_UINT8);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - mean_scale[loc_freq].y) / mean_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
     }
 }
 

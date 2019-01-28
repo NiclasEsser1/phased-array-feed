@@ -28,6 +28,7 @@ extern "C" void usage ()
 	   " -c  Block size in X\n"
 	   " -d  Number of samples to accumulate in each block\n"
 	   " -e  Number of streams in use\n"
+	   " -f  Number of samples to average\n"
 	   " -h  show help\n");
 }
 
