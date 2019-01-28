@@ -396,7 +396,8 @@ class SearchFile(Pipeline):
     def baseband2filterbank(self, key_in, key_out, runtime_dir):                            
         software = "{}/src/baseband2filterbank_main".format(PAF_ROOT)
         if NVPROF:
-            cmd = "nvprof --output-profile "
+            #cmd = "nvprof "
+            cmd = "nvprof -f --export-profile baseband2filterbank-{}.profile --print-summary ".format(key_in)
         else:
             cmd = ""
 

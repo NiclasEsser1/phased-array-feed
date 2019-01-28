@@ -104,16 +104,6 @@ int init_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMallocHost((void **)&conf->mean_scale_h, conf->nchan_out * sizeof(cufftComplex)));
   CudaSafeCall(cudaMemset((void *)conf->mean_scale_d, 0, conf->nchan_out * sizeof(cufftComplex)));// We have to clear the memory for this parameter
   
-  //CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, conf->nchan_out * sizeof(float)));
-  //CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, conf->nchan_out * sizeof(float)));
-  //CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, conf->nchan_out * sizeof(float)));
-  //CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, conf->nchan_out * sizeof(float)));   // We have to clear the memory for this parameter
-  //CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, conf->nchan_out * sizeof(float)));// We have to clear the memory for this parameter
-  //
-  //CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
-  //CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
-  //CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, conf->nchan_out * sizeof(float)));   // Malloc host memory to receive data from device
-
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->stream_ndf_chk;
   conf->gridsize_unpack.y = conf->nchk_in;
@@ -333,17 +323,14 @@ int baseband2filterbank(conf_t conf)
 	      
 	      /* Unpack raw data into cufftComplex array */
 	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-	      CHECK_LAUNCH_ERROR();
+	      //CHECK_LAUNCH_ERROR();
 	      
 	      /* Do forward FFT */
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 
 	      swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan, conf.nchan_keep_band, conf.nchan_edge);
-	      CHECK_LAUNCH_ERROR();
-	      
-	      //detect_faccumulate_scale_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);
-	      //detect_faccumulate_scale_kernel1<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.mean_scale_d);
-	      	  
+	      //CHECK_LAUNCH_ERROR();
+	      	      	  
 	      switch (blocksize_detect_faccumulate_scale.x)
 		{
 		case 1024:
@@ -380,7 +367,7 @@ int baseband2filterbank(conf_t conf)
 		  detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		}
-	      CHECK_LAUNCH_ERROR();	      
+	      //CHECK_LAUNCH_ERROR();	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	}
@@ -452,12 +439,12 @@ int dat_offs_scl(conf_t conf)
 
 	  /* Unpack raw data into cufftComplex array */
 	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-	  CHECK_LAUNCH_ERROR();
+	  //CHECK_LAUNCH_ERROR();
 	  
 	  /* Do forward FFT */
 	  CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 	  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan, conf.nchan_keep_band, conf.nchan_edge);
-	  CHECK_LAUNCH_ERROR();
+	  //CHECK_LAUNCH_ERROR();
 	  
 	  switch (blocksize_detect_faccumulate_pad_transpose.x )
 	    {
@@ -495,7 +482,7 @@ int dat_offs_scl(conf_t conf)
 	      detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;
 	    }
-	  CHECK_LAUNCH_ERROR();
+	  //CHECK_LAUNCH_ERROR();
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
       
@@ -535,12 +522,12 @@ int dat_offs_scl(conf_t conf)
           reduce9_kernel<   1><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         }
-      CHECK_LAUNCH_ERROR();
+      //CHECK_LAUNCH_ERROR();
     }
   
   /* Get the scale of each chanel */
   scale2_kernel<<<gridsize_scale, blocksize_scale>>>(conf.mean_scale_d, SCL_NSIG, SCL_UINT8);
-  CHECK_LAUNCH_ERROR();
+  //CHECK_LAUNCH_ERROR();
   CudaSynchronizeCall();
   
   CudaSafeCall(cudaMemcpy(conf.mean_scale_h, conf.mean_scale_d, sizeof(cufftComplex) * conf.nchan_out, cudaMemcpyDeviceToHost));
