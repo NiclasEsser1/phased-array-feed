@@ -82,12 +82,12 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'c':
-	  sscanf(optarg, "%[^;];%d;%d;%d;%d", conf.ip_alive[conf.nport_alive], &conf.port_alive[conf.nport_alive], &conf.nchk_alive_expect[conf.nport_alive], &conf.nchk_alive_actual[conf.nport_alive], &conf.cpt_cpu[conf.nport_alive]);
+	  sscanf(optarg, "%[^_]_%d_%d_%d_%d", conf.ip_alive[conf.nport_alive], &conf.port_alive[conf.nport_alive], &conf.nchk_alive_expect[conf.nport_alive], &conf.nchk_alive_actual[conf.nport_alive], &conf.cpt_cpu[conf.nport_alive]);
 	  conf.nport_alive++;
 	  break;
 	  
 	case 'd':
-	  sscanf(optarg, "%[^;];%d;%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchk_dead[conf.nport_dead]);
+	  sscanf(optarg, "%[^_]_%d_%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchk_dead[conf.nport_dead]);
 	  conf.nport_dead++;
 	  break;
 	  
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'f':
-	  sscanf(optarg, "%d;%"SCNu64";%"SCNu64"", &conf.epoch0, &conf.df_sec0, &conf.idf_prd0);
+	  sscanf(optarg, "%d_%"SCNu64"_%"SCNu64"", &conf.epoch0, &conf.df_sec0, &conf.idf_prd0);
 	  break;
 	  
 	case 'g':
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'j':
-	  sscanf(optarg, "%d;%d", &conf.cpt_ctrl, &conf.cpt_ctrl_cpu);
+	  sscanf(optarg, "%d_%d", &conf.cpt_ctrl, &conf.cpt_ctrl_cpu);
 	  break;
 	  
 	case 'k':
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 	case 'p':
 	  {
 	    source = 1;
-	    sscanf(optarg, "%[^;];%[^;];%s", conf.source, conf.ra, conf.dec);
+	    sscanf(optarg, "%[^_]_%[^_]_%s", conf.source, conf.ra, conf.dec);
 	    break;
 	  }
 	  
