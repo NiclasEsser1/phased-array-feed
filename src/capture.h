@@ -16,6 +16,7 @@
 
 typedef struct conf_t
 {
+  int process_index;
   int ithread;
   FILE *logfile;
   

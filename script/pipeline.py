@@ -102,7 +102,7 @@ SEARCH_CONFIG_1BEAM = {"rbuf_baseband_key":      ["dada"],
 SEARCH_CONFIG_2BEAMS = {"rbuf_baseband_key":       ["dada", "dadc"],
                         "rbuf_filterbank_key":     ["dade", "dadg"],
                         "nchan_keep_band":         24576,
-                        "nbeam":                   2,
+                        "nbeam":                   1,
                         "nport_beam":              3,
                         "nchk_port":               11,
 }

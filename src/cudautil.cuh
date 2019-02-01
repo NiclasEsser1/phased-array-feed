@@ -7,12 +7,14 @@
 
 #define CUDA_ERROR_CHECK
 #define CudaSafeCall(err) __cudaSafeCall(err, __FILE__, __LINE__)
-#define CudaSynchronizeCall()  __cudaSynchronizeCall(__FILE__, __LINE__)
 #define CufftSafeCall(err) __cufftSafeCall(err, __FILE__, __LINE__)
+#define CudaSynchronizeCall()  __cudaSynchronizeCall(__FILE__, __LINE__)
+#define CudaSafeKernelLaunch()  __CudaSafeKernelLaunch(__FILE__, __LINE__)
 
-inline void __cudaSafeCall(cudaError err, const char *file, const int line);
 inline void __cudaSynchronizeCall(const char *file, const int line);
-
+inline void __cudaSafeKernelLaunch(const char *file, const int line);
+inline void __cudaSafeCall(cudaError err, const char *file, const int line);
+inline void __cufftSafeCall(cudaError err, const char *file, const int line);
 
 // Define this to turn on error checking
 /*
@@ -32,7 +34,7 @@ inline void __cudaSafeCall(cudaError err, const char *file, const int line)
     {
       fprintf(stderr, "cudaSafeCall() failed at %s:%i : %s\n",
 	      file, line, cudaGetErrorString(err));
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
 #endif
   
@@ -43,21 +45,12 @@ inline void __cudaSynchronizeCall(const char *file, const int line)
 {
 #ifdef CUDA_ERROR_CHECK
   cudaError err = cudaGetLastError();
-  if (cudaSuccess != err)
-    {
-      fprintf(stderr, "cudaSynchronizeCall() failed at %s:%i : %s\n",
-	      file, line, cudaGetErrorString(err));
-      exit(-1);
-    }
-  
-  // More careful checking. However, this will affect performance.
-  // Comment away if needed.
   err = cudaDeviceSynchronize();
   if(cudaSuccess != err)
     {
       fprintf(stderr, "cudaSynchronizeCall() with sync failed at %s:%i : %s\n",
   	       file, line, cudaGetErrorString(err));
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
 #endif
   
@@ -115,23 +108,22 @@ inline void __cufftSafeCall(cufftResult err, const char *file, const int line)
 }
 
 // Macro to catch CUDA errors in kernel launches
-#define CHECK_LAUNCH_ERROR()                                          \
-  do {								      \
-    /* Check synchronous errors, i.e. pre-launch */                   \
-    cudaError_t err = cudaGetLastError();                             \
-    if (cudaSuccess != err) {						\
-      fprintf (stderr, "Cuda error in file '%s' in line %i : %s.\n",	\
-	       __FILE__, __LINE__, cudaGetErrorString(err) );		\
-      exit(EXIT_FAILURE);						\
-    }									\
-    /* Check asynchronous errors, i.e. kernel failed (ULF) */		\
-    err = cudaDeviceSynchronize();					\
-    if (cudaSuccess != err) {						\
-      fprintf (stderr, "Cuda error in file '%s' in line %i : %s.\n",	\
-	       __FILE__, __LINE__, cudaGetErrorString( err) );		\
-      exit(EXIT_FAILURE);						\
-    }									\
-  } while (0)
+inline void __CudaSafeKernelLaunch(const char *file, const int line)
+{
+#ifdef CUDA_ERROR_CHECK
+  
+  cudaError err = cudaGetLastError();
+  if (cudaSuccess != err)
+    {
+      fprintf(stderr, "cudaSynchronizeCall() failed at %s:%i : %s\n",
+	      file, line, cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
+#endif
+}
+
+#define CHECK_LAUNCH_ERROR()			\
+  
 
 #define BSWAP_64(x)     (((uint64_t)(x) << 56) |                        \
                          (((uint64_t)(x) << 40) & 0xff000000000000ULL) | \

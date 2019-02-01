@@ -8,7 +8,9 @@
 #include "capture.h"
 #include "log.h"
 
+// release source when EXIT_FAILURE
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+extern int quit;
 
 void usage()
 {
@@ -33,6 +35,7 @@ void usage()
 	  " -o The name of instrument \n"
 	  " -p The source information, which is required for the case without capture control, in the format \"name;ra;dec\" \n"
 	  " -q Force to pad band edge \n"
+	  " -r The index of process \n"
 	   );
 }
 
@@ -56,7 +59,7 @@ int main(int argc, char **argv)
   
   for(i = 0; i < MPORT_CAPTURE; i++)
     conf.cpt_cpu[i] = 0;
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:")) != -1)
     {
       switch(arg)
 	{
@@ -138,6 +141,10 @@ int main(int argc, char **argv)
 	case 'q':
 	  sscanf(optarg, "%d", &conf.pad);
 	  break;
+	  
+	case 'r':
+	  sscanf(optarg, "%d", &conf.process_index);
+	  break;
 	}
     }
 
@@ -151,7 +158,7 @@ int main(int argc, char **argv)
       exit(EXIT_FAILURE);
     }
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "CAPTURE START");
-
+  
   /* Log the input parameters */
   strcpy(command_line, argv[0]);
   for(i = 1; i < argc; i++)
@@ -159,7 +166,8 @@ int main(int argc, char **argv)
       strcat(command_line, " ");
       strcat(command_line, argv[i]);
     }
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);    
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "We capture data with process %d", conf.process_index);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Hexadecimal shared memory key for capture is %x", conf.key);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Start point of packet is %d", conf.dfoff);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "We have %d alive ports, which are:", conf.nport_alive);
@@ -228,13 +236,19 @@ int main(int argc, char **argv)
   
   /* Do the job */
   threads(&conf);
-  
+    
   /* Destory capture */
   destroy_capture(conf);
   
   /* Destory log interface */
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "CAPTURE END");  
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "CAPTURE END");
+  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The last quit is %d", quit);
   paf_log_close(conf.logfile);
 
+  if(quit == 2)
+    exit(EXIT_FAILURE);
+
+  fprintf(stdout, "CAPTURE_DONE\n");
+  fflush(stdout); 
   return EXIT_SUCCESS;
 }

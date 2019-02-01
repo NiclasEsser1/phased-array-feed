@@ -284,11 +284,14 @@ int baseband2filterbank(conf_t conf)
   fflush(stdout);
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   
-  /* Register header */
-  if(register_header(&conf))
+  /* Register header only with sod */
+  if(conf.sod)
     {
-      paf_log_add(conf.logfile, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
-      exit(EXIT_FAILURE);
+      if(register_header(&conf))
+	{
+	  paf_log_add(conf.logfile, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+	  exit(EXIT_FAILURE);
+	}
     }
   paf_log_add(conf.logfile, "INFO", 1, log_mutex, "register_header done");
   
@@ -304,7 +307,7 @@ int baseband2filterbank(conf_t conf)
       	{
       	  first = 0;
       	  dat_offs_scl(conf);
-	  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "dat_offs_scl done");
+	  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "dat_offs_scl done");  // I may need to put this part before while and make the first output buffer block empty
 	}
 
       for(i = 0; i < conf.nrun_blk; i ++)
@@ -323,13 +326,13 @@ int baseband2filterbank(conf_t conf)
 	      
 	      /* Unpack raw data into cufftComplex array */
 	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-	      //CHECK_LAUNCH_ERROR();
+	      CudaSafeKernelLaunch();
 	      
 	      /* Do forward FFT */
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 
 	      swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan, conf.nchan_keep_band, conf.nchan_edge);
-	      //CHECK_LAUNCH_ERROR();
+	      CudaSafeKernelLaunch();
 	      	      	  
 	      switch (blocksize_detect_faccumulate_scale.x)
 		{
@@ -367,7 +370,7 @@ int baseband2filterbank(conf_t conf)
 		  detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.mean_scale_d);
 		  break;
 		}
-	      //CHECK_LAUNCH_ERROR();	      
+	      CudaSafeKernelLaunch();	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	}
@@ -439,12 +442,12 @@ int dat_offs_scl(conf_t conf)
 
 	  /* Unpack raw data into cufftComplex array */
 	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
-	  //CHECK_LAUNCH_ERROR();
+	  CudaSafeKernelLaunch();
 	  
 	  /* Do forward FFT */
 	  CufftSafeCall(cufftExecC2C(conf.fft_plans[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 	  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan, conf.nchan_keep_band, conf.nchan_edge);
-	  //CHECK_LAUNCH_ERROR();
+	  CudaSafeKernelLaunch();
 	  
 	  switch (blocksize_detect_faccumulate_pad_transpose.x )
 	    {
@@ -482,7 +485,7 @@ int dat_offs_scl(conf_t conf)
 	      detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2, conf.naccumulate_pad);
 	      break;
 	    }
-	  //CHECK_LAUNCH_ERROR();
+	  CudaSafeKernelLaunch();
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
       
@@ -522,12 +525,12 @@ int dat_offs_scl(conf_t conf)
           reduce9_kernel<   1><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.mean_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.sclndim);
           break;
         }
-      //CHECK_LAUNCH_ERROR();
+      CudaSafeKernelLaunch();
     }
   
   /* Get the scale of each chanel */
   scale2_kernel<<<gridsize_scale, blocksize_scale>>>(conf.mean_scale_d, SCL_NSIG, SCL_UINT8);
-  //CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   CudaSynchronizeCall();
   
   CudaSafeCall(cudaMemcpy(conf.mean_scale_h, conf.mean_scale_d, sizeof(cufftComplex) * conf.nchan_out, cudaMemcpyDeviceToHost));
