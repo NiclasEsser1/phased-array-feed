@@ -80,7 +80,7 @@ int init_buf(conf_t *conf)
   
   if(conf->rbufsz != ipcbuf_get_bufsz(conf->db_data))  // Check the buffer size
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf->rbufsz, ipcbuf_get_bufsz(conf->db_data), __FILE__, __LINE__);
       
       for(i = 0; i < MPORT_CAPTURE; i++)
 	{
@@ -127,8 +127,8 @@ int init_buf(conf_t *conf)
   
   /* Get the buffer block ready, first to catch up */
   int sock;
-  struct sockaddr_in sa, fromsa;
-  socklen_t fromlen;// = sizeof(fromsa);
+  struct sockaddr_in sa = {0}, fromsa = {0};
+  socklen_t fromlen = sizeof(fromsa);
   int64_t idf_blk = -1;
   uint64_t idf_prd, df_sec;
   char *df = NULL;
@@ -151,12 +151,14 @@ int init_buf(conf_t *conf)
       /* Force to quit if we have time out */
       free(df);
       paf_log_close(conf->logfile);
+      exit(EXIT_FAILURE);
     }
   
   if(recvfrom(sock, (void *)df, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
     {
       paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Can not receive data from %s;%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      
+
+      free(df);
       paf_log_close(conf->logfile);
       exit(EXIT_FAILURE);
     }
@@ -176,16 +178,17 @@ int init_buf(conf_t *conf)
 	  if(cbuf == NULL)
 	    {
 	      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	      free(df);
 	      paf_log_close(conf->logfile);
-	      
 	      exit(EXIT_FAILURE);
 	    }
 	  
 	  if(ipcbuf_mark_filled(conf->db_data, conf->rbufsz) < 0)
 	    {
 	      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+
+	      free(df);
 	      paf_log_close(conf->logfile);
-	      
 	      exit(EXIT_FAILURE);
 	    }
 	  
@@ -204,13 +207,14 @@ int init_buf(conf_t *conf)
     }
   free(df);
   close(sock);
+  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "nblk_delay is %d", nblk_delay);
+  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "reference info is %"PRIu64"\t%"PRIu64"", conf->df_sec0, conf->idf_prd0);
   
   cbuf = ipcbuf_get_next_write(conf->db_data);
   if(cbuf == NULL)
     {
       paf_log_add(conf->logfile, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      paf_log_close(conf->logfile);
-      
+      paf_log_close(conf->logfile);      
       exit(EXIT_FAILURE);
     }
   
@@ -222,8 +226,8 @@ void *capture(void *conf)
   char *df = NULL;
   conf_t *captureconf = (conf_t *)conf;
   int sock, ichk; 
-  struct sockaddr_in sa, fromsa;
-  socklen_t fromlen;// = sizeof(fromsa);
+  struct sockaddr_in sa = {0}, fromsa = {0};
+  socklen_t fromlen = sizeof(fromsa);
   int64_t idf_blk = -1;
   uint64_t idf_prd, df_sec;
   double freq;
@@ -260,11 +264,8 @@ void *capture(void *conf)
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "free(df) in bind %d", captureconf->ithread);
       free(df);
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "done free(df) in bind %d", captureconf->ithread);
-      paf_log_close(captureconf->logfile);
       
-      //pthread_detach(pthread_self());
       pthread_exit(NULL);
-      //return NULL;
     }
 
   do{    
@@ -277,11 +278,8 @@ void *capture(void *conf)
 	paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "free(df) in recvfrom %d", captureconf->ithread);
 	free(df);
 	paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "done free(df) in recvfrom %d", captureconf->ithread);
-	paf_log_close(captureconf->logfile);
 	
-	//pthread_detach(pthread_self());
 	pthread_exit(NULL);
-	//return NULL;
       }
 
     /* Get header information from bmf packet */    
@@ -291,7 +289,6 @@ void *capture(void *conf)
     df_sec = (writebuf & 0x3fffffff00000000) >> 32;
         
     pthread_mutex_lock(&ref_mutex[ithread]);
-    //idf_blk = (int64_t)(idf_prd - ref[ithread].idf_prd) + ((double)df_sec - (double)ref[ithread].df_sec) / df_res;
     idf_blk = (int64_t)(idf_prd - idf_prd_ref[ithread]) + ((double)df_sec - (double)df_sec_ref[ithread]) / df_res;
     pthread_mutex_unlock(&ref_mutex[ithread]);
   }while(idf_blk<0);
@@ -309,11 +306,8 @@ void *capture(void *conf)
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "free(df) in recvfrom, while loop, %d", captureconf->ithread);
       	  free(df);
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "done free(df) in recvfrom, while loop, %d", captureconf->ithread);
-	  paf_log_close(captureconf->logfile);
-      
-	  //pthread_detach(pthread_self());
+
       	  pthread_exit(NULL);
-      	  //return NULL;
       	}
 
       /* Get header information from bmf packet */    
@@ -334,15 +328,11 @@ void *capture(void *conf)
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "free(df) in ichk, while loop, %d", captureconf->ithread);
 	  free(df);
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "done free(df) in ichk, while loop, %d", captureconf->ithread);
-	  paf_log_close(captureconf->logfile);
-
-	  //pthread_detach(pthread_self());
+	  
 	  pthread_exit(NULL);
-	  //return NULL;
 	}
       
       pthread_mutex_lock(&ref_mutex[ithread]);
-      //idf_blk = (int64_t)(idf_prd - ref[ithread].idf_prd) + ((double)df_sec - (double)ref[ithread].df_sec) / df_res;
       idf_blk = (int64_t)(idf_prd - idf_prd_ref[ithread]) + ((double)df_sec - (double)df_sec_ref[ithread]) / df_res;
       pthread_mutex_unlock(&ref_mutex[ithread]);
 
@@ -394,10 +384,7 @@ void *capture(void *conf)
   paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "done free(df) after while loop, %d", captureconf->ithread);
   close(sock);
   
-  //pthread_detach(pthread_self());
   pthread_exit(NULL);
-
-  //return NULL;
 }
 
 int init_capture(conf_t *conf)
@@ -687,23 +674,13 @@ void *buf_control(void *conf)
       if(quit == 1)
 	{
 	  paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Quit just after the buffer transit state change");
-	  paf_log_close(captureconf->logfile);
-
-	  //pthread_detach(pthread_self());
-	  //exit(EXIT_SUCCESS);
 	  pthread_exit(NULL);
-	  //return NULL;
 	}
       if(quit == 2)
 	{
 	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "Quit just after the buffer transit state change");
-	  paf_log_close(captureconf->logfile);
-
-	  //pthread_detach(pthread_self());
-	  //exit(EXIT_SUCCESS);
 	  
 	  pthread_exit(NULL);
-	  //return NULL;
 	}
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Just after buffer transit state change");
       
@@ -740,12 +717,8 @@ void *buf_control(void *conf)
       if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
 	{
 	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  paf_log_close(captureconf->logfile);
-	  
 	  quit = 2;
-	  //pthread_detach(pthread_self());
 	  pthread_exit(NULL);
-	  //return NULL;
 	}
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Mark filled done");
       
@@ -756,12 +729,9 @@ void *buf_control(void *conf)
       if(ipcbuf_get_nfull(captureconf->db_data) >= (ipcbuf_get_nbufs(captureconf->db_data) - 1)) 
 	{
 	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "buffers are all full, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
-	  paf_log_close(captureconf->logfile);
 	  
 	  quit = 2;
-	  //pthread_detach(pthread_self());
 	  pthread_exit(NULL);
-	  //return NULL;
 	}
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Available buffer block check done");
       
@@ -771,12 +741,9 @@ void *buf_control(void *conf)
       if(cbuf == NULL)
 	{
 	  paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  paf_log_close(captureconf->logfile);
 	  
 	  quit = 2;
-	  //pthread_detach(pthread_self());
 	  pthread_exit(NULL);
-	  //return NULL; 
 	}
       
       /* Update reference point */
@@ -855,8 +822,6 @@ void *buf_control(void *conf)
   if(ipcbuf_mark_filled(captureconf->db_data, captureconf->rbufsz) < 0)
     {
       paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      paf_log_close(captureconf->logfile);
-      
       quit = 2;
 
       //pthread_detach(pthread_self());
@@ -874,8 +839,8 @@ void *buf_control(void *conf)
 void *capture_control(void *conf)
 {  
   int sock, i;
-  struct sockaddr_un sa, fromsa;
-  socklen_t fromlen;
+  struct sockaddr_un sa = {0}, fromsa = {0};
+  socklen_t fromlen = sizeof(fromsa);
   conf_t *captureconf = (conf_t *)conf;
   char command_line[MSTR_LEN], command[MSTR_LEN];
   int64_t start_buf;
@@ -888,12 +853,9 @@ void *capture_control(void *conf)
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      paf_log_close(captureconf->logfile);
       
       quit = 1;
-      //pthread_detach(pthread_self());
       pthread_exit(NULL);
-      //return NULL;
     }
   
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&captureconf->tout, sizeof(captureconf->tout));
@@ -907,13 +869,11 @@ void *capture_control(void *conf)
   if(bind(sock, (struct sockaddr*)&sa, sizeof(sa)) == -1)
     {
       paf_log_add(captureconf->logfile, "INFO", 1, log_mutex, "Can not bind to file socket, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-      paf_log_close(captureconf->logfile);
-      
+       
       quit = 1;
       close(sock);
-      //pthread_detach(pthread_self());
       pthread_exit(NULL);
-      //return NULL;
+ 
     }
 
   fprintf(stdout, "CAPTURE_READY\n"); // Tell other process that the capture is ready
@@ -999,12 +959,9 @@ void *capture_control(void *conf)
 	  if(ipcbuf_get_nfull(captureconf->db_hdr) >= (ipcbuf_get_nbufs(captureconf->db_hdr) - 1)) 
 	    {
 	      paf_log_add(captureconf->logfile, "ERR", 1, log_mutex, "buffers are all full, has to abort");
-	      paf_log_close(captureconf->logfile);
 	      
 	      quit = 2;
-	      //pthread_detach(pthread_self());
 	      pthread_exit(NULL);
-	      //return NULL;
 	    }
 	  
 	  /* setup dada header here */
