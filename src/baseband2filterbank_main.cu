@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
   char command_line[MSTR_LEN] = {'\0'};
 
   conf.sod = 0; // We do not enable sod by default
-  /* Initial part */  
+  /* Initializeial part */  
   while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:")) != -1)
     {
       switch(arg)
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 	  break;
 	  	  
 	case 'c':
-	  sscanf(optarg, "%"SCNu64"", &conf.rbufin_ndf_chk);
+	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chunk_rbufin);
 	  break;
 	  
 	case 'd':
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 	  break;
 	  
 	case 'e':
-	  sscanf(optarg, "%d", &conf.stream_ndf_chk);
+	  sscanf(optarg, "%d", &conf.ndf_per_chunk_stream);
 	  break;
 	  	  
 	case 'f':
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	  break;
 	  
 	case 'i':
-	  sscanf(optarg, "%d", &conf.nchk_in);
+	  sscanf(optarg, "%d", &conf.nchunk_in);
 	  break;
 
 	case 'j':
@@ -108,13 +108,13 @@ int main(int argc, char *argv[])
 
   /* Setup log interface */
   sprintf(log_fname, "%s/baseband2filterbank.log", conf.dir);
-  conf.logfile = log_open(log_fname, "ab+");
-  if(conf.logfile == NULL)
+  conf.log_file = log_open(log_fname, "ab+");
+  if(conf.log_file == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", log_fname);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
 
   /* Log the input */
   strcpy(command_line, argv[0]);
@@ -123,36 +123,36 @@ int main(int argc, char *argv[])
       strcat(command_line, " ");
       strcat(command_line, argv[i]);
     }
-  log_add(conf.logfile, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
-  log_add(conf.logfile, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.rbufin_ndf_chk);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.stream_ndf_chk);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_chunk_rbufin);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);
   if(conf.sod)
-    log_add(conf.logfile, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
+    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
   else
-    log_add(conf.logfile, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
-  log_add(conf.logfile, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchk_in);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band);
+    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
+  log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk_in);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band);
   
-  /* init */
-  init_baseband2filterbank(&conf);
+  /* initialize */
+  initialize_baseband2filterbank(&conf);
 
   /* Play with data */
   baseband2filterbank(conf);
 
   /* Destroy */
-  log_add(conf.logfile, "INFO", 1, log_mutex, "BEFORE destroy");  
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BEFORE destroy");  
   destroy_baseband2filterbank(conf);
-  log_add(conf.logfile, "INFO", 1, log_mutex, "END destroy");
+  log_add(conf.log_file, "INFO", 1, log_mutex, "END destroy");
   
   /* Destory log interface */  
-  log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
-  log_close(conf.logfile);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
+  log_close(conf.log_file);
   
   return EXIT_SUCCESS;
 }

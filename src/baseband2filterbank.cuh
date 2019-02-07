@@ -21,23 +21,20 @@
 #define NBIT_OUT                 8
 #define NDIM_OUT                 1
 #define NPOL_OUT                 1
-#define SCL_UINT8            64.0f          // uint8_t, detected samples should vary in 0.5 * range(uint8_t) = 127, to be safe, use 0.25
-#define OFFS_UINT8           64.0f          // uint8_t, detected samples should center at 0.5 * range(uint8_t) = 127, to be safe, use 0.25
-#define SCL_NSIG             3.0f
 
 typedef struct conf_t
 {
-  FILE *logfile;
+  FILE *log_file;
 
-  int nrun_blk;
-  int nchk_in, nchan_in;
+  int nrepeat_per_blk;
+  int nchunk_in, nchan_in;
   int cufft_nx, cufft_mod;
   int nchan_keep_band, nchan_out, nchan_keep_chan, nchan_edge;
-  double nchan_ratei, bw, scl_dtsz;
+  double inverse_nchan_rate, bandwidth, scale_dtsz;
     
-  int stream_ndf_chk;
+  int ndf_per_chunk_stream;
   int nstream;
-  float sclndim;
+  float ndim_scale;
   int sod;
   
   char dir[MSTR_LEN];
@@ -47,11 +44,11 @@ typedef struct conf_t
   dada_hdu_t *hdu_in, *hdu_out;
 
   ipcbuf_t *db_in, *db_out;
-  char *curbuf_in, *curbuf_out;
+  char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;
   uint8_t *dbuf_out;
   
-  uint64_t rbufin_ndf_chk;
+  uint64_t ndf_chunk_rbufin;
   uint64_t bufin_size, bufout_size; // Device buffer size for all streams
   uint64_t sbufin_size, sbufout_size; // Buffer size for each stream
   uint64_t bufrt1_size, bufrt2_size;
@@ -68,7 +65,7 @@ typedef struct conf_t
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   
-  cufftComplex *mean_scale_d, *mean_scale_h;
+  cufftComplex *offset_scale_d, *offset_scale_h;
   cudaStream_t *streams;
   cufftHandle *fft_plans;
   
@@ -81,9 +78,9 @@ typedef struct conf_t
   int naccumulate_pad, naccumulate_scale, naccumulate;
 }conf_t; 
 
-int init_baseband2filterbank(conf_t *conf);
+int initialize_baseband2filterbank(conf_t *conf);
 int baseband2filterbank(conf_t conf);
-int dat_offs_scl(conf_t conf);
+int offset_scale(conf_t conf);
 int register_header(conf_t *conf);
 
 int destroy_baseband2filterbank(conf_t conf);

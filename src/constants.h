@@ -23,11 +23,15 @@ extern "C" {
 #define NCHUNK_FULL_BAND         48
 #define NPROCESS_PER_NODE_MAX    2
 #define CUFFT_RANK     1
-#define NCPU_PER_NUMA_NODE 10
 #define MAX_RAND       1024
-#define BAND_LIMIT_UP   640.0
-#define BAND_LIMIT_DOWN 1920.0
-
+#define NBEAM_MAX      36
+  
+#define BAND_LIMIT_UP   1920.0
+#define BAND_LIMIT_DOWN 640.0
+#define SCL_UINT8            64.0f          // uint8_t, detected samples should vary in 0.5 * range(uint8_t) = 127, to be safe, use 0.25
+#define OFFS_UINT8           64.0f          // uint8_t, detected samples should center at 0.5 * range(uint8_t) = 127, to be safe, use 0.25
+#define SCL_NSIG 3.0f
+  
 #endif
 
 #ifdef __cplusplus

@@ -18,7 +18,7 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_
   int64_t tmp;
   
   /* 
-     Loc for the input array, it is in continuous order, it is in (STREAM_BUF_NDFSTP)T(NCHK_NIC)F(NSAMP_DF)T(NCHAN_CHK)F(NPOL_SAMP)P order
+     Loc for the input array, it is in continuous order, it is in (STREAM_BUF_NDFSTP)T(NCHUNK_NIC)F(NSAMP_DF)T(NCHAN_CHUNK)F(NPOL_SAMP)P order
      This is for entire setting, since gridDim.z =1 and blockDim.z = 1, we can simply it to the latter format;
      Becareful here, if these number are not 1, we need to use a different format;
    */
@@ -231,10 +231,10 @@ __global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsi
 /*
   This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
 */
-__global__ void scale2_kernel(cufftComplex *mean_scale, float scl_nsig, float scl_uint8)
+__global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_uint8)
 {
   uint64_t loc_freq  = threadIdx.x;
-  mean_scale[loc_freq].y = scl_nsig * sqrtf(mean_scale[loc_freq].y - mean_scale[loc_freq].x * mean_scale[loc_freq].x) / scl_uint8;
+  offset_scale[loc_freq].y = scl_nsig * sqrtf(offset_scale[loc_freq].y - offset_scale[loc_freq].x * offset_scale[loc_freq].x) / scl_uint8;
 }
 
 /*
@@ -297,7 +297,7 @@ __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *
   This kernel will detect data, accumulate it in frequency and scale it;
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
-__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *mean_scale)
+__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale)
 {
   extern volatile __shared__ float scale_sdata[];
   uint64_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
@@ -340,12 +340,12 @@ __global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t 
       loc_freq = blockIdx.y;
       power = scale_sdata[0];
 
-      if(mean_scale[loc_freq].y == 0.0)
+      if(offset_scale[loc_freq].y == 0.0)
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
 	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
       else
-	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
     }
 }
 

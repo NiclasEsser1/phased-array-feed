@@ -208,6 +208,7 @@ int initialize_capture(conf_t *conf)
   uint64_t df_in_period, seconds_from_epoch, writebuf, *ptr = NULL;
   char *dbuf = NULL;
   time_t now;
+  int beam_index;
   
   /* Unix socket for capture control*/
   if(conf->capture_ctrl)
@@ -328,6 +329,7 @@ int initialize_capture(conf_t *conf)
      Get the first ring buffer block ready for capture, 
      to catch up if the reference time is before current time,
      write empty buffer blocks if we need to catch up;
+     Also check the beam_index and seconds_from_epoch here;
   */
   dbuf = (char *)malloc(sizeof(char) * DFSZ);  
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -365,7 +367,19 @@ int initialize_capture(conf_t *conf)
   writebuf = bswap_64(*ptr);
   df_in_period = writebuf & 0x00000000ffffffff;
   seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
-
+  writebuf = bswap_64(*(ptr + 2));
+  beam_index = writebuf & 0x000000000000ffff;
+  if(beam_index != conf->beam_index) // Check the beam index
+    {      
+      log_add(conf->log_file, "ERR", 1, log_mutex, "beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort", beam_index, conf->beam_index, __FILE__, __LINE__);
+      fprintf(stderr, "beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort\n", beam_index, conf->beam_index, __FILE__, __LINE__);
+      
+      free(dbuf);
+      close(sock);
+      destroy_capture(*conf);
+      log_close(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
   if((int)((double)seconds_from_epoch - (double)conf->seconds_from_epoch) % PERIOD) // The difference in seconds should be multiple times of period    
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "the difference in seconds is not multiple times of period, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -576,6 +590,16 @@ int register_dada_header(conf_t conf)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  
+  if(ascii_header_set(hdrbuf, "BEAM_ID", "%d", conf.beam_index) < 0)
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -1033,6 +1057,16 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We capture data with process %d", conf.process_index);
   
+  if((conf.beam_index<0) || (conf.beam_index>=NBEAM_MAX)) // More careful check later
+    {
+      fprintf(stderr, "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.beam_index, NBEAM_MAX - 1, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.", conf.beam_index, NBEAM_MAX - 1, __FILE__, __LINE__);
+      
+      fclose(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We capture data with beam %d", conf.beam_index);
+  
   log_add(conf.log_file, "INFO", 1, log_mutex, "Hexadecimal shared memory key for capture is %x", conf.key); // How to check this?
   
   if((conf.dfsz_seek != 0) && (conf.dfsz_seek != DF_HDRSZ)) // The seek bytes has to be 0 or DF_HDRSZ
@@ -1065,8 +1099,17 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       for(i = 0; i < conf.nport_dead; i++)
 	log_add(conf.log_file, "WARN", 1, log_mutex, "    ip %s, port %d, expected frequency chunks %d", conf.ip_dead[i], conf.port_dead[i], conf.nchunk_dead_on_port[i]);
     }
-  
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The center frequency for the capture is %f MHz", conf.center_freq); // if it is not right, the calculation of chunk_index can not be right, check there 
+
+  if(conf.center_freq > BAND_LIMIT_UP || conf.center_freq < BAND_LIMIT_DOWN)
+    // The reference information has to be reasonable, later more careful check
+    {
+      fprintf(stderr, "center_freq %f is not in (%f %f), happens at \"%s\", line [%d], has to abort.\n",conf.center_freq, BAND_LIMIT_DOWN, BAND_LIMIT_UP, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "center_freq %f is not in (%f %f), happens at \"%s\", line [%d], has to abort.",conf.center_freq, BAND_LIMIT_DOWN, BAND_LIMIT_UP, __FILE__, __LINE__);
+      
+      fclose(conf.log_file);
+      exit(EXIT_FAILURE);
+    }  
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The center frequency for the capture is %f MHz", conf.center_freq); 
 
   if((conf.days_from_1970 <= 0) || (conf.seconds_from_epoch <= -1) || (conf.df_in_period < 0) || (conf.df_in_period >= NDF_PER_CHUNK_PER_PERIOD))
     // The reference information has to be reasonable, later more careful check
@@ -1083,26 +1126,10 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.cpu_bind)  
     {      
-      //if((conf.rbuf_ctrl_cpu < conf.process_index * NCPU_PER_NUMA_NODE) || (conf.rbuf_ctrl_cpu >= (conf.process_index + 1) * NCPU_PER_NUMA_NODE))
-      //	// Check the cpu bind information for ring buffer control 
-      //	{
-      //	  fprintf(stderr, "The rbuf_ctrl_cpu is %d, but it should be in [%d %d), happens at \"%s\", line [%d], has to abort.\n", conf.rbuf_ctrl_cpu, conf.process_index * NCPU_PER_NUMA_NODE, (conf.process_index + 1) * NCPU_PER_NUMA_NODE, __FILE__, __LINE__);
-      //	  log_add(conf.log_file, "ERR", 1, log_mutex, "The rbuf_ctrl_cpu is %d, but it should be in [%d %d), happens at \"%s\", line [%d], has to abort.\n", conf.rbuf_ctrl_cpu, conf.process_index * NCPU_PER_NUMA_NODE, (conf.process_index + 1) * NCPU_PER_NUMA_NODE, __FILE__, __LINE__);
-      //	  fclose(conf.log_file);
-      //	  exit(EXIT_FAILURE);
-      //	}
       log_add(conf.log_file, "INFO", 1, log_mutex, "Buffer control thread runs on CPU %d", conf.rbuf_ctrl_cpu);
       
       for(i = 0; i < conf.nport_alive; i++) // To check the bind information for capture threads
 	{	  
-	  //if((conf.capture_cpu[i] < conf.process_index * NCPU_PER_NUMA_NODE) || (conf.capture_cpu[i] >= (conf.process_index + 1) * NCPU_PER_NUMA_NODE))
-	  //  {
-	  //    fprintf(stderr, "The rbuf_ctrl_cpu is %d, but it should be in [%d %d), happens at \"%s\", line [%d], has to abort.\n", conf.capture_cpu[i], conf.process_index * NCPU_PER_NUMA_NODE, (conf.process_index + 1) * NCPU_PER_NUMA_NODE, __FILE__, __LINE__);
-	  //    log_add(conf.log_file, "ERR", 1, log_mutex, "The rbuf_ctrl_cpu is %d, but it should be in [%d %d), happens at \"%s\", line [%d], has to abort.\n", conf.capture_cpu[i], conf.process_index * NCPU_PER_NUMA_NODE, (conf.process_index + 1) * NCPU_PER_NUMA_NODE, __FILE__, __LINE__);
-	  //    fclose(conf.log_file);
-	  //    exit(EXIT_FAILURE);
-	  //  }
-	  //
 	  if(((conf.capture_cpu[i] == conf.capture_ctrl_cpu)?0:1) == 1)
 	    break;
 	  if(((conf.capture_cpu[i] == conf.rbuf_ctrl_cpu)?0:1) == 1)
@@ -1118,16 +1145,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	}      
               
       if(conf.capture_ctrl)
-	{
-	  //if((conf.capture_ctrl_cpu < conf.process_index * NCPU_PER_NUMA_NODE) || (conf.capture_ctrl_cpu >= (conf.process_index + 1) * NCPU_PER_NUMA_NODE))
-	  //  {
-	  //    fprintf(stderr, "The capture_ctrl_cpu is %d, but it should be in [%d %d), happens at \"%s\", line [%d], has to abort.\n", conf.capture_ctrl_cpu, conf.process_index * NCPU_PER_NUMA_NODE, (conf.process_index + 1) * NCPU_PER_NUMA_NODE, __FILE__, __LINE__);
-	  //    log_add(conf.log_file, "ERR", 1, log_mutex, "The capture_ctrl_cpu is %d, but it should be in [%d %d), happens at \"%s\", line [%d], has to abort.\n", conf.capture_ctrl_cpu, conf.process_index * NCPU_PER_NUMA_NODE, (conf.process_index + 1) * NCPU_PER_NUMA_NODE, __FILE__, __LINE__);
-	  //    fclose(conf.log_file);
-	  //    exit(EXIT_FAILURE);
-	  //  }
-	  log_add(conf.log_file, "INFO", 1, log_mutex, "We will NOT enable sod at the beginning, Capture control thread runs on CPU %d", conf.capture_ctrl_cpu);
-	}
+	log_add(conf.log_file, "INFO", 1, log_mutex, "We will NOT enable sod at the beginning, Capture control thread runs on CPU %d", conf.capture_ctrl_cpu);
       else
 	{      
 	  if((conf.source == "unset") && ((conf.ra == "unset") || (conf.dec == "unset")))
@@ -1204,6 +1222,7 @@ int default_arguments(conf_t *conf)
   conf->cpu_bind       = 0;      // Default do not bind thread to cpu
   conf->pad            = 0;      // Default do not pad
   conf->process_index  = -1;     // Default with an impossible value
+  conf->beam_index     = -1;     // Default with an impossible value
   conf->ndf_per_chunk_rbuf = 0;  // Default with an impossible value
   conf->ndf_per_chunk_tbuf = 0;  // Default with an impossible value
   

@@ -17,7 +17,7 @@
 typedef struct conf_t
 {
   FILE *log_file;
-  int process_index, thread_index;
+  int process_index, thread_index, beam_index;
   
   key_t key;
   dada_hdu_t *hdu;

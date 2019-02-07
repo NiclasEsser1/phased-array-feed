@@ -39,7 +39,7 @@ TSAMP        0.84375           # sampling interval in microseconds
 
 # description of formed beams
 NBEAM	      unset
-IBEAM	      unset
+BEAM_ID	      unset
 
 # description of data
 BYTES_PER_SECOND  3185777778   # 336 channels, 8 bytes/sample, 128 samples in 108us, round to int

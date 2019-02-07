@@ -38,6 +38,7 @@ void usage()
 	  " -p The source information, which is required for the case without capture control, in the format \"name;ra;dec\" \n"
 	  " -q Force to pad band edge \n"
 	  " -r The index of process \n"
+	  " -s The index of  beam \n"
 	   );
 }
 
@@ -52,7 +53,7 @@ int main(int argc, char **argv)
   default_arguments(&conf);
 
   /* read in argument from command line */
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:")) != -1)
     {
       switch(arg)
 	{
@@ -136,6 +137,10 @@ int main(int argc, char **argv)
 	  
 	case 'r':
 	  sscanf(optarg, "%d", &conf.process_index);
+	  break;
+	  
+	case 's':
+	  sscanf(optarg, "%d", &conf.beam_index);
 	  break;
 	}
     }

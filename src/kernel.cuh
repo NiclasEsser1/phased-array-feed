@@ -21,11 +21,11 @@ __global__ void mean_kernel(cufftComplex *buf_in, uint64_t offset_in, float *dda
 //__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl); // Share between fold and search mode
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_uint8);
 __global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_uint8);
-__global__ void scale2_kernel(cufftComplex *mean_scale, float scl_nsig, float scl_uint8);
+__global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_uint8);
 
 /* The following are only for search mode */
 __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, float *ddat_offs, float *ddat_scl);
-__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *mean_scale);
+__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale);
 __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in);
 
 // Modified from the example here, https://devtalk.nvidia.com/default/topic/1038617/cuda-programming-and-performance/understanding-and-adjusting-mark-harriss-array-reduction/
@@ -461,7 +461,7 @@ __global__ void reduce8_kernel(cufftComplex *dbuf_in, float *ddat_offs, float *d
 
 // reduce8 + cufftComplex output
 template <unsigned int blockSize>
-__global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *mean_scale, uint64_t offset_in, uint64_t n_accumulate, int nstream, float scl_ndim)
+__global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *offset_scale, uint64_t offset_in, uint64_t n_accumulate, int nstream, float scl_ndim)
 {
   extern volatile __shared__ cufftComplex sdata[];
   int j;
@@ -588,8 +588,8 @@ __global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *mean_scale, 
   
   if (tid == 0)
     {
-      mean_scale[blockIdx.x * gridDim.y + blockIdx.y].x += sdata[0].x/scl_ndim;
-      mean_scale[blockIdx.x * gridDim.y + blockIdx.y].y += sdata[0].y/scl_ndim;
+      offset_scale[blockIdx.x * gridDim.y + blockIdx.y].x += sdata[0].x/scl_ndim;
+      offset_scale[blockIdx.x * gridDim.y + blockIdx.y].y += sdata[0].y/scl_ndim;
     }
 }
 
@@ -598,7 +598,7 @@ __global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *mean_scale, 
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
 template <unsigned int blockSize>
-__global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, uint64_t n_accumulate, cufftComplex *mean_scale)
+__global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, uint64_t n_accumulate, cufftComplex *offset_scale)
 {
   extern volatile __shared__ float scale_sdata[];
   uint64_t i   = threadIdx.x;
@@ -684,12 +684,12 @@ __global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t 
     {
       loc_freq = blockIdx.y;
 
-      if(mean_scale[loc_freq].y == 0.0)
+      if(offset_scale[loc_freq].y == 0.0)
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(scale_sdata[0]);
 	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(scale_sdata[0]); // Reverse frequency order
       else
-	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((scale_sdata[0] - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((scale_sdata[0] - mean_scale[loc_freq].x) / mean_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
+	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((scale_sdata[0] - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8);
+	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((scale_sdata[0] - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
     }
 }
 
