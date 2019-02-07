@@ -40,7 +40,8 @@ int main(int argc, char *argv[])
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
   char command_line[MSTR_LEN] = {'\0'};
-  
+
+  conf.sod = 0; // We do not enable sod by default
   /* Initial part */  
   while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:")) != -1)
     {
@@ -107,13 +108,13 @@ int main(int argc, char *argv[])
 
   /* Setup log interface */
   sprintf(log_fname, "%s/baseband2filterbank.log", conf.dir);
-  conf.logfile = paf_log_open(log_fname, "ab+");
+  conf.logfile = log_open(log_fname, "ab+");
   if(conf.logfile == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", log_fname);
       exit(EXIT_FAILURE);
     }
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
 
   /* Log the input */
   strcpy(command_line, argv[0]);
@@ -122,21 +123,21 @@ int main(int argc, char *argv[])
       strcat(command_line, " ");
       strcat(command_line, argv[i]);
     }
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.rbufin_ndf_chk);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.stream_ndf_chk);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
+  log_add(conf.logfile, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.rbufin_ndf_chk);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.stream_ndf_chk);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);
   if(conf.sod)
-    paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
+    log_add(conf.logfile, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
   else
-    paf_log_add(conf.logfile, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchk_in);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band);
+    log_add(conf.logfile, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchk_in);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band);
   
   /* init */
   init_baseband2filterbank(&conf);
@@ -145,13 +146,13 @@ int main(int argc, char *argv[])
   baseband2filterbank(conf);
 
   /* Destroy */
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BEFORE destroy");  
+  log_add(conf.logfile, "INFO", 1, log_mutex, "BEFORE destroy");  
   destroy_baseband2filterbank(conf);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "END destroy");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "END destroy");
   
   /* Destory log interface */  
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
-  paf_log_close(conf.logfile);
+  log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
+  log_close(conf.logfile);
   
   return EXIT_SUCCESS;
 }

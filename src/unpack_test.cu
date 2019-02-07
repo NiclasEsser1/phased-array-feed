@@ -73,11 +73,11 @@ int main(int argc, char *argv[])
   gridsize_unpack.y = nchk_in;
   gridsize_unpack.z = 1;
   blocksize_unpack.x = NSAMP_DF; 
-  blocksize_unpack.y = NCHAN_CHK;
+  blocksize_unpack.y = NCHAN_PER_CHUNK;
   blocksize_unpack.z = 1;
   fprintf(stdout, "The configuration of the kernel is (%d, %d, %d) and (%d, %d, %d)\n", gridsize_unpack.x, gridsize_unpack.y, gridsize_unpack.z, blocksize_unpack.x, blocksize_unpack.y, blocksize_unpack.z);
 
-  nsamp  = stream_ndf_chk * nchk_in * NSAMP_DF * NCHAN_CHK;
+  nsamp  = stream_ndf_chk * nchk_in * NSAMP_DF * NCHAN_PER_CHUNK;
   npol   = nsamp * NPOL_IN;
   ndata  = npol * NDIM_IN;
   fprintf(stdout, "nsamp is %"PRIu64", %"PRIu64", %"PRIu64"\n", nsamp, npol, ndata);
@@ -102,12 +102,12 @@ int main(int argc, char *argv[])
 	{
 	  for(k = 0 ; k < NSAMP_DF; k++)
 	    {
-	      for(l = 0 ; l < NCHAN_CHK; l++)
+	      for(l = 0 ; l < NCHAN_PER_CHUNK; l++)
 		{
-		  idx_in = i*nchk_in*NSAMP_DF*NCHAN_CHK +
-		    j*NSAMP_DF*NCHAN_CHK + k*NCHAN_CHK + l;
+		  idx_in = i*nchk_in*NSAMP_DF*NCHAN_PER_CHUNK +
+		    j*NSAMP_DF*NCHAN_PER_CHUNK + k*NCHAN_PER_CHUNK + l;
 
-		  idx_out = j*NCHAN_CHK*stream_ndf_chk*NSAMP_DF +
+		  idx_out = j*NCHAN_PER_CHUNK*stream_ndf_chk*NSAMP_DF +
 		    l*stream_ndf_chk*NSAMP_DF + i*NSAMP_DF + k;
 		  
 		  tmp = bswap_64(data_int64[idx_in]);

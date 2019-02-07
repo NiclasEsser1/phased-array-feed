@@ -16,55 +16,52 @@
 
 typedef struct conf_t
 {
-  int process_index;
-  int ithread;
-  FILE *logfile;
+  FILE *log_file;
+  int process_index, thread_index;
   
   key_t key;
   dada_hdu_t *hdu;
-  ipcbuf_t *db_data, *db_hdr;
+  ipcbuf_t *data_block, *header_block;
   
-  uint64_t rbuf_ndf_chk, tbuf_ndf_chk, rbufsz, tbufsz;
+  uint64_t ndf_per_chunk_rbuf, ndf_per_chunk_tbuf, blksz_rbuf, tbufsz;
   
   int pad;
-  int dfoff, required_dfsz;
-  int cpt_cpu[MPORT_CAPTURE], rbuf_ctrl_cpu, cpt_ctrl_cpu, cpt_ctrl, cpu_bind;
-  char cpt_ctrl_addr[MSTR_LEN];
+  int dfsz_seek, dfsz_keep;
+  int capture_cpu[MPORT_CAPTURE], rbuf_ctrl_cpu, capture_ctrl_cpu, capture_ctrl, cpu_bind;
+  char capture_ctrl_addr[MSTR_LEN];
   
   char ip_alive[MPORT_CAPTURE][MSTR_LEN], ip_dead[MPORT_CAPTURE][MSTR_LEN];;
   int port_alive[MPORT_CAPTURE], port_dead[MPORT_CAPTURE];
   int nport_alive, nport_dead;
-  int nchk_alive_expect[MPORT_CAPTURE], nchk_alive_actual[MPORT_CAPTURE], nchk_dead[MPORT_CAPTURE];;  // For each port;
-  int nchan, nchk, nchk_alive;
+  int nchunk_alive_expect_on_port[MPORT_CAPTURE], nchunk_alive_actual_on_port[MPORT_CAPTURE], nchunk_dead_on_port[MPORT_CAPTURE];;  // For each port;
+  int nchan, nchunk, nchunk_alive;
   
-  char dir[MSTR_LEN], hfname[MSTR_LEN], instrument[MSTR_LEN];
+  char dir[MSTR_LEN], dada_header_template[MSTR_LEN], instrument_name[MSTR_LEN];
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
-  
-  double cfreq, chan_res, bw;
-  double df_res, blk_res;  // time resolution of each data frame and ring buffer block, for start time determination;
-  double ichk0;
 
-  int epoch0;                       // Number of days from 1970
-  time_t sec_int, sec_int_ref;      // int seconds from 1970
-  uint64_t df_sec0, idf_prd0; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
+  double center_freq, freq_res, bandwidth;
+  double time_res_df, time_res_blk;  // time resolution of each data frame and ring buffer block, for start time determination;
+  double chunk_index0;
+
+  int days_from_1970;   // Number of days from 1970
+  time_t seconds_from_1970;
+  int64_t seconds_from_epoch, df_in_period; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
   uint64_t picoseconds, picoseconds_ref;
-  
   char utc_start[MSTR_LEN];
   double mjd_start;
 
   struct timeval tout;
 }conf_t;
 
-int init_capture(conf_t *conf);
-void *capture(void *conf);
-int init_buf(conf_t *conf);
+int initialize_capture(conf_t *conf);
+void *do_capture(void *conf);
 int destroy_capture(conf_t conf);
 
 void *capture_control(void *conf);
-
-int threads(conf_t *conf);
 void *buf_control(void *conf);
 
-int dada_header(conf_t conf);
-
+int default_arguments(conf_t *conf);
+int threads(conf_t *conf);
+int register_dada_header(conf_t conf);
+int examine_record_arguments(conf_t conf, char **argv, int argc);
 #endif

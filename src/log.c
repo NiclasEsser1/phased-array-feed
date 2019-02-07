@@ -10,7 +10,7 @@
 #include <string.h>
 #include "log.h"
 
-FILE *paf_log_open(char *fname, const char *mode)
+FILE *log_open(char *fname, const char *mode)
 {  
   FILE *fp = fopen(fname, mode);
   if(fp == NULL)
@@ -21,7 +21,7 @@ FILE *paf_log_open(char *fname, const char *mode)
   return fp;
 }
 
-int paf_log_add(FILE *fp, const char *type, int flush, pthread_mutex_t mutex, const char *format, ...)
+int log_add(FILE *fp, const char *type, int flush, pthread_mutex_t mutex, const char *format, ...)
 {
   struct tm *local = NULL;
   time_t rawtime;
@@ -49,7 +49,7 @@ int paf_log_add(FILE *fp, const char *type, int flush, pthread_mutex_t mutex, co
   return EXIT_SUCCESS;
 }
 
-int paf_log_close(FILE *fp)
+int log_close(FILE *fp)
 {
   if(fp!=NULL)
     fclose(fp);

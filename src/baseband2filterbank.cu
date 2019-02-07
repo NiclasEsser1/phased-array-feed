@@ -24,29 +24,29 @@ int init_baseband2filterbank(conf_t *conf)
   
   /* Prepare parameters */
   conf->nrun_blk        = conf->rbufin_ndf_chk / (conf->stream_ndf_chk * conf->nstream);
-  conf->nchan_in        = conf->nchk_in * NCHAN_CHK;
-  conf->nchan_keep_chan = (int)(conf->cufft_nx * OSAMP_RATEI);
-  conf->cufft_mod       = (int)(0.5 * conf->cufft_nx * OSAMP_RATEI);
+  conf->nchan_in        = conf->nchk_in * NCHAN_PER_CHUNK;
+  conf->nchan_keep_chan = (int)(conf->cufft_nx / OVER_SAMP_RATE);
+  conf->cufft_mod       = (int)(0.5 * conf->cufft_nx / OVER_SAMP_RATE);
   conf->nchan_edge      = (int)(0.5 * conf->nchan_in * conf->nchan_keep_chan - 0.5 * conf->nchan_keep_band);
   conf->nchan_ratei     = conf->nchan_in * conf->nchan_keep_chan/(double)conf->nchan_keep_band;
-  conf->scl_dtsz        = OSAMP_RATEI * NBYTE_OUT * conf->nchan_out/ (double)(conf->nchan_ratei * conf->nchan_keep_band * NPOL_IN * NDIM_IN * NBYTE_IN);
+  conf->scl_dtsz        = NBYTE_OUT / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->nchan_ratei * conf->nchan_keep_band * NPOL_IN * NDIM_IN * NBYTE_IN);
   conf->bw              = conf->nchan_keep_band/(double)conf->nchan_keep_chan;
 
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "We will drop %d fine channels at the band edge for frequency accumulation", conf->nchan_edge);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "%f percent fine channels (after down sampling) are kept for frequency accumulation", 1.0/conf->nchan_ratei * 100.);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The data size rate between filterbank and baseband data is %f", conf->scl_dtsz);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The bandwidth for the final output is %f MHz", conf->bw);
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrun_blk);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "We will drop %d fine channels at the band edge for frequency accumulation", conf->nchan_edge);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "%f percent fine channels (after down sampling) are kept for frequency accumulation", 1.0/conf->nchan_ratei * 100.);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The data size rate between filterbank and baseband data is %f", conf->scl_dtsz);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The bandwidth for the final output is %f MHz", conf->bw);
+  log_add(conf->logfile, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrun_blk);
   
   /* Prepare buffer, stream and fft plan for process */
   conf->nsamp1       = conf->stream_ndf_chk * conf->nchan_in * NSAMP_DF;
   conf->npol1        = conf->nsamp1 * NPOL_IN;
   conf->ndata1       = conf->npol1  * NDIM_IN;
   
-  conf->nsamp2       = conf->nsamp1 * OSAMP_RATEI / conf->nchan_ratei;
+  conf->nsamp2       = conf->nsamp1 / OVER_SAMP_RATE / conf->nchan_ratei;
   conf->npol2        = conf->nsamp2 * NPOL_IN;
   conf->ndata2       = conf->npol2  * NDIM_IN;
 
@@ -109,9 +109,9 @@ int init_baseband2filterbank(conf_t *conf)
   conf->gridsize_unpack.y = conf->nchk_in;
   conf->gridsize_unpack.z = 1;
   conf->blocksize_unpack.x = NSAMP_DF; 
-  conf->blocksize_unpack.y = NCHAN_CHK;
+  conf->blocksize_unpack.y = NCHAN_PER_CHUNK;
   conf->blocksize_unpack.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of unpack kernel is (%d, %d, %d) and (%d, %d, %d)",
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of unpack kernel is (%d, %d, %d) and (%d, %d, %d)",
 	      conf->gridsize_unpack.x, conf->gridsize_unpack.y, conf->gridsize_unpack.z,
 	      conf->blocksize_unpack.x, conf->blocksize_unpack.y, conf->blocksize_unpack.z);
   
@@ -121,7 +121,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->blocksize_swap_select_transpose.x = conf->cufft_nx;
   conf->blocksize_swap_select_transpose.y = 1;
   conf->blocksize_swap_select_transpose.z = 1;  
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of swap_select_transpose kernel is (%d, %d, %d) and (%d, %d, %d)",
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of swap_select_transpose kernel is (%d, %d, %d) and (%d, %d, %d)",
 	      conf->gridsize_swap_select_transpose.x, conf->gridsize_swap_select_transpose.y, conf->gridsize_swap_select_transpose.z,
 	      conf->blocksize_swap_select_transpose.x, conf->blocksize_swap_select_transpose.y, conf->blocksize_swap_select_transpose.z);        
 
@@ -133,7 +133,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->blocksize_detect_faccumulate_pad_transpose.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_detect_faccumulate_pad_transpose.y = 1;
   conf->blocksize_detect_faccumulate_pad_transpose.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
 	      conf->gridsize_detect_faccumulate_pad_transpose.x, conf->gridsize_detect_faccumulate_pad_transpose.y, conf->gridsize_detect_faccumulate_pad_transpose.z,
 	      conf->blocksize_detect_faccumulate_pad_transpose.x, conf->blocksize_detect_faccumulate_pad_transpose.y, conf->blocksize_detect_faccumulate_pad_transpose.z, conf->naccumulate_pad);
 
@@ -145,7 +145,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->blocksize_detect_faccumulate_scale.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_detect_faccumulate_scale.y = 1;
   conf->blocksize_detect_faccumulate_scale.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
 	      conf->gridsize_detect_faccumulate_scale.x, conf->gridsize_detect_faccumulate_scale.y, conf->gridsize_detect_faccumulate_scale.z,
 	      conf->blocksize_detect_faccumulate_scale.x, conf->blocksize_detect_faccumulate_scale.y, conf->blocksize_detect_faccumulate_scale.z, conf->naccumulate_scale);
 
@@ -157,7 +157,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->blocksize_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_taccumulate.y = 1;
   conf->blocksize_taccumulate.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
 	      conf->gridsize_taccumulate.x, conf->gridsize_taccumulate.y, conf->gridsize_taccumulate.z,
 	      conf->blocksize_taccumulate.x, conf->blocksize_taccumulate.y, conf->blocksize_taccumulate.z, conf->naccumulate);
   
@@ -167,7 +167,7 @@ int init_baseband2filterbank(conf_t *conf)
   conf->blocksize_scale.x = conf->nchan_out;
   conf->blocksize_scale.y = 1;
   conf->blocksize_scale.z = 1;
-  paf_log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of scale kernel is (%d, %d, %d) and (%d, %d, %d)",
+  log_add(conf->logfile, "INFO", 1, log_mutex, "The configuration of scale kernel is (%d, %d, %d) and (%d, %d, %d)",
 	      conf->gridsize_scale.x, conf->gridsize_scale.y, conf->gridsize_scale.z,
 	      conf->blocksize_scale.x, conf->blocksize_scale.y, conf->blocksize_scale.z);
   
@@ -176,14 +176,14 @@ int init_baseband2filterbank(conf_t *conf)
   dada_hdu_set_key(conf->hdu_in, conf->key_in);
   if(dada_hdu_connect(conf->hdu_in) < 0)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       exit(EXIT_FAILURE);    
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
   if((conf->rbufin_size % conf->bufin_size != 0) || (conf->rbufin_size/conf->bufin_size)!= conf->nrun_blk)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);    
     }
   
@@ -193,14 +193,14 @@ int init_baseband2filterbank(conf_t *conf)
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
   if(conf->hdrsz != DADA_HDRSZ)    // This number should match
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);    
     }
   
   /* make ourselves the read client */
   if(dada_hdu_lock_read(conf->hdu_in) < 0)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
 
@@ -209,7 +209,7 @@ int init_baseband2filterbank(conf_t *conf)
   dada_hdu_set_key(conf->hdu_out, conf->key_out);
   if(dada_hdu_connect(conf->hdu_out) < 0)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
@@ -217,14 +217,14 @@ int init_baseband2filterbank(conf_t *conf)
    
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);    
     }
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_out->header_block);  
   if(conf->hdrsz != DADA_HDRSZ)    // This number should match
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);    
     }
   dada_cuda_dbregister(conf->hdu_out);
@@ -232,7 +232,7 @@ int init_baseband2filterbank(conf_t *conf)
   /* make ourselves the write client */
   if(dada_hdu_lock_write(conf->hdu_out) < 0)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
 
@@ -240,7 +240,7 @@ int init_baseband2filterbank(conf_t *conf)
     {
       if(ipcbuf_disable_sod(conf->db_out) < 0)
 	{
-	  paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);	  
+	  log_add(conf->logfile, "ERR", 1, log_mutex, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);	  
 	  dada_hdu_unlock_write(conf->hdu_out);
 	  exit(EXIT_FAILURE);
 	}
@@ -282,32 +282,32 @@ int baseband2filterbank(conf_t conf)
 
   fprintf(stdout, "BASEBAND2FILTERBANK_READY\n");  // Ready to take data from ring buffer, just before the header thing
   fflush(stdout);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   
   /* Register header only with sod */
   if(conf.sod)
     {
       if(register_header(&conf))
 	{
-	  paf_log_add(conf.logfile, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+	  log_add(conf.logfile, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
 	  exit(EXIT_FAILURE);
 	}
     }
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "register_header done");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "register_header done");
   
   while(!ipcbuf_eod(conf.db_in))
     {
-      paf_log_add(conf.logfile, "INFO", 1, log_mutex, "before getting new buffer block");
+      log_add(conf.logfile, "INFO", 1, log_mutex, "before getting new buffer block");
       conf.curbuf_in  = ipcbuf_get_next_read(conf.db_in, &curbufsz);
       conf.curbuf_out = ipcbuf_get_next_write(conf.db_out);
-      paf_log_add(conf.logfile, "INFO", 1, log_mutex, "after getting new buffer block");
+      log_add(conf.logfile, "INFO", 1, log_mutex, "after getting new buffer block");
       
       /* Get scale of data */
       if(first)
       	{
       	  first = 0;
       	  dat_offs_scl(conf);
-	  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "dat_offs_scl done");  // I may need to put this part before while and make the first output buffer block empty
+	  log_add(conf.logfile, "INFO", 1, log_mutex, "dat_offs_scl done");  // I may need to put this part before while and make the first output buffer block empty
 	}
 
       for(i = 0; i < conf.nrun_blk; i ++)
@@ -376,13 +376,13 @@ int baseband2filterbank(conf_t conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      paf_log_add(conf.logfile, "INFO", 1, log_mutex, "before closing old buffer block");
+      log_add(conf.logfile, "INFO", 1, log_mutex, "before closing old buffer block");
       ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * conf.scl_dtsz));
       ipcbuf_mark_cleared(conf.db_in);
-      paf_log_add(conf.logfile, "INFO", 1, log_mutex, "after closing old buffer block");
+      log_add(conf.logfile, "INFO", 1, log_mutex, "after closing old buffer block");
     }
 
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "FINISH the process");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "FINISH the process");
 
   return EXIT_SUCCESS;
 }
@@ -540,7 +540,7 @@ int dat_offs_scl(conf_t conf)
   fp = fopen(fname, "w");
   if(fp == NULL)
     {
-      paf_log_add(conf.logfile, "ERR", 1, log_mutex, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf.logfile, "ERR", 1, log_mutex, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   for (i = 0; i< conf.nchan_out; i++)
@@ -560,19 +560,19 @@ int destroy_baseband2filterbank(conf_t conf)
     }
   free(conf.streams);
   free(conf.fft_plans);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "destroy fft plan and stream done");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "destroy fft plan and stream done");
   
   cudaFree(conf.dbuf_in);
   cudaFree(conf.dbuf_out);
   cudaFreeHost(conf.mean_scale_h);
   cudaFree(conf.mean_scale_d);
 
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "Free cuda memory done");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "Free cuda memory done");
   
   dada_cuda_dbunregister(conf.hdu_in);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "dbunregister done1");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "dbunregister done1");
   dada_cuda_dbunregister(conf.hdu_out);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "dbunregister done2");
+  log_add(conf.logfile, "INFO", 1, log_mutex, "dbunregister done2");
   
   dada_hdu_unlock_write(conf.hdu_out);
   dada_hdu_disconnect(conf.hdu_out);
@@ -580,7 +580,7 @@ int destroy_baseband2filterbank(conf_t conf)
   dada_hdu_unlock_read(conf.hdu_in);
   dada_hdu_disconnect(conf.hdu_in);
   dada_hdu_destroy(conf.hdu_in);
-  paf_log_add(conf.logfile, "INFO", 1, log_mutex, "destory hdu done");  
+  log_add(conf.logfile, "INFO", 1, log_mutex, "destory hdu done");  
 
   return EXIT_SUCCESS;
 }
@@ -595,40 +595,40 @@ int register_header(conf_t *conf)
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
   if(hdrsz != DADA_HDRSZ)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
 
   hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
   if (!hdrbuf_out)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }  
   if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"PRIu64"", &file_size) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }   
   if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"PRIu64"", &bytes_per_seconds) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }  
   if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &tsamp) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }   
   /* Get utc_start from hdrin */
   if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
@@ -638,58 +638,58 @@ int register_header(conf_t *conf)
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "BW", "%lf", -conf->bw) < 0)  // Reverse frequency order
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp * conf->cufft_nx) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_OUT) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR:\tError setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_OUT) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_OUT) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       exit(EXIT_FAILURE);
     }
   if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_seconds) < 0)  
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
     
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
   /* donot set header parameters anymore - acqn. doesn't start */
   if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
     {
-      paf_log_add(conf->logfile, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      log_add(conf->logfile, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       exit(EXIT_FAILURE);
     }
 

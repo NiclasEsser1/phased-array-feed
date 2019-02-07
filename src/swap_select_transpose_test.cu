@@ -91,8 +91,8 @@ int main(int argc, char *argv[])
   fprintf(stdout, "nchk_in is %d, stream_ndf_chk is %d, cufft_nx is %d and nchan_keep_band is %d\n", nchk_in, stream_ndf_chk, cufft_nx, nchan_keep_band);
 
   /* Setup size */
-  nchan_in        = nchk_in * NCHAN_CHK;
-  nchan_keep_chan = cufft_nx * OSAMP_RATEI;
+  nchan_in        = nchk_in * NCHAN_PER_CHUNK;
+  nchan_keep_chan = cufft_nx / OVER_SAMP_RATE;
   nchan_edge      = 0.5 * (nchan_in * nchan_keep_chan - nchan_keep_band);
   cufft_mod       = 0.5 * nchan_keep_chan;
   fprintf(stdout, "nchan_in is %d, nchan_keep_chan is %d, cufft_mod is %d and nchan_edge is %d\n", nchan_in, nchan_keep_chan, cufft_mod, nchan_edge);
