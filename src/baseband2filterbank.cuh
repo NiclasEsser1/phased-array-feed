@@ -47,6 +47,7 @@ typedef struct conf_t
   char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;
   uint8_t *dbuf_out;
+  double tsamp_in, tsamp_out;
   
   uint64_t ndf_per_chunk_rbufin;
   uint64_t bufin_size, bufout_size; // Device buffer size for all streams

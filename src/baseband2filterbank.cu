@@ -335,6 +335,7 @@ int baseband2filterbank(conf_t conf)
   dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
   uint64_t cbufsz;
   int first = 1;
+  double time_res_blk, elapsed_time = 0;
   
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
@@ -347,19 +348,16 @@ int baseband2filterbank(conf_t conf)
   fflush(stdout);
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   
-  /* Register header only with sod */
-  if(conf.sod == 1)
+  if(register_header(&conf))
     {
-      if(register_header(&conf))
-	{
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-	  fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-	  destroy_baseband2filterbank(conf);
-	  fclose(conf.log_file);
-	  exit(EXIT_FAILURE);
-	}
+      log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2filterbank(conf);
+      fclose(conf.log_file);
+      exit(EXIT_FAILURE);
     }
+  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after register_header, in seconds
   log_add(conf.log_file, "INFO", 1, log_mutex, "register_header done");
   
   while(!ipcbuf_eod(conf.db_in))
@@ -447,6 +445,10 @@ int baseband2filterbank(conf_t conf)
       ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
       ipcbuf_mark_cleared(conf.db_in);
       log_add(conf.log_file, "INFO", 1, log_mutex, "after closing old buffer block");
+
+      elapsed_time += time_res_blk;
+      fprintf(stdout, "BASEBAND2FILTERBANK, finished %f seconds data\n", elapsed_time);
+      fflush(stdout);
     }
 
   log_add(conf.log_file, "INFO", 1, log_mutex, "FINISH the process");
@@ -669,7 +671,6 @@ int register_header(conf_t *conf)
   uint64_t hdrsz;
   char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
   uint64_t file_size, bytes_per_seconds;
-  double tsamp;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -719,7 +720,7 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }  
-  if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &tsamp) < 0)  
+  if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -761,7 +762,8 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", tsamp * conf->cufft_nx) < 0)  
+  conf->tsamp_out = conf->tsamp_in * conf->cufft_nx;
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", conf->tsamp_out) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -770,6 +772,7 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_OUT) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);

@@ -11,7 +11,7 @@ PRIMARY      BMF                 # primary node host name
 SECONDARY    unset               # secondary node host name
 FILE_NAME    unset               # full path of the data file
 
-FILE_SIZE    35481600000000      # For 10 minutes
+FILE_SIZE    212889600000000     # For one hour
 FILE_NUMBER  0                   # number of data file
 
 # time of the rising edge of the first time sample
