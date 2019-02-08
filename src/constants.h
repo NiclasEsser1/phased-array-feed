@@ -25,6 +25,7 @@ extern "C" {
 #define CUFFT_RANK     1
 #define MAX_RAND       1024
 #define NBEAM_MAX      36
+#define NCHUNK_MAX     48
   
 #define BAND_LIMIT_UP   1920.0
 #define BAND_LIMIT_DOWN 640.0

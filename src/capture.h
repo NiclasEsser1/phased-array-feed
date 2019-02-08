@@ -45,7 +45,7 @@ typedef struct conf_t
 
   int days_from_1970;   // Number of days from 1970
   time_t seconds_from_1970;
-  int64_t seconds_from_epoch, df_in_period; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
+  uint64_t seconds_from_epoch, df_in_period; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
   uint64_t picoseconds, picoseconds_ref;
   char utc_start[MSTR_LEN];
   double mjd_start;

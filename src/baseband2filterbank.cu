@@ -17,6 +17,23 @@
 
 extern pthread_mutex_t log_mutex;
 
+int default_arguments(conf_t *conf)
+{
+  memset(conf->dir, 0x00, sizeof(conf->dir));
+  sprintf(conf->dir, "unset"); // Default with "unset"
+  
+  conf->ndf_per_chunk_rbufin = 0; // Default with an impossible value
+  conf->nstream          = -1; // Default with an impossible value
+  conf->ndf_per_chunk_stream = 0; // Default with an impossible value
+  conf->sod = 0;                   // Default no SOD at the beginning
+  conf->nchunk_in = -1;
+  conf->cufft_nx = -1;
+  conf->nchan_out = -1;
+  conf->nchan_keep_band = -1;
+  
+  return EXIT_SUCCESS;
+}
+
 int initialize_baseband2filterbank(conf_t *conf)
 {
   int i;
@@ -24,18 +41,28 @@ int initialize_baseband2filterbank(conf_t *conf)
   int naccumulate_pow2;
   
   /* Prepare parameters */
-  conf->nrepeat_per_blk        = conf->ndf_chunk_rbufin / (conf->ndf_per_chunk_stream * conf->nstream);
+  conf->nrepeat_per_blk = conf->ndf_per_chunk_rbufin / (conf->ndf_per_chunk_stream * conf->nstream);
   conf->nchan_in        = conf->nchunk_in * NCHAN_PER_CHUNK;
   conf->nchan_keep_chan = (int)(conf->cufft_nx / OVER_SAMP_RATE);
   conf->cufft_mod       = (int)(0.5 * conf->cufft_nx / OVER_SAMP_RATE);
   conf->nchan_edge      = (int)(0.5 * conf->nchan_in * conf->nchan_keep_chan - 0.5 * conf->nchan_keep_band);
-  conf->inverse_nchan_rate     = conf->nchan_in * conf->nchan_keep_chan/(double)conf->nchan_keep_band;
-  conf->scale_dtsz        = NBYTE_OUT / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->inverse_nchan_rate * conf->nchan_keep_band * NPOL_IN * NDIM_IN * NBYTE_IN);
+  conf->inverse_nchan_rate = conf->nchan_in * conf->nchan_keep_chan/(double)conf->nchan_keep_band;
+  conf->scale_dtsz         = NBYTE_OUT / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->inverse_nchan_rate * conf->nchan_keep_band * NPOL_IN * NDIM_IN * NBYTE_IN);
   conf->bandwidth       = conf->nchan_keep_band/(double)conf->nchan_keep_chan;
 
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
+  if(conf->nchan_edge<0) // Check the nchan_keep_band further
+    {
+      fprintf(stderr, "nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf->nchan_edge, __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1, log_mutex, "nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf->nchan_edge, __FILE__, __LINE__);
+      
+      log_close(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf->nchan_keep_band); 
+  
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will drop %d fine channels at the band edge for frequency accumulation", conf->nchan_edge);
   log_add(conf->log_file, "INFO", 1, log_mutex, "%f percent fine channels (after down sampling) are kept for frequency accumulation", 1.0/conf->inverse_nchan_rate * 100.);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The data size rate between filterbank and baseband data is %f", conf->scale_dtsz);
@@ -55,7 +82,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->npol3        = conf->nsamp3 * NPOL_OUT;
   conf->ndata3       = conf->npol3  * NDIM_OUT;  
 
-  conf->ndim_scale      = conf->ndf_chunk_rbufin * NSAMP_DF / conf->cufft_nx;   // We do not average in time and here we work on detected data;
+  conf->ndim_scale      = conf->ndf_per_chunk_rbufin * NSAMP_DF / conf->cufft_nx;   // We do not average in time and here we work on detected data;
   
   nx        = conf->cufft_nx;
   batch     = conf->npol1 / conf->cufft_nx;
@@ -269,7 +296,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       exit(EXIT_FAILURE);
     }
 
-  if(!conf->sod)
+  if(!(conf->sod == 1))
     {
       if(ipcbuf_disable_sod(conf->db_out) < 0)
 	{
@@ -321,7 +348,7 @@ int baseband2filterbank(conf_t conf)
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   
   /* Register header only with sod */
-  if(conf.sod)
+  if(conf.sod == 1)
     {
       if(register_header(&conf))
 	{
@@ -809,5 +836,110 @@ int register_header(conf_t *conf)
       exit(EXIT_FAILURE);
     }
 
+  return EXIT_SUCCESS;
+}
+
+int examine_record_arguments(conf_t conf, char **argv, int argc)
+{
+  int i;
+  char command_line[MSTR_LEN] = {'\0'};
+  
+  /* Log the input */
+  strcpy(command_line, argv[0]);
+  for(i = 1; i < argc; i++)
+    {
+      strcat(command_line, " ");
+      strcat(command_line, argv[i]);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
+
+  if(conf.ndf_per_chunk_rbufin == 0)
+    {
+      fprintf(stderr, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
+
+  if(conf.nstream <= 0)
+    {
+      fprintf(stderr, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nstream, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
+  
+  if(conf.ndf_per_chunk_stream == 0)
+    {
+      fprintf(stderr, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
+
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);  // Checked already
+  
+  if(conf.sod == 1)
+    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
+  else
+    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
+
+  if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_MAX)    
+    {
+      fprintf(stderr, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }  
+  log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk_in);
+
+  if(conf.cufft_nx<=0)    
+    {
+      fprintf(stderr, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.cufft_nx, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
+  
+  if(conf.nchan_out <= 0)
+    {
+      fprintf(stderr, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+
+  if((log2((double)conf.nchan_out) - floor(log2((double)conf.nchan_out))) != 0)
+    {
+      fprintf(stderr, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
+  
+  if(conf.nchan_keep_band<=0)    
+    {
+      fprintf(stderr, "nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band); 
+  
   return EXIT_SUCCESS;
 }

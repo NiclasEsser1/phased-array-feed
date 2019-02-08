@@ -7,10 +7,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <dirent.h>
+#include <errno.h>
 
 #include "baseband2filterbank.cuh"
 #include "cudautil.cuh"
 #include "log.h"
+
+// Default arguments and check them
+// Clean up unused kernels and parameters
+// Clean up testers also
 
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -36,12 +42,13 @@ void usage ()
 
 int main(int argc, char *argv[])
 {
-  int i, arg;
+  int arg;
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
-  char command_line[MSTR_LEN] = {'\0'};
 
-  conf.sod = 0; // We do not enable sod by default
+  /* Default argument */
+  default_arguments(&conf);
+  
   /* Initializeial part */  
   while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:")) != -1)
     {
@@ -69,7 +76,7 @@ int main(int argc, char *argv[])
 	  break;
 	  	  
 	case 'c':
-	  sscanf(optarg, "%"SCNu64"", &conf.ndf_chunk_rbufin);
+	  sscanf(optarg, "%"SCNu64"", &conf.ndf_per_chunk_rbufin);
 	  break;
 	  
 	case 'd':
@@ -107,6 +114,14 @@ int main(int argc, char *argv[])
     }
 
   /* Setup log interface */
+  DIR* dir = opendir(conf.dir); // First to check if the directory exists
+  if(dir)
+    closedir(dir);
+  else
+    {
+      fprintf(stderr, "Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
+      exit(EXIT_FAILURE);
+    }
   sprintf(log_fname, "%s/baseband2filterbank.log", conf.dir);
   conf.log_file = log_open(log_fname, "ab+");
   if(conf.log_file == NULL)
@@ -116,28 +131,8 @@ int main(int argc, char *argv[])
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
 
-  /* Log the input */
-  strcpy(command_line, argv[0]);
-  for(i = 1; i < argc; i++)
-    {
-      strcat(command_line, " ");
-      strcat(command_line, argv[i]);
-    }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_chunk_rbufin);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);
-  if(conf.sod)
-    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
-  else
-    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
-  log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk_in);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band);
+  /* check the command line and record it */
+  examine_record_arguments(conf, argv, argc);
   
   /* initialize */
   initialize_baseband2filterbank(&conf);

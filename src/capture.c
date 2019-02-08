@@ -1067,7 +1067,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We capture data with beam %d", conf.beam_index);
   
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Hexadecimal shared memory key for capture is %x", conf.key); // How to check this?
+  log_add(conf.log_file, "INFO", 1, log_mutex, "Hexadecimal shared memory key for capture is %x", conf.key); // Check it when create HDU
   
   if((conf.dfsz_seek != 0) && (conf.dfsz_seek != DF_HDRSZ)) // The seek bytes has to be 0 or DF_HDRSZ
     {
@@ -1111,11 +1111,11 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }  
   log_add(conf.log_file, "INFO", 1, log_mutex, "The center frequency for the capture is %f MHz", conf.center_freq); 
 
-  if((conf.days_from_1970 <= 0) || (conf.seconds_from_epoch <= -1) || (conf.df_in_period < 0) || (conf.df_in_period >= NDF_PER_CHUNK_PER_PERIOD))
+  if((conf.days_from_1970 <= 0) || (conf.df_in_period >= NDF_PER_CHUNK_PER_PERIOD))
     // The reference information has to be reasonable, later more careful check
     {
-      fprintf(stderr, "The reference information is not right, days_from_1970 is %d, seconds_from_epoch is %"PRId64" and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.\n", conf.days_from_1970, conf.seconds_from_epoch, conf.df_in_period, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "The reference information is not right, days_from_1970 is %d, seconds_from_epoch is %"PRId64" and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.", conf.days_from_1970, conf.seconds_from_epoch, conf.df_in_period, __FILE__, __LINE__);
+      fprintf(stderr, "The reference information is not right, days_from_1970 is %d and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.\n", conf.days_from_1970, conf.df_in_period, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "The reference information is not right, days_from_1970 is %d and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.", conf.days_from_1970, conf.df_in_period, __FILE__, __LINE__);
       
       fclose(conf.log_file);
       exit(EXIT_FAILURE);
@@ -1163,7 +1163,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   else
     log_add(conf.log_file, "WARN", 1, log_mutex, "We will NOT bind threads to CPUs");
 
-  if(conf.ndf_per_chunk_rbuf<=0)  // The actual size of it will be checked later
+  if(conf.ndf_per_chunk_rbuf==0)  // The actual size of it will be checked later
     {      
       fprintf(stderr, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbuf, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbuf, __FILE__, __LINE__);
@@ -1173,7 +1173,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbuf);
   
-  if(conf.ndf_per_chunk_tbuf<=0)  // The actual size of it will be checked later
+  if(conf.ndf_per_chunk_tbuf==0)  // The actual size of it will be checked later
     {      
       fprintf(stderr, "ndf_per_chunk_tbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_tbuf, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_tbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_tbuf, __FILE__, __LINE__);
@@ -1196,7 +1196,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   log_add(conf.log_file, "INFO", 1, log_mutex, "The name of instrument is %s", conf.instrument_name); // Instrument name is not critical
   
-  if(conf.pad)
+  if(conf.pad==1)
     log_add(conf.log_file, "INFO", 1, log_mutex, "We will pad frequency chunks to fake full bandwidth data");
   else
     log_add(conf.log_file, "INFO", 1, log_mutex, "We will NOT pad frequency chunks to fake full bandwidth data");

@@ -48,7 +48,7 @@ typedef struct conf_t
   int64_t *dbuf_in;
   uint8_t *dbuf_out;
   
-  uint64_t ndf_chunk_rbufin;
+  uint64_t ndf_per_chunk_rbufin;
   uint64_t bufin_size, bufout_size; // Device buffer size for all streams
   uint64_t sbufin_size, sbufout_size; // Buffer size for each stream
   uint64_t bufrt1_size, bufrt2_size;
@@ -84,5 +84,7 @@ int offset_scale(conf_t conf);
 int register_header(conf_t *conf);
 
 int destroy_baseband2filterbank(conf_t conf);
+int default_arguments(conf_t *conf);
+int examine_record_arguments(conf_t conf, char **argv, int argc);
 
 #endif
