@@ -57,7 +57,7 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_
    2.2 drop some channels (depends on the setup) at each end of band to give a good number for the accumulation in frequency;
    3.  reorder the FFT data from PFTF to PTF;
 */
-__global__ void swap_select_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan, int nchan_keep_band, int nchan_edge)
+__global__ void swap_select_transpose_ptf_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan, int nchan_keep_band, int nchan_edge)
 {
   int remainder, loc;
   int64_t loc_in, loc_out;
@@ -85,6 +85,82 @@ __global__ void swap_select_transpose_kernel(cufftComplex *dbuf_in, cufftComplex
 	  dbuf_out[loc_out].x = p2.x;
 	  dbuf_out[loc_out].y = p2.y;
 	}
+    }
+}
+
+/* 
+   This kernel is used to :
+   1. swap the halves of CUDA FFT output, we need to do that because CUDA FFT put the centre frequency at bin 0;
+   2. drop the first 3 and last 2 points of the swapped 32-points FFT output, which will reduce to oversample rate to 1;
+      for 64 points FFT, drop the first and last 5 points;
+      for 128 points FFT, we need to drop the first and last 10 points;
+      for 1024 points FFT, we drop the first and last 80 points;
+   3. reorder the FFT data from PFTF to PFT;
+*/
+__global__ void swap_select_transpose_pft_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
+{
+  int remainder, loc;
+  int64_t loc_in, loc_out;
+  cufftComplex p1, p2;
+
+  remainder = (threadIdx.x + cufft_mod)%cufft_nx;
+  if(remainder < nchan_keep_chan)
+    {
+      loc = blockIdx.x * nchan_keep_chan + remainder;
+      loc_in = blockIdx.x * gridDim.y * blockDim.x +
+	blockIdx.y * blockDim.x +
+	threadIdx.x;
+      
+      loc_out = gridDim.y * loc + blockIdx.y;  // The profermance here may have problem;
+      
+      p1 = dbuf_in[loc_in];
+      dbuf_out[loc_out].x = p1.x;
+      dbuf_out[loc_out].y = p1.y;
+      
+      loc_out = loc_out + offset_out;
+      
+      p2 = dbuf_in[loc_in + offset_in];
+      dbuf_out[loc_out].x = p2.x;
+      dbuf_out[loc_out].y = p2.y;
+    }
+}
+
+/* 
+   This kernel is used to :
+   1. swap the halves of CUDA FFT output, we need to do that because CUDA FFT put the centre frequency at bin 0;
+   2. drop the first 3 and last 2 points of the swapped 32-points FFT output, which will reduce to oversample rate to 1;
+      for 64 points FFT, drop the first and last 5 points;
+      for 128 points FFT, we need to drop the first and last 10 points;
+      for 1024 points FFT, we drop the first and last 80 points;
+   3. reorder the FFT data from PFTF to PFT;
+
+   this kernel is planned to optimize the swap_select_transpose_pft_kernel, the performance of swap_select_transpose_pft is not very good;
+*/
+__global__ void swap_select_transpose_pft1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
+{
+  int remainder, loc;
+  int64_t loc_in, loc_out;
+  cufftComplex p1, p2;
+
+  remainder = (threadIdx.x + cufft_mod)%cufft_nx;
+  if(remainder < nchan_keep_chan)
+    {
+      loc = blockIdx.x * nchan_keep_chan + remainder;
+      loc_in = blockIdx.x * gridDim.y * blockDim.x +
+	blockIdx.y * blockDim.x +
+	threadIdx.x;
+      
+      loc_out = gridDim.y * loc + blockIdx.y;  // The profermance here may have problem;
+      
+      p1 = dbuf_in[loc_in];
+      dbuf_out[loc_out].x = p1.x;
+      dbuf_out[loc_out].y = p1.y;
+      
+      loc_out = loc_out + offset_out;
+      
+      p2 = dbuf_in[loc_in + offset_in];
+      dbuf_out[loc_out].x = p2.x;
+      dbuf_out[loc_out].y = p2.y;
     }
 }
 
@@ -297,7 +373,7 @@ __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *
   This kernel will detect data, accumulate it in frequency and scale it;
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
-__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale)
+__global__ void detect_faccumulate_scale1_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale)
 {
   extern volatile __shared__ float scale_sdata[];
   uint64_t tid, loc1, loc2, loc11, loc22, loc_freq, s;

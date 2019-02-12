@@ -13,7 +13,9 @@
 __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_t offset_out);
 
 /* Use after forward FFT to get ready for further steps */
-__global__ void swap_select_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan, int nchan_keep_band, int nchan_edge);
+__global__ void swap_select_transpose_ptf_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan, int nchan_keep_band, int nchan_edge);
+__global__ void swap_select_transpose_pft_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan);
+__global__ void swap_select_transpose_pft1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan);
 
 /* The following 4 kernels are for scale calculation */
 __global__ void accumulate_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out);  // Share between fold and search mode
@@ -25,7 +27,7 @@ __global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float 
 
 /* The following are only for search mode */
 __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, float *ddat_offs, float *ddat_scl);
-__global__ void detect_faccumulate_scale_kernel1(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale);
+__global__ void detect_faccumulate_scale1_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale);
 __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in);
 
 // Modified from the example here, https://devtalk.nvidia.com/default/topic/1038617/cuda-programming-and-performance/understanding-and-adjusting-mark-harriss-array-reduction/
@@ -694,7 +696,7 @@ __global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t 
 }
 
 /*
-  This kernel will detect data, accumulate it in frequency and scale it;
+  This kernel will detect data, accumulate it in frequency;
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
 template <unsigned int blockSize>
@@ -783,6 +785,145 @@ __global__ void detect_faccumulate_pad_transpose_kernel1(cufftComplex *dbuf_in, 
     {      
       dbuf_out[blockIdx.y * gridDim.x + blockIdx.x].x = scale_sdata[tid];
       dbuf_out[blockIdx.y * gridDim.x + blockIdx.x].y = scale_sdata[tid]*scale_sdata[tid];
+    }
+}
+
+/*
+  This kernel take PFT order data with cufftComplex,
+  calculate the spctrum according of all types;
+  accumulate it in T and the final output will be PFT;
+*/
+template <unsigned int blockSize>
+__global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, int n_accumulate)
+{
+  extern volatile __shared__ float spectrum_sdata[];
+  uint64_t i = threadIdx.x, j;
+  uint64_t tid = i;
+  uint64_t loc;
+  float aa, bb, ab, phi, u, v;
+  int ndim = 6;
+  
+  for(j = 0 ; j < ndim; j ++)
+    spectrum_sdata[tid + j*blockDim.x] = 0;
+
+  while (i < n_accumulate)
+    {
+      loc = blockIdx.x*gridDim.y*n_accumulate + blockIdx.y*n_accumulate + i;
+      aa = dbuf_in[loc].x*dbuf_in[loc].x + dbuf_in[loc].y*dbuf_in[loc].y;
+      bb = dbuf_in[loc + offset_in].x*dbuf_in[loc + offset_in].x + dbuf_in[loc + offset_in].y*dbuf_in[loc + offset_in].y;			       
+      
+      ab = sqrtf(aa*bb);
+      u = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].x + dbuf_in[loc].y * dbuf_in[loc + offset_in].y);
+      phi = acosf(0.5 * u / ab);
+      v = 2 * ab * sinf(phi);
+      
+      spectrum_sdata[tid] += (aa + bb);
+      spectrum_sdata[tid + blockDim.x] += (aa - bb);
+      spectrum_sdata[tid + blockDim.x*2] += u;
+      spectrum_sdata[tid + blockDim.x*3] += v;
+      spectrum_sdata[tid + blockDim.x*4] += aa;
+      spectrum_sdata[tid + blockDim.x*5] += bb;
+  
+      i += blockSize;
+    }  
+  __syncthreads();
+  
+  if (blockSize >= 1024)
+    {
+      if (tid < 512)
+	{
+	  for(j = 0; j < ndim; j++)
+	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 512];
+	}
+    }
+  __syncthreads();
+  
+  if (blockSize >= 512)
+    {
+      if (tid < 256)
+	{	  
+	  for(j = 0; j < ndim; j++)
+	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 256];
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 256)
+    {
+      if (tid < 128)
+	{
+	  for(j = 0; j < ndim; j++)
+	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 128];
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 128)
+    {
+      if (tid < 64)
+	{
+	  for(j = 0; j < ndim; j++)
+	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 64];
+	}
+    }
+  __syncthreads();
+    
+  if (tid < 32)
+    {
+      if (blockSize >= 64)
+	{
+	  if (tid < 32)
+	    {	      
+	      for(j = 0; j < ndim; j++)
+		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 32];
+	    }
+	}
+      if (blockSize >= 32)
+	{
+	  if (tid < 16)
+	    {	      
+	      for(j = 0; j < ndim; j++)
+		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 16];
+	    }
+	}
+      if (blockSize >= 16)
+	{
+	  if (tid < 8)
+	    {	      
+	      for(j = 0; j < ndim; j++)
+		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 8];
+	    }
+	}
+      if (blockSize >= 8)
+	{
+	  if (tid < 4)
+	    {     
+	      for(j = 0; j < ndim; j++)
+		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 4];
+	    }
+	}
+      if (blockSize >= 4)
+	{
+	  if (tid < 2)
+	    {	      
+	      for(j = 0; j < ndim; j++)
+		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 2];
+	    }
+	}
+      if (blockSize >= 2)
+	{
+	  if (tid < 1)
+	    {  
+	      for(j = 0; j < ndim; j++)
+		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 1];
+	    }
+	}
+    }
+  
+  if (tid == 0)
+    {
+      for(j = 0; j < ndim; j++)	
+	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] = spectrum_sdata[j*blockDim.x];
     }
 }
 

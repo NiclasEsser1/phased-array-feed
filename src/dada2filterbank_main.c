@@ -7,8 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "log.h"
 #include "dada2filterbank.h"
-multilog_t *runtime_log;
+
+extern pthread_mutex_t log_mutex;
 
 void usage()
 {
@@ -16,7 +18,7 @@ void usage()
 	  "dada2filterbank_main - Convert dada format data into filterbank format\n"
 	  "\n"
 	  "Usage: dada2filterbank_main [options]\n"
-	  " -a input dada file name or buffer key \n"
+	  " -a input dada file name or buffer key, k_key or f_fname \n"
 	  " -b output filterbank file name \n"
 	  " -c Directory to put runtime file \n"
 	   );
@@ -24,10 +26,9 @@ void usage()
 
 int main(int argc, char **argv)
 {
-  FILE *fp_log = NULL;
   int i, arg;
   conf_t conf;
-  char log_fname[MSTR_LEN];
+  char log_fname[MSTR_LEN] = {'\0'};
   
   /* Get input parameters */
   while((arg=getopt(argc,argv,"a:hb:c:")) != -1)
@@ -39,7 +40,16 @@ int main(int argc, char **argv)
 	  return EXIT_FAILURE;
 	  
 	case 'a':
-	  sscanf(optarg, "%x", &conf.key);
+	  if(optarg[0] == 'k')
+	    {
+	      conf.file = 0;
+	      sscanf(&optarg[2], "%x", &conf.key);
+	    }
+	  if(optarg[0] == 'f')
+	    {
+	      conf.file = 1;
+	      sscanf(&optarg[2], "%s", conf.d_fname);
+	    }
 	  break;
 
 	case 'b':
@@ -51,19 +61,18 @@ int main(int argc, char **argv)
 	  break;	  
 	}
     }
-
+  fprintf(stdout, "%s\n", conf.d_fname);
+  
   /* Setup log interface */
   sprintf(log_fname, "%s/dada2filterbank.log", conf.dir);
-  fp_log = fopen(log_fname, "ab+");
-  if(fp_log == NULL)
+  conf.log_file = log_open(log_fname, "ab+");
+  if(conf.log_file == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
-  runtime_log = multilog_open("dada2filterbank", 1);
-  multilog_add(runtime_log, fp_log);
-  multilog(runtime_log, LOG_INFO, "START DADA2FILTERBANK\n");
-
+  log_add(conf.log_file, "INFO", 1, log_mutex, "DADA2FILTERBANK START");
+  
   /* init the thing */
   initialization(&conf);
   
@@ -78,11 +87,10 @@ int main(int argc, char **argv)
 
   /* Destory the thing */
   destroy(conf);
-
+  
   /* Destory log interface */
-  multilog(runtime_log, LOG_INFO, "FINISH DADA2FILTERBANK\n\n");
-  multilog_close(runtime_log);
-  fclose(fp_log);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "FINISH DADA2FILTERBANK");
+  fclose(conf.log_file);
 
   return EXIT_SUCCESS;
 }

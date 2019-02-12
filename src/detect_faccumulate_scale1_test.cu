@@ -20,7 +20,7 @@
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "detect_faccumulate_scale1_test - Test the detect_faccumulate_scale kernel \n"
+	   "detect_faccumulate_scale1_test - Test the detect_faccumulate_scale1 kernel \n"
 	   "\n"
 	   "Usage: detect_faccumulate_scale_test [options]\n"
 	   " -a  Grid size in X, which is number of samples in time\n"
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
-  detect_faccumulate_scale_kernel1<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, mean_scale_d);
+  detect_faccumulate_scale1_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, mean_scale_d);
   CHECK_LAUNCH_ERROR();
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  
