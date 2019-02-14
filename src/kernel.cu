@@ -138,29 +138,43 @@ __global__ void swap_select_transpose_pft_kernel(cufftComplex *dbuf_in, cufftCom
 */
 __global__ void swap_select_transpose_pft1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
 {
-  int remainder, loc;
+  int i, x, y, loc, reminder;
   int64_t loc_in, loc_out;
-  cufftComplex p1, p2;
 
-  remainder = (threadIdx.x + cufft_mod)%cufft_nx;
-  if(remainder < nchan_keep_chan)
+  __shared__ cufftComplex tile_pft[2][TILE_DIM][TILE_DIM + 1];
+  x = threadIdx.x;
+  loc = blockIdx.x * gridDim.y * blockDim.x * TILE_DIM +
+    blockIdx.y * blockDim.x * TILE_DIM +
+    x;
+  
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
     {
-      loc = blockIdx.x * nchan_keep_chan + remainder;
-      loc_in = blockIdx.x * gridDim.y * blockDim.x +
-	blockIdx.y * blockDim.x +
-	threadIdx.x;
-      
-      loc_out = gridDim.y * loc + blockIdx.y;  // The profermance here may have problem;
-      
-      p1 = dbuf_in[loc_in];
-      dbuf_out[loc_out].x = p1.x;
-      dbuf_out[loc_out].y = p1.y;
-      
-      loc_out = loc_out + offset_out;
-      
-      p2 = dbuf_in[loc_in + offset_in];
-      dbuf_out[loc_out].x = p2.x;
-      dbuf_out[loc_out].y = p2.y;
+      y = threadIdx.y + i;
+      loc_in = loc + y * blockDim.x;
+      tile_pft[0][y][x].x = dbuf_in[loc_in].x;
+      tile_pft[0][y][x].y = dbuf_in[loc_in].y;
+      tile_pft[1][y][x].x = dbuf_in[loc_in + offset_in].x;
+      tile_pft[1][y][x].y = dbuf_in[loc_in + offset_in].y;
+    }
+  __syncthreads(); // sync all threads in the same block;
+
+  loc = blockIdx.x * gridDim.y * blockDim.x * TILE_DIM +
+    blockIdx.y * blockDim.x +
+    x;
+    
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      y = threadIdx.y + i;
+      reminder = (y + cufft_mod)%cufft_nx;
+      if(reminder < nchan_keep_chan)
+	{
+	  loc_out = loc + reminder * gridDim.y * blockDim.x;
+	  
+	  dbuf_out[loc_out].x              = tile_pft[0][x][y].x;
+	  dbuf_out[loc_out].y              = tile_pft[0][x][y].y;
+	  dbuf_out[loc_out + offset_out].x = tile_pft[1][x][y].x;
+	  dbuf_out[loc_out + offset_out].y = tile_pft[1][x][y].y;
+	}
     }
 }
 

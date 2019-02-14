@@ -8,6 +8,7 @@
 #include <cufft.h>
 #include <inttypes.h>
 #include "baseband2filterbank.cuh"
+#include "constants.h"
 
 /* For raw data unpack to get ready for forward FFT */
 __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_t offset_out);
@@ -923,7 +924,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
   if (tid == 0)
     {
       for(j = 0; j < ndim; j++)	
-	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] = spectrum_sdata[j*blockDim.x];
+	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] += spectrum_sdata[j*blockDim.x];
     }
 }
 

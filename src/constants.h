@@ -4,8 +4,9 @@ extern "C" {
 #ifndef _CONSTANTS_CUH
 #define _CONSTANTS_CUH
 
-  //#define TRANS_BUFSZ    1073741824 // 1GB
-  #define TRANS_BUFSZ    1048576 // 1MB
+#define TILE_DIM        32
+#define NROWBLOCK_TRANS 8  
+#define TRANS_BUFSZ    1048576 // 1MB
 #define MSTR_LEN       1024
 #define DADA_HDRSZ     4096
 
