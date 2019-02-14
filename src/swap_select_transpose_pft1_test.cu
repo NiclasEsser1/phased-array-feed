@@ -88,11 +88,11 @@ int main(int argc, char *argv[])
   cufft_mod       = 0.5 * nchan_keep_chan;
   fprintf(stdout, "nchan_in is %d, nchan_keep_chan is %d and cufft_mod is %d\n", nchan_in, nchan_keep_chan, cufft_mod);
     
-  grid_size.x = stream_ndf_chk * NSAMP_DF / cufft_nx / TILE_DIM;
-  grid_size.y = cufft_nx / TILE_DIM;  
+  grid_size.x = cufft_nx / TILE_FDIM;  
+  grid_size.y = stream_ndf_chk * NSAMP_DF / cufft_nx / TILE_TDIM;
   grid_size.z = nchan_in;
-  block_size.x = TILE_DIM;
-  block_size.y = NROWBLOCK_TRANS;
+  block_size.x = TILE_FDIM;
+  block_size.y = TILE_TDIM;
   block_size.z = 1;
   fprintf(stdout, "kernel configuration is (%d, %d, %d) and (%d, %d, %d)\n", grid_size.x, grid_size.y, grid_size.z, block_size.x, block_size.y, block_size.z);
 
@@ -109,7 +109,8 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * sizeof(cufftComplex)));
   CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * sizeof(cufftComplex)));
   CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * sizeof(cufftComplex)));
-
+  CudaSafeCall(cudaMemset((void *)g_out,  0,      npol_out * sizeof(cufftComplex)));
+  
   /* Prepare the data */
   srand(time(NULL));
   for(i = 0; i < nchan_in; i++)
@@ -157,13 +158,16 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
 
   /* Check the result */
-  //for(i = 0; i < nsamp_out; i++)
-  //  {      
-  //    if((h_result[i].x - g_result[i].x) !=0 || (h_result[i].y - g_result[i].y) != 0)
-  //	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
-  //    if((h_result[i+nsamp_out].x - g_result[i+nsamp_out].x) !=0 || (h_result[i+nsamp_out].y - g_result[i+nsamp_out].y) !=0)
-  //	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i+nsamp_out].x, g_result[i+nsamp_out].x, h_result[i+nsamp_out].x - g_result[i+nsamp_out].x, h_result[i+nsamp_out].y, g_result[i+nsamp_out].y, h_result[i+nsamp_out].y - g_result[i+nsamp_out].y);
-  //  }
+  for(i = 0; i < nsamp_out; i++)
+    {      
+      //if((h_result[i].x - g_result[i].x) !=0 || (h_result[i].y - g_result[i].y) != 0)
+      //	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
+      //if((h_result[i+nsamp_out].x - g_result[i+nsamp_out].x) !=0 || (h_result[i+nsamp_out].y - g_result[i+nsamp_out].y) !=0)
+      //	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i+nsamp_out].x, g_result[i+nsamp_out].x, h_result[i+nsamp_out].x - g_result[i+nsamp_out].x, h_result[i+nsamp_out].y, g_result[i+nsamp_out].y, h_result[i+nsamp_out].y - g_result[i+nsamp_out].y);
+      if(g_result[i].x == 0 || g_result[i].y == 0)
+  	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
+      
+    }
 
   /* Free buffer */
   CudaSafeCall(cudaFreeHost(data));
