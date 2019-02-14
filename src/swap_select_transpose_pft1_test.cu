@@ -85,19 +85,21 @@ int main(int argc, char *argv[])
   /* Setup size */
   nchan_in        = nchk_in * NCHAN_PER_CHUNK;
   nchan_keep_chan = cufft_nx / OVER_SAMP_RATE;
+  //nchan_keep_chan = cufft_nx;
   cufft_mod       = 0.5 * nchan_keep_chan;
   fprintf(stdout, "nchan_in is %d, nchan_keep_chan is %d and cufft_mod is %d\n", nchan_in, nchan_keep_chan, cufft_mod);
-    
-  grid_size.x = cufft_nx / TILE_FDIM;  
-  grid_size.y = stream_ndf_chk * NSAMP_DF / cufft_nx / TILE_TDIM;
+  
+  grid_size.x = ceil(cufft_nx / (double)TILE_DIM);  
+  grid_size.y = ceil(stream_ndf_chk * NSAMP_DF / (double) (cufft_nx * TILE_DIM));
   grid_size.z = nchan_in;
-  block_size.x = TILE_FDIM;
-  block_size.y = TILE_TDIM;
+  block_size.x = TILE_DIM;
+  block_size.y = NROWBLOCK_TRANS;
   block_size.z = 1;
   fprintf(stdout, "kernel configuration is (%d, %d, %d) and (%d, %d, %d)\n", grid_size.x, grid_size.y, grid_size.z, block_size.x, block_size.y, block_size.z);
 
   nsamp_in  = stream_ndf_chk * nchan_in * NSAMP_DF;
   nsamp_out = nsamp_in / OVER_SAMP_RATE;
+  //nsamp_out = nsamp_in;
   npol_in   = nsamp_in * NPOL_IN;
   npol_out  = nsamp_out * NPOL_IN;
   
@@ -153,20 +155,19 @@ int main(int argc, char *argv[])
   
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, npol_in * sizeof(cufftComplex), cudaMemcpyHostToDevice));
-  swap_select_transpose_pft1_kernel<<<grid_size, block_size>>>(g_in, g_out, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
+  swap_select_transpose_pft1_kernel<<<grid_size, block_size>>>(g_in, g_out, cufft_nx, NSAMP_DF, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
   CHECK_LAUNCH_ERROR();
   CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < nsamp_out; i++)
     {      
-      //if((h_result[i].x - g_result[i].x) !=0 || (h_result[i].y - g_result[i].y) != 0)
-      //	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
-      //if((h_result[i+nsamp_out].x - g_result[i+nsamp_out].x) !=0 || (h_result[i+nsamp_out].y - g_result[i+nsamp_out].y) !=0)
-      //	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i+nsamp_out].x, g_result[i+nsamp_out].x, h_result[i+nsamp_out].x - g_result[i+nsamp_out].x, h_result[i+nsamp_out].y, g_result[i+nsamp_out].y, h_result[i+nsamp_out].y - g_result[i+nsamp_out].y);
+      if((h_result[i].x - g_result[i].x) !=0 || (h_result[i].y - g_result[i].y) != 0)
+      	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
+      if((h_result[i+nsamp_out].x - g_result[i+nsamp_out].x) !=0 || (h_result[i+nsamp_out].y - g_result[i+nsamp_out].y) !=0)
+      	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i+nsamp_out].x, g_result[i+nsamp_out].x, h_result[i+nsamp_out].x - g_result[i+nsamp_out].x, h_result[i+nsamp_out].y, g_result[i+nsamp_out].y, h_result[i+nsamp_out].y - g_result[i+nsamp_out].y);
       if(g_result[i].x == 0 || g_result[i].y == 0)
   	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
-      
     }
 
   /* Free buffer */

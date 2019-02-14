@@ -136,89 +136,81 @@ __global__ void swap_select_transpose_pft_kernel(cufftComplex *dbuf_in, cufftCom
 
    this kernel is planned to optimize the swap_select_transpose_pft_kernel, the performance of swap_select_transpose_pft is not very good;
 */
-__global__ void swap_select_transpose_pft1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
+//__global__ void swap_select_transpose_pft1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
+//{
+//  int reminder;
+//  int64_t loc_in, loc_out;
+//
+//  __shared__ cufftComplex tile_pft[2][TILE_TDIM][TILE_FDIM];
+//  
+//  loc_in = blockIdx.z * (gridDim.y * TILE_TDIM) * (gridDim.x * TILE_FDIM) +
+//    (blockIdx.y * TILE_TDIM + threadIdx.y) * (gridDim.x * TILE_FDIM) +
+//    blockIdx.x * TILE_FDIM + threadIdx.x;
+//  
+//  tile_pft[0][threadIdx.y][threadIdx.x].x = dbuf_in[loc_in].x;
+//  tile_pft[0][threadIdx.y][threadIdx.x].y = dbuf_in[loc_in].y;
+//  tile_pft[1][threadIdx.y][threadIdx.x].x = dbuf_in[loc_in + offset_in].x;
+//  tile_pft[1][threadIdx.y][threadIdx.x].y = dbuf_in[loc_in + offset_in].y;
+//  __syncthreads(); // sync all threads in the same block;
+//  
+//  //reminder = (blockIdx.x * TILE_FDIM + threadIdx.x + cufft_mod)%cufft_nx;
+//  reminder = (blockIdx.y * TILE_FDIM + threadIdx.x + cufft_mod)%cufft_nx;
+//  if(reminder < nchan_keep_chan)
+//    {
+//      loc_out = blockIdx.z * gridDim.y * TILE_TDIM * nchan_keep_chan + 
+//	//(blockIdx.y * TILE_TDIM + threadIdx.y) * nchan_keep_chan +
+//	(blockIdx.x * TILE_TDIM + threadIdx.y) * nchan_keep_chan + 
+//	reminder;
+//      
+//      dbuf_out[loc_out].x = tile_pft[0][threadIdx.y][threadIdx.x].x;
+//      dbuf_out[loc_out].y = tile_pft[0][threadIdx.y][threadIdx.x].y;
+//      dbuf_out[loc_out + offset_out].x = tile_pft[1][threadIdx.y][threadIdx.x].x;
+//      dbuf_out[loc_out + offset_out].y = tile_pft[1][threadIdx.y][threadIdx.x].y;
+//    }
+//}
+
+__global__ void swap_select_transpose_pft1_kernel(cufftComplex* dbuf_in, cufftComplex *dbuf_out, int n, int m, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
 {
-  int reminder;
+  int i;
   int64_t loc_in, loc_out;
-
-  __shared__ cufftComplex tile_pft[2][TILE_TDIM][TILE_FDIM];
+  int reminder;
   
-  loc_in = blockIdx.z * (gridDim.y * TILE_TDIM) * (gridDim.x * TILE_FDIM) +
-    (blockIdx.y * TILE_TDIM + threadIdx.y) * (gridDim.x * TILE_FDIM) +
-    blockIdx.x * TILE_FDIM + threadIdx.x;
-  
-  tile_pft[0][threadIdx.y][threadIdx.x].x = dbuf_in[loc_in].x;
-  tile_pft[0][threadIdx.y][threadIdx.x].y = dbuf_in[loc_in].y;
-  tile_pft[1][threadIdx.y][threadIdx.x].x = dbuf_in[loc_in + offset_in].x;
-  tile_pft[1][threadIdx.y][threadIdx.x].y = dbuf_in[loc_in + offset_in].y;
-  __syncthreads(); // sync all threads in the same block;
-  
-  //reminder = (blockIdx.x * TILE_FDIM + threadIdx.x + cufft_mod)%cufft_nx;
-  reminder = (blockIdx.y * TILE_FDIM + threadIdx.x + cufft_mod)%cufft_nx;
-  if(reminder < nchan_keep_chan)
-    {
-      loc_out = blockIdx.z * gridDim.y * TILE_TDIM * nchan_keep_chan + 
-	//(blockIdx.y * TILE_TDIM + threadIdx.y) * nchan_keep_chan +
-	(blockIdx.x * TILE_TDIM + threadIdx.y) * nchan_keep_chan + 
-	reminder;
-      
-      dbuf_out[loc_out].x = tile_pft[0][threadIdx.y][threadIdx.x].x;
-      dbuf_out[loc_out].y = tile_pft[0][threadIdx.y][threadIdx.x].y;
-      dbuf_out[loc_out + offset_out].x = tile_pft[1][threadIdx.y][threadIdx.x].x;
-      dbuf_out[loc_out + offset_out].y = tile_pft[1][threadIdx.y][threadIdx.x].y;
-    }
-}
-
-__global__ void transposeGPUcoalescing(double* matIn, int n, int m, double* matTran){
-  __shared__ double tile[TILE_DIM][TILE_DIM];
-  int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
-  int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // <- threadIdx.y only between 0 and 7
+  __shared__ cufftComplex tile[2][TILE_DIM][TILE_DIM + 1];
   
   // Load matrix into tile
-  // Every Thread loads in this case 4 elements into tile.
-  int i;
-  for (i = 0; i < TILE_DIM; i += BLOCK_ROWS){
-    if(i_n < n  && (i_m+i) < m){
-      tile[threadIdx.y+i][threadIdx.x] = matIn[(i_m+i)*n + i_n];
+  // Every Thread loads in this case 4 elements into tile.  
+  int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
+  int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // <- threadIdx.y only between 0 and 7
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      if(i_n < n  && (i_m+i) < m)
+  	{
+  	  //loc_in = blockIdx.z * (gridDim.x * TILE_DIM) * (gridDim.y * TILE_DIM) + (i_m+i)*n + i_n;
+	  loc_in = blockIdx.z * m * n + (i_m+i)*n + i_n;
+  	  tile[0][threadIdx.y+i][threadIdx.x].x = dbuf_in[loc_in].x;
+  	  tile[0][threadIdx.y+i][threadIdx.x].y = dbuf_in[loc_in].y;
+  	  tile[1][threadIdx.y+i][threadIdx.x].x = dbuf_in[loc_in + offset_in].x;
+  	  tile[1][threadIdx.y+i][threadIdx.x].y = dbuf_in[loc_in + offset_in].y;
         }
-  }
+    }
   __syncthreads();
   
   i_n = blockIdx.y * TILE_DIM + threadIdx.x; 
   i_m = blockIdx.x * TILE_DIM + threadIdx.y;
-  
-  for (i = 0; i < TILE_DIM; i += BLOCK_ROWS){
-    if(i_n < m  && (i_m+i) < n){
-      matTran[(i_m+i)*m + i_n] = tile[threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
-      
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      reminder = (i_m + i + cufft_mod) % cufft_nx;      
+      if(i_n < m  && (i_m+i) < n && reminder < nchan_keep_chan)
+  	{
+  	  //loc_out = blockIdx.z * nchan_keep_chan * (gridDim.y * TILE_DIM) + reminder*m + i_n;
+	  loc_out = blockIdx.z * nchan_keep_chan * m + reminder*m + i_n;
+  	  dbuf_out[loc_out].x              = tile[0][threadIdx.x][threadIdx.y + i].x; // <- multiply by m, non-squared!
+  	  dbuf_out[loc_out].y              = tile[0][threadIdx.x][threadIdx.y + i].y; // <- multiply by m, non-squared!
+  	  dbuf_out[loc_out + offset_out].x = tile[1][threadIdx.x][threadIdx.y + i].x; // <- multiply by m, non-squared!
+  	  dbuf_out[loc_out + offset_out].y = tile[1][threadIdx.x][threadIdx.y + i].y; // <- multiply by m, non-squared!
+  	}
     }
-  }
 }
-
-__global__ void transposeGPUcoalescing(double* matIn, int n, int m, double* matTran){
-  __shared__ double tile[TILE_DIM][TILE_DIM];
-  int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
-  int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // <- threadIdx.y only between 0 and 7
-
-  // Load matrix into tile
-  // Every Thread loads in this case 4 elements into tile.
-  int i;
-  for (i = 0; i < TILE_DIM; i += BLOCK_ROWS){
-    if(i_n < n  && (i_m+i) < m){
-      tile[threadIdx.y+i][threadIdx.x] = matIn[(i_m+i)*n + i_n];
-    }
-  }
-  __syncthreads();
-
-  i_n = blockIdx.y * TILE_DIM + threadIdx.x;
-  i_m = blockIdx.x * TILE_DIM + threadIdx.y;
-
-  for (i = 0; i < TILE_DIM; i += BLOCK_ROWS){
-    if(i_n < m  && (i_m+i) < n){
-      matTran[(i_m+i)*m + i_n] = tile[threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
-
-    }
- 
 
 ///* A example of accumulate */
 //template <unsigned int blockSize>
