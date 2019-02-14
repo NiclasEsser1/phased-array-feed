@@ -7,7 +7,6 @@
 #include <cuda.h>
 #include <cufft.h>
 #include <inttypes.h>
-#include "baseband2filterbank.cuh"
 #include "constants.h"
 
 /* For raw data unpack to get ready for forward FFT */

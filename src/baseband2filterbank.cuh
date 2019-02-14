@@ -1,5 +1,5 @@
-#ifndef _PROCESS_CUH
-#define _PROCESS_CUH
+#ifndef _BASEBAND2FILTERBANK_CUH
+#define _BASEBAND2FILTERBANK_CUH
 
 #include <cuda_runtime.h>
 #include <cuda.h>

@@ -1,3 +1,6 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef __CAPTURE_H
 #define __CAPTURE_H
 
@@ -11,8 +14,6 @@
 #include "daemon.h"
 #include "futils.h"
 #include "constants.h"
-
-#define MPORT_CAPTURE  10
 
 typedef struct conf_t
 {
@@ -64,4 +65,8 @@ int default_arguments(conf_t *conf);
 int threads(conf_t *conf);
 int register_dada_header(conf_t conf);
 int examine_record_arguments(conf_t conf, char **argv, int argc);
+#endif
+
+#ifdef __cplusplus
+} 
 #endif

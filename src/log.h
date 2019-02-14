@@ -1,10 +1,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
-#ifndef __LOG_H
-#define __LOG_H
 
+#ifndef _LOG_H
+#define _LOG_H
+  
 #include <pthread.h>
   
 #define MSTR_LEN 1024

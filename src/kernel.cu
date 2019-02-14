@@ -3,7 +3,6 @@
 #endif
 
 #include "kernel.cuh"
-#include "baseband2filterbank.cuh"
 #include "cudautil.cuh"
 
 /*
@@ -135,40 +134,8 @@ __global__ void swap_select_transpose_pft_kernel(cufftComplex *dbuf_in, cufftCom
    3. reorder the FFT data from PFTF to PFT;
 
    this kernel is planned to optimize the swap_select_transpose_pft_kernel, the performance of swap_select_transpose_pft is not very good;
+   The tranpose part of this kernel works with any size of matrix;
 */
-//__global__ void swap_select_transpose_pft1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
-//{
-//  int reminder;
-//  int64_t loc_in, loc_out;
-//
-//  __shared__ cufftComplex tile_pft[2][TILE_TDIM][TILE_FDIM];
-//  
-//  loc_in = blockIdx.z * (gridDim.y * TILE_TDIM) * (gridDim.x * TILE_FDIM) +
-//    (blockIdx.y * TILE_TDIM + threadIdx.y) * (gridDim.x * TILE_FDIM) +
-//    blockIdx.x * TILE_FDIM + threadIdx.x;
-//  
-//  tile_pft[0][threadIdx.y][threadIdx.x].x = dbuf_in[loc_in].x;
-//  tile_pft[0][threadIdx.y][threadIdx.x].y = dbuf_in[loc_in].y;
-//  tile_pft[1][threadIdx.y][threadIdx.x].x = dbuf_in[loc_in + offset_in].x;
-//  tile_pft[1][threadIdx.y][threadIdx.x].y = dbuf_in[loc_in + offset_in].y;
-//  __syncthreads(); // sync all threads in the same block;
-//  
-//  //reminder = (blockIdx.x * TILE_FDIM + threadIdx.x + cufft_mod)%cufft_nx;
-//  reminder = (blockIdx.y * TILE_FDIM + threadIdx.x + cufft_mod)%cufft_nx;
-//  if(reminder < nchan_keep_chan)
-//    {
-//      loc_out = blockIdx.z * gridDim.y * TILE_TDIM * nchan_keep_chan + 
-//	//(blockIdx.y * TILE_TDIM + threadIdx.y) * nchan_keep_chan +
-//	(blockIdx.x * TILE_TDIM + threadIdx.y) * nchan_keep_chan + 
-//	reminder;
-//      
-//      dbuf_out[loc_out].x = tile_pft[0][threadIdx.y][threadIdx.x].x;
-//      dbuf_out[loc_out].y = tile_pft[0][threadIdx.y][threadIdx.x].y;
-//      dbuf_out[loc_out + offset_out].x = tile_pft[1][threadIdx.y][threadIdx.x].x;
-//      dbuf_out[loc_out + offset_out].y = tile_pft[1][threadIdx.y][threadIdx.x].y;
-//    }
-//}
-
 __global__ void swap_select_transpose_pft1_kernel(cufftComplex* dbuf_in, cufftComplex *dbuf_out, int n, int m, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
 {
   int i;

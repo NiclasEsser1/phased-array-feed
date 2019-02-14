@@ -14,7 +14,6 @@
 #include "cudautil.cuh"
 #include "log.h"
 
-// Default arguments and check them
 // Clean up unused kernels and parameters
 // Clean up testers also
 

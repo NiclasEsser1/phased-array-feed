@@ -4,6 +4,8 @@ extern "C" {
 #ifndef _CONSTANTS_CUH
 #define _CONSTANTS_CUH
 
+#define MPORT_CAPTURE  10
+
 #define TILE_TDIM 4
 #define TILE_FDIM 32
 
@@ -41,7 +43,6 @@ extern "C" {
 #define SCL_NSIG 3.0f
   
 #endif
-
 #ifdef __cplusplus
 } 
 #endif

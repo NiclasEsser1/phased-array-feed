@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef __DADA2FILTERBANK_H
 #define __DADA2FILTERBANK_H
 
@@ -28,4 +32,7 @@ int dada_header(conf_t *conf);
 int filterbank_data(conf_t conf);
 int destroy(conf_t conf);
 int initialization(conf_t *conf);
+#endif
+#ifdef __cplusplus
+} 
 #endif
