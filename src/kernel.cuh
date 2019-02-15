@@ -928,4 +928,6 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     }
 }
 
+__global__ void spectrum_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
+
 #endif

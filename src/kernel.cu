@@ -133,7 +133,7 @@ __global__ void swap_select_transpose_pft_kernel(cufftComplex *dbuf_in, cufftCom
       for 1024 points FFT, we drop the first and last 80 points;
    3. reorder the FFT data from PFTF to PFT;
 
-   this kernel is planned to optimize the swap_select_transpose_pft_kernel, the performance of swap_select_transpose_pft is not very good;
+   this kernel is to optimize the swap_select_transpose_pft_kernel, the performance of swap_select_transpose_pft is not very good;
    The tranpose part of this kernel works with any size of matrix;
 */
 __global__ void swap_select_transpose_pft1_kernel(cufftComplex* dbuf_in, cufftComplex *dbuf_out, int n, int m, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
@@ -494,4 +494,17 @@ __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, c
       dbuf_out[blockIdx.y * gridDim.x + blockIdx.x].x = power;
       dbuf_out[blockIdx.y * gridDim.x + blockIdx.x].y = power_square;
     }
+}
+
+__global__ void spectrum_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream)
+{
+  int i;
+  uint64_t loc;
+  
+  loc = blockIdx.x * gridDim.y * blockDim.x +
+    blockIdx.y * blockDim.x +
+    threadIdx.x;
+
+  for(i = 1; i < nstream; i++)
+    dbuf[loc] += dbuf[loc+i*offset];  
 }

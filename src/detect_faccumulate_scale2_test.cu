@@ -191,7 +191,8 @@ int main(int argc, char *argv[])
       detect_faccumulate_scale_kernel2<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
     }
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
+
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  
   /* Check the result */

@@ -122,7 +122,8 @@ int main(int argc, char *argv[])
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   detect_faccumulate_pad_transpose_kernel<<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * NBYTE>>>(g_in, g_out, nsamp);
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
+  
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
  
   /* Check the result */

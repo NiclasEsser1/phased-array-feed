@@ -114,8 +114,8 @@ int main(int argc, char *argv[])
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, len_in * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   accumulate_kernel<<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_RT>>>(g_in, g_out);
-  
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
+
   CudaSafeCall(cudaMemcpy(g_result, g_out, len_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
 
   /* Check the result */

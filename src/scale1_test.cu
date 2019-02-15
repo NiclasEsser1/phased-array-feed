@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   scale1_kernel<<<gridsize_scale1, blocksize_scale1>>>(g_in, g_out, SCL_NSIG, SCL_UINT8);
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   
   CudaSafeCall(cudaMemcpy(g_result, g_out, nchan * sizeof(float), cudaMemcpyDeviceToHost));
 

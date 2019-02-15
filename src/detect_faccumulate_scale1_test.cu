@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   detect_faccumulate_scale1_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, mean_scale_d);
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  
   /* Check the result */

@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
       reduce6_kernel<   1><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_RT>>>(g_in, g_out, n_accumulate);
       break;
     }
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   CudaSafeCall(cudaMemcpy(g_result, g_out, len_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
 
   /* Check the result */

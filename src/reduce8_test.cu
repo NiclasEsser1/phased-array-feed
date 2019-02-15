@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
       reduce8_kernel<   1><<<gridsize_reduce8, blocksize_reduce8, blocksize_reduce8.x * NBYTE_RT>>>(g_in, g_out_offs, g_out_mean, len_in, n_accumulate, nstream, scl_ndim);
       break;
     }
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   CudaSafeCall(cudaMemcpy(g_result_offs, g_out_offs, len_out * sizeof(float), cudaMemcpyDeviceToHost));
   CudaSafeCall(cudaMemcpy(g_result_mean, g_out_mean, len_out * sizeof(float), cudaMemcpyDeviceToHost));
 

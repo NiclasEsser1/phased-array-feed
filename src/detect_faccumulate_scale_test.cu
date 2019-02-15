@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMemcpy(scale_d, scale_h, nchan * sizeof(float), cudaMemcpyHostToDevice));
   CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   detect_faccumulate_scale_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, mean_d, scale_d);
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  
   /* Check the result */

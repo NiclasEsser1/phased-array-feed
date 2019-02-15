@@ -156,7 +156,8 @@ int main(int argc, char *argv[])
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, npol_in * sizeof(cufftComplex), cudaMemcpyHostToDevice));
   swap_select_transpose_pft1_kernel<<<grid_size, block_size>>>(g_in, g_out, cufft_nx, NSAMP_DF, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
+
   CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
 
   /* Check the result */

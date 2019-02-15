@@ -122,9 +122,6 @@ inline void __CudaSafeKernelLaunch(const char *file, const int line)
 #endif
 }
 
-#define CHECK_LAUNCH_ERROR()			\
-  
-
 #define BSWAP_64(x)     (((uint64_t)(x) << 56) |                        \
                          (((uint64_t)(x) << 40) & 0xff000000000000ULL) | \
                          (((uint64_t)(x) << 24) & 0xff0000000000ULL) |  \

@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMemcpy(g_offs, h_offs, nchan * sizeof(float), cudaMemcpyHostToDevice));
   CudaSafeCall(cudaMemcpy(g_mean, h_mean, nchan * sizeof(float), cudaMemcpyHostToDevice));
   scale_kernel<<<gridsize_scale, blocksize_scale>>>(g_offs, g_mean, g_out_scl, SCL_NSIG, SCL_UINT8);
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
   
   CudaSafeCall(cudaMemcpy(g_result_scl, g_out_scl, nchan * sizeof(float), cudaMemcpyDeviceToHost));
 

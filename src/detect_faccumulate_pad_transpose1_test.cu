@@ -178,7 +178,8 @@ int main(int argc, char *argv[])
       detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
     }
-  CHECK_LAUNCH_ERROR();
+  CudaSafeKernelLaunch();
+
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
  
   /* Check the result */
