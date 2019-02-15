@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
   blocksize_detect_faccumulate_pad_transpose.z = 1;
   nout                                         = grid_x*grid_y;
   nsamp                                        = nout*n_accumulate;
-  npol                                         = NPOL_IN * nsamp;
+  npol                                         = NPOL_BASEBAND * nsamp;
    
   /* Create buffer */
   CudaSafeCall(cudaMallocHost((void **)&data, npol * sizeof(cufftComplex)));
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 	  for(k = 0; k < n_accumulate; k++)
 	    {
 	      idx = (i*grid_y + j) * n_accumulate + k;
-	      for(l = 0; l < NPOL_IN; l++)
+	      for(l = 0; l < NPOL_BASEBAND; l++)
 		{
 		  data[idx+l*nsamp].x = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND))/100.;
 		  data[idx+l*nsamp].y = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND))/100.;

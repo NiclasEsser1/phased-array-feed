@@ -100,8 +100,8 @@ int main(int argc, char *argv[])
   nsamp_in  = stream_ndf_chk * nchan_in * NSAMP_DF;
   nsamp_out = nsamp_in / OVER_SAMP_RATE;
   //nsamp_out = nsamp_in;
-  npol_in   = nsamp_in * NPOL_IN;
-  npol_out  = nsamp_out * NPOL_IN;
+  npol_in   = nsamp_in * NPOL_BASEBAND;
+  npol_out  = nsamp_out * NPOL_BASEBAND;
   
   fprintf(stdout, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", nsamp_in, nsamp_out, npol_in, npol_out);
 

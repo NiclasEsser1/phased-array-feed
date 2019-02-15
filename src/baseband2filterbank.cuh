@@ -15,13 +15,6 @@
 #include "futils.h"
 #include "constants.h"
 
-#define NBYTE_RT              8    // cudaComplex
-#define NBYTE_OUT             1    // uint8_t
-
-#define NBIT_OUT                 8
-#define NDIM_OUT                 1
-#define NPOL_OUT                 1
-
 typedef struct conf_t
 {
   FILE *log_file;

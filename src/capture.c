@@ -22,16 +22,16 @@
 char *cbuf = NULL;
 char *tbuf = NULL;
 int quit   = 0; // 0 means no quit, 1 means quit normal, 2 means quit with problem;
-int transit[MPORT_CAPTURE] = {0};
+int transit[NPORT_MAX] = {0};
 
-uint64_t ndf[MPORT_CAPTURE]  = {0};
-uint64_t tail[MPORT_CAPTURE] = {0};
-uint64_t ndf_advance[MPORT_CAPTURE];
-uint64_t df_in_period_ref[MPORT_CAPTURE]; 
-uint64_t seconds_from_epoch_ref[MPORT_CAPTURE];
+uint64_t ndf[NPORT_MAX]  = {0};
+uint64_t tail[NPORT_MAX] = {0};
+uint64_t ndf_advance[NPORT_MAX];
+uint64_t df_in_period_ref[NPORT_MAX]; 
+uint64_t seconds_from_epoch_ref[NPORT_MAX];
 
-pthread_mutex_t ref_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutex_t ndf_mutex[MPORT_CAPTURE] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t ref_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t ndf_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t log_mutex                = PTHREAD_MUTEX_INITIALIZER;
 
 void *do_capture(void *conf)
@@ -225,7 +225,7 @@ int initialize_capture(conf_t *conf)
   for(i = 0; i < conf->nport_dead; i++)
     conf->nchunk       += conf->nchunk_dead_on_port[i];
   if(conf->pad == 1)
-    conf->nchunk = NCHUNK_FULL_BAND;
+    conf->nchunk = NCHUNK_MAX;
   if(conf->nchunk_alive == 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "None alive chunks, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -461,7 +461,7 @@ int destroy_capture(conf_t conf)
 {
   int i;
   
-  for(i = 0; i < MPORT_CAPTURE; i++)
+  for(i = 0; i < NPORT_MAX; i++)
     {
       pthread_mutex_destroy(&ref_mutex[i]);
       pthread_mutex_destroy(&ndf_mutex[i]);
@@ -641,12 +641,12 @@ int register_dada_header(conf_t conf)
 
 int threads(conf_t *conf)
 {
-  int i, ret[MPORT_CAPTURE + 2], nthread;
-  pthread_t thread[MPORT_CAPTURE + 2];
+  int i, ret[NPORT_MAX + 2], nthread;
+  pthread_t thread[NPORT_MAX + 2];
   pthread_attr_t attr;
   cpu_set_t cpus;
   int nport_alive = conf->nport_alive;
-  conf_t thread_conf[MPORT_CAPTURE];
+  conf_t thread_conf[NPORT_MAX];
     
   for(i = 0; i < nport_alive; i++)
     /* 
@@ -1240,7 +1240,7 @@ int default_arguments(conf_t *conf)
   sprintf(conf->dada_header_template, "unset"); // Default with "unset"
   sprintf(conf->instrument_name, "unset"); // Default with "unset"
   
-  for(i = 0; i < MPORT_CAPTURE; i++)
+  for(i = 0; i < NPORT_MAX; i++)
     {      
       sprintf(conf->ip_alive[i], "unset"); // Default with "unset"
       sprintf(conf->ip_dead[i], "unset");  // Default with "unset"

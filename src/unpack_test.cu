@@ -78,8 +78,8 @@ int main(int argc, char *argv[])
   fprintf(stdout, "The configuration of the kernel is (%d, %d, %d) and (%d, %d, %d)\n", gridsize_unpack.x, gridsize_unpack.y, gridsize_unpack.z, blocksize_unpack.x, blocksize_unpack.y, blocksize_unpack.z);
 
   nsamp  = stream_ndf_chk * nchk_in * NSAMP_DF * NCHAN_PER_CHUNK;
-  npol   = nsamp * NPOL_IN;
-  ndata  = npol * NDIM_IN;
+  npol   = nsamp * NPOL_BASEBAND;
+  ndata  = npol * NDIM_BASEBAND;
   fprintf(stdout, "nsamp is %"PRIu64", %"PRIu64", %"PRIu64"\n", nsamp, npol, ndata);
   
   /* Create buffer */

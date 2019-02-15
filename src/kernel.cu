@@ -496,7 +496,7 @@ __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, c
     }
 }
 
-__global__ void spectrum_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream)
+__global__ void spectral_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream)
 {
   int i;
   uint64_t loc;

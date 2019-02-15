@@ -795,9 +795,9 @@ __global__ void detect_faccumulate_pad_transpose_kernel1(cufftComplex *dbuf_in, 
   accumulate it in T and the final output will be PFT;
 */
 template <unsigned int blockSize>
-__global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, int n_accumulate)
+__global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, int n_accumulate)
 {
-  extern volatile __shared__ float spectrum_sdata[];
+  extern volatile __shared__ float spectral_sdata[];
   uint64_t i = threadIdx.x, j;
   uint64_t tid = i;
   uint64_t loc;
@@ -805,7 +805,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
   int ndim = 6;
   
   for(j = 0 ; j < ndim; j ++)
-    spectrum_sdata[tid + j*blockDim.x] = 0;
+    spectral_sdata[tid + j*blockDim.x] = 0;
 
   while (i < n_accumulate)
     {
@@ -818,12 +818,12 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
       phi = acosf(0.5 * u / ab);
       v = 2 * ab * sinf(phi);
       
-      spectrum_sdata[tid] += (aa + bb);
-      spectrum_sdata[tid + blockDim.x] += (aa - bb);
-      spectrum_sdata[tid + blockDim.x*2] += u;
-      spectrum_sdata[tid + blockDim.x*3] += v;
-      spectrum_sdata[tid + blockDim.x*4] += aa;
-      spectrum_sdata[tid + blockDim.x*5] += bb;
+      spectral_sdata[tid] += (aa + bb);
+      spectral_sdata[tid + blockDim.x] += (aa - bb);
+      spectral_sdata[tid + blockDim.x*2] += u;
+      spectral_sdata[tid + blockDim.x*3] += v;
+      spectral_sdata[tid + blockDim.x*4] += aa;
+      spectral_sdata[tid + blockDim.x*5] += bb;
   
       i += blockSize;
     }  
@@ -834,7 +834,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
       if (tid < 512)
 	{
 	  for(j = 0; j < ndim; j++)
-	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 512];
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 512];
 	}
     }
   __syncthreads();
@@ -844,7 +844,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
       if (tid < 256)
 	{	  
 	  for(j = 0; j < ndim; j++)
-	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 256];
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 256];
 	}
     }
   __syncthreads();
@@ -854,7 +854,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
       if (tid < 128)
 	{
 	  for(j = 0; j < ndim; j++)
-	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 128];
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 128];
 	}
     }
   __syncthreads();
@@ -864,7 +864,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
       if (tid < 64)
 	{
 	  for(j = 0; j < ndim; j++)
-	    spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 64];
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 64];
 	}
     }
   __syncthreads();
@@ -876,7 +876,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	  if (tid < 32)
 	    {	      
 	      for(j = 0; j < ndim; j++)
-		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 32];
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 32];
 	    }
 	}
       if (blockSize >= 32)
@@ -884,7 +884,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	  if (tid < 16)
 	    {	      
 	      for(j = 0; j < ndim; j++)
-		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 16];
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 16];
 	    }
 	}
       if (blockSize >= 16)
@@ -892,7 +892,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	  if (tid < 8)
 	    {	      
 	      for(j = 0; j < ndim; j++)
-		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 8];
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 8];
 	    }
 	}
       if (blockSize >= 8)
@@ -900,7 +900,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	  if (tid < 4)
 	    {     
 	      for(j = 0; j < ndim; j++)
-		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 4];
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 4];
 	    }
 	}
       if (blockSize >= 4)
@@ -908,7 +908,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	  if (tid < 2)
 	    {	      
 	      for(j = 0; j < ndim; j++)
-		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 2];
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 2];
 	    }
 	}
       if (blockSize >= 2)
@@ -916,7 +916,7 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	  if (tid < 1)
 	    {  
 	      for(j = 0; j < ndim; j++)
-		spectrum_sdata[tid + j*blockDim.x] += spectrum_sdata[tid + j*blockDim.x + 1];
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 1];
 	    }
 	}
     }
@@ -924,10 +924,10 @@ __global__ void spectrum_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
   if (tid == 0)
     {
       for(j = 0; j < ndim; j++)	
-	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] += spectrum_sdata[j*blockDim.x];
+	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] += spectral_sdata[j*blockDim.x];
     }
 }
 
-__global__ void spectrum_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
+__global__ void spectral_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
 
 #endif

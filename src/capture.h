@@ -28,13 +28,13 @@ typedef struct conf_t
   
   int pad;
   int dfsz_seek, dfsz_keep;
-  int capture_cpu[MPORT_CAPTURE], rbuf_ctrl_cpu, capture_ctrl_cpu, capture_ctrl, cpu_bind;
+  int capture_cpu[NPORT_MAX], rbuf_ctrl_cpu, capture_ctrl_cpu, capture_ctrl, cpu_bind;
   char capture_ctrl_addr[MSTR_LEN];
   
-  char ip_alive[MPORT_CAPTURE][MSTR_LEN], ip_dead[MPORT_CAPTURE][MSTR_LEN];;
-  int port_alive[MPORT_CAPTURE], port_dead[MPORT_CAPTURE];
+  char ip_alive[NPORT_MAX][MSTR_LEN], ip_dead[NPORT_MAX][MSTR_LEN];;
+  int port_alive[NPORT_MAX], port_dead[NPORT_MAX];
   int nport_alive, nport_dead;
-  int nchunk_alive_expect_on_port[MPORT_CAPTURE], nchunk_alive_actual_on_port[MPORT_CAPTURE], nchunk_dead_on_port[MPORT_CAPTURE];;  // For each port;
+  int nchunk_alive_expect_on_port[NPORT_MAX], nchunk_alive_actual_on_port[NPORT_MAX], nchunk_dead_on_port[NPORT_MAX];;  // For each port;
   int nchan, nchunk, nchunk_alive;
   
   char dir[MSTR_LEN], dada_header_template[MSTR_LEN], instrument_name[MSTR_LEN];

@@ -47,7 +47,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->cufft_mod       = (int)(0.5 * conf->cufft_nx / OVER_SAMP_RATE);
   conf->nchan_edge      = (int)(0.5 * conf->nchan_in * conf->nchan_keep_chan - 0.5 * conf->nchan_keep_band);
   conf->inverse_nchan_rate = conf->nchan_in * conf->nchan_keep_chan/(double)conf->nchan_keep_band;
-  conf->scale_dtsz         = NBYTE_OUT / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->inverse_nchan_rate * conf->nchan_keep_band * NPOL_IN * NDIM_IN * NBYTE_IN);
+  conf->scale_dtsz         = NBYTE_FILTERBANK / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->inverse_nchan_rate * conf->nchan_keep_band * NPOL_BASEBAND * NDIM_BASEBAND * NBYTE_BASEBAND);
   conf->bandwidth       = conf->nchan_keep_band/(double)conf->nchan_keep_chan;
 
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
@@ -71,18 +71,18 @@ int initialize_baseband2filterbank(conf_t *conf)
   
   /* Prepare buffer, stream and fft plan for process */
   conf->nsamp1       = conf->ndf_per_chunk_stream * conf->nchan_in * NSAMP_DF;
-  conf->npol1        = conf->nsamp1 * NPOL_IN;
-  conf->ndata1       = conf->npol1  * NDIM_IN;
+  conf->npol1        = conf->nsamp1 * NPOL_BASEBAND;
+  conf->ndata1       = conf->npol1  * NDIM_BASEBAND;
   
   conf->nsamp2       = conf->nsamp1 / OVER_SAMP_RATE / conf->inverse_nchan_rate;
-  conf->npol2        = conf->nsamp2 * NPOL_IN;
-  conf->ndata2       = conf->npol2  * NDIM_IN;
+  conf->npol2        = conf->nsamp2 * NPOL_BASEBAND;
+  conf->ndata2       = conf->npol2  * NDIM_BASEBAND;
 
   conf->nsamp3       = conf->nsamp2 * conf->nchan_out / conf->nchan_keep_band;
-  conf->npol3        = conf->nsamp3 * NPOL_OUT;
-  conf->ndata3       = conf->npol3  * NDIM_OUT;  
+  conf->npol3        = conf->nsamp3 * NPOL_FILTERBANK;
+  conf->ndata3       = conf->npol3  * NDIM_FILTERBANK;  
 
-  conf->ndim_scale      = conf->ndf_per_chunk_rbufin * NSAMP_DF / conf->cufft_nx;   // We do not average in time and here we work on detected data;
+  conf->ndim_scale   = conf->ndf_per_chunk_rbufin * NSAMP_DF / conf->cufft_nx;   // We do not average in time and here we work on detected data;
   
   nx        = conf->cufft_nx;
   batch     = conf->npol1 / conf->cufft_nx;
@@ -104,8 +104,8 @@ int initialize_baseband2filterbank(conf_t *conf)
       CufftSafeCall(cufftSetStream(conf->fft_plans[i], conf->streams[i]));
     }
   
-  conf->sbufin_size  = conf->ndata1 * NBYTE_IN;
-  conf->sbufout_size = conf->ndata3 * NBYTE_OUT;
+  conf->sbufin_size  = conf->ndata1 * NBYTE_BASEBAND;
+  conf->sbufout_size = conf->ndata3 * NBYTE_FILTERBANK;
   
   conf->bufin_size   = conf->nstream * conf->sbufin_size;
   conf->bufout_size  = conf->nstream * conf->sbufout_size;
@@ -116,11 +116,11 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
   conf->hbufin_offset = conf->sbufin_size;
-  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_IN * NDIM_IN);
+  conf->dbufin_offset = conf->sbufin_size / (NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND);
   conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
   conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
   
-  conf->dbufout_offset = conf->sbufout_size / NBYTE_OUT;
+  conf->dbufout_offset = conf->sbufout_size / NBYTE_FILTERBANK;
   conf->hbufout_offset = conf->sbufout_size;
 
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
@@ -773,7 +773,7 @@ int register_header(conf_t *conf)
       exit(EXIT_FAILURE);
     }
 
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_OUT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -782,7 +782,7 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_OUT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -791,7 +791,7 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_OUT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
