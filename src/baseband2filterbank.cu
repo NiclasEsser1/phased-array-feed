@@ -224,7 +224,7 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   
   /* registers the existing host memory range for use by CUDA */
-  dada_cuda_dbregister(conf->hdu_in);
+  dada_cuda_dbregister(conf->hdu_in);  // To put this into capture does not help!!!
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
   if(conf->hdrsz != DADA_HDRSZ)    // This number should match

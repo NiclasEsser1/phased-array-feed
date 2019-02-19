@@ -15,6 +15,7 @@
 #include <linux/un.h>
 #include <unistd.h>
 
+#include "dada_cuda.h"
 #include "ipcbuf.h"
 #include "capture.h"
 #include "log.h"
@@ -58,7 +59,8 @@ void *do_capture(void *conf)
   log_add(capture_conf->log_file, "INFO", 1, log_mutex, "In funtion thread id = %ld, %d, %d", (long)pthread_self(), capture_conf->thread_index, thread_index);
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&capture_conf->tout, sizeof(capture_conf->tout));  
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&capture_conf->tout, sizeof(capture_conf->tout));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(capture_conf->port_alive[thread_index]);
@@ -288,6 +290,9 @@ int initialize_capture(conf_t *conf)
       log_close(conf->log_file);
       exit(EXIT_FAILURE);
     }
+
+  //dada_cuda_dbregister(conf->hdu);
+  
   conf->data_block   = (ipcbuf_t *)(conf->hdu->data_block);
   conf->header_block = (ipcbuf_t *)(conf->hdu->header_block);
   
@@ -333,7 +338,8 @@ int initialize_capture(conf_t *conf)
   */
   dbuf = (char *)malloc(sizeof(char) * DFSZ);  
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&conf->tout, sizeof(conf->tout));  
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&conf->tout, sizeof(conf->tout));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(conf->port_alive[0]);
@@ -469,7 +475,10 @@ int destroy_capture(conf_t conf)
   pthread_mutex_destroy(&log_mutex);
 
   if(conf.data_block)
-    dada_hdu_unlock_write(conf.hdu);
+    {
+      //dada_cuda_dbunregister(conf.hdu);
+      dada_hdu_unlock_write(conf.hdu);
+    }
   dada_hdu_destroy(conf.hdu); // it has disconnect
   
   return EXIT_SUCCESS;
@@ -774,7 +783,7 @@ void *buf_control(void *conf)
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "%s starts from port %d, packet loss rate %d %f %E %E", capture_conf->ip_alive[0], capture_conf->port_alive[0], rbuf_nblk * capture_conf->time_res_blk, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Packets counters, %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"", ndf_actual, ndf_expect, ndf_blk_actual, ndf_blk_expect);
       
-      fprintf(stdout, "CAPTURE_STATUS %d %f %E %E\n", capture_conf->process_index, rbuf_nblk * capture_conf->time_res_blk, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
+      fprintf(stdout, "CAPTURE_STATUS %d %f %E %E\n", capture_conf->process_index, rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
       fflush(stdout);
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "After fflush stdout");
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Before mark filled");
@@ -918,6 +927,7 @@ void *capture_control(void *conf)
     }
   
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&capture_conf->tout, sizeof(capture_conf->tout));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
   strncpy(sa.sun_path, capture_conf->capture_ctrl_addr, strlen(capture_conf->capture_ctrl_addr));
@@ -986,8 +996,7 @@ void *capture_control(void *conf)
 	  
 	  sscanf(capture_control_command, "%[^_]_%[^_]_%[^_]_%[^_]_%"SCNd64"", capture_control_keyword, capture_conf->source, capture_conf->ra, capture_conf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
 	  available_buf = ipcbuf_get_write_count(capture_conf->data_block);
-	  start_buf = (start_buf > available_buf) ? start_buf : available_buf; // To make sure the start buffer is valuable, to get the most recent buffer
-	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "The data is enabled at %"PRIu64" buffer block", start_buf);
+	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "The data is enabled at %"PRIu64" buffer block, the most recent buffer block is %"PRIu64"", start_buf, available_buf);
 	  ipcbuf_enable_sod(capture_conf->data_block, (uint64_t)start_buf, 0);
 	  
 	  /* To get time stamp for current header */

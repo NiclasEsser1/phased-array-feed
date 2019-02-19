@@ -20,8 +20,8 @@ log = logging.getLogger("mpikat.paf_pipeline")
 EXECUTE = True
 #EXECUTE        = False
 
-NVPROF = True
-#NVPROF         = False
+#NVPROF = True
+NVPROF         = False
 
 FILTERBANK_SOD = True   # Start filterbank data
 # FILTERBANK_SOD  = False  # Do not start filterbank data
@@ -104,6 +104,22 @@ SEARCH_CONFIG_2BEAMS = {"dada_fname":              "{}/{}/{}_33chunks.dada".form
                         "nchk_port":               11,
                         }
 
+SPECTRAL_CONF_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
+                       "rbuf_baseband_key":      ["dada"],
+                       "rbuf_filterbank_key":    ["dade"],
+                       "nbeam":                  1,
+                       "nport_beam":             3,
+                       "nchk_port":              16,
+}
+
+SPECTRAL_CONFIG_2BEAMS = {"dada_fname":              "{}/{}/{}_33chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
+                        "rbuf_baseband_key":       ["dada", "dadc"],
+                        "rbuf_filterbank_key":     ["dade", "dadg"],
+                        "nbeam":                   2,
+                        "nport_beam":              3,
+                        "nchk_port":               11,
+                        }
+
 class PipelineError(Exception):
     pass
 
@@ -125,7 +141,6 @@ class ExecuteCommand(object):
         
         self._process = None
         self._executable_command = None
-        self._monitor_thread = None
         self._stdout = None
         self._stderr = None
         self._returncode = None
@@ -151,10 +166,11 @@ class ExecuteCommand(object):
             # Start monitors
             self._monitor_threads.append(threading.Thread(target=self._stdout_monitor))
             self._monitor_threads.append(threading.Thread(target=self._stderr_monitor))
-
+            
             for thread in self._monitor_threads:
+                thread.daemon = True
                 thread.start()
-
+                                    
     def __del__(self):
         class_name = self.__class__.__name__
 
@@ -162,7 +178,7 @@ class ExecuteCommand(object):
         if EXECUTE:
             for thread in self._monitor_threads:
                 thread.join()
-                
+
     def stdout_notify(self):
         for callback in self.stdout_callbacks:
             callback(self._stdout, self)
@@ -209,22 +225,21 @@ class ExecuteCommand(object):
                 stdout = self._process.stdout.readline().rstrip("\n\r")
                 if stdout != b"":
                     self.stdout = stdout
-                    #print self.stdout, self._command
-            
-            if self._process.returncode:
-                self.returncode = self._command + "; RETURNCODE is: " + str(self._process.returncode)
+                #print self._command, "HERE STDOUT 1\n\n\n"
                 
+            if self._process.returncode and self._process.stderr.readline().rstrip("\n\r") == b"":
+                self.returncode = self._command + "; RETURNCODE is: " + str(self._process.returncode)
+            
     def _stderr_monitor(self):
         if EXECUTE:
             while self._process.poll() == None:
                 stderr = self._process.stderr.readline().rstrip("\n\r")
+                #print self._command, "HERE STDERR 1\n\n\n"
                 if stderr != b"":
+                    #print self._command, "HERE STDERR 2\n\n\n"
                     self.stderr = self._command + "; STDERR is: " + stderr
-                    #print self.stderr
+                    #print self._command, "HERE STDERR 3\n\n\n"
             
-            if self._process.returncode:
-                self.returncode = self._command + "; RETURNCODE is: " + str(self._process.returncode)
-                                
 class Pipeline(object):
     def __init__(self):
         self._prd = PAF_CONFIG["prd"]
@@ -239,6 +254,8 @@ class Pipeline(object):
         self._ndim_pol_baseband = PAF_CONFIG["ndim_pol_baseband"]
         self._npol_samp_baseband = PAF_CONFIG["npol_samp_baseband"]
         self._mem_node           = PAF_CONFIG["mem_node"]
+        self._execution_instances = []
+        self._cleanup_commands = []
         
     def __del__(self):
         class_name = self.__class__.__name__
@@ -263,13 +280,23 @@ class Pipeline(object):
         if EXECUTE:
             log.debug(returncode)
             if returncode:
+                self.cleanup()
                 raise PipelineError(returncode)
 
     def _handle_execution_stderr(self, stderr, callback):
         if EXECUTE:
             log.error(stderr)
+            self.cleanup()
             raise PipelineError(stderr)
 
+    def cleanup(self):
+        # Kill existing process and free shared memory if there is any
+        execution_instances = []
+        for command in self._cleanup_commands:
+            execution_instances.append(ExecuteCommand(command))            
+        for execution_instance in execution_instances:         # Wait until the cleanup is done
+            execution_instance.finish()
+            
 @register_pipeline("Search")
 class Search(Pipeline):
     def __init__(self):
@@ -349,27 +376,27 @@ class Search(Pipeline):
         
         # To see if we can process baseband data with integer repeats
         if self._rbuf_baseband_ndf_chk % (self._ndf_stream * self._nstream):
+            self.cleanup()
             raise PipelineError("data in baseband ring buffer block can only "
                                 "be processed by baseband2filterbank with integer repeats")
 
         # To see if we have enough memory
         if self._nbeam*(self._rbuf_filterbank_blksz + self._rbuf_baseband_blksz) > self._mem_node:
+            self.cleanup()
             raise PipelineError("We do not have enough shared memory for the setup "
                                 "Try to reduce the ring buffer block number "
                                 "or reduce the number of packets in each ring buffer block")
         
         # To be safe, kill all related softwares and free shared memory
-        execution_instances = []
-        for command in self._cleanup_commands:
-            execution_instances.append(ExecuteCommand(command))            
-        for execution_instance in execution_instances:         # Wait until the cleanup is done
-            execution_instance.finish()
+        self.cleanup()
                 
         # To setup commands for each process
         baseband2filterbank = "{}/src/baseband2filterbank_main".format(PAF_ROOT)
         if not os.path.isfile(baseband2filterbank):
+            self.cleanup()
             raise PipelineError("{} is not exist".format(baseband2filterbank))
         if not os.path.isfile(self._dada_fname):
+            self.cleanup()
             raise PipelineError("{} is not exist".format(self._dada_fname))                
         for i in range(self._nbeam):      
             if EXECUTE:
@@ -379,6 +406,7 @@ class Search(Pipeline):
                     try:
                         os.makedirs(directory)
                     except:
+                        self.cleanup()
                         raise PipelineError("Fail to create {}".format(runtime_directory))
             else:
                 runtime_directory = None                
@@ -394,9 +422,14 @@ class Search(Pipeline):
             if NVPROF:
                 command += "nvprof "
             command += ("{} -a {} -b {} -c {} -d {} -e {} "
-                        "-f {} -i {} -j {} -k {} -l {} ").format(baseband2filterbank, self._rbuf_baseband_key[i], self._rbuf_filterbank_key[i],                                                                 self._rbuf_filterbank_ndf_chk, self._nstream, self._ndf_stream,
-                                                                self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
+                        "-f {} -i {} -j {} -k {} -l {} ").format(baseband2filterbank, self._rbuf_baseband_key[i], self._rbuf_filterbank_key[i],
+                                                                 self._rbuf_filterbank_ndf_chk, self._nstream, self._ndf_stream,
+                                                                 self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
                                                                  self._nchan_filterbank, self._nchan_keep_band)
+            #command += ("{} -a {} -b {} -c {} -d {} -e {} "
+            #            "-f {} -i {} -j {} ").format(baseband2filterbank, self._rbuf_baseband_key[i], self._rbuf_filterbank_key[i],
+            #                                         self._rbuf_filterbank_ndf_chk, self._nstream, self._ndf_stream,
+            #                                         self._runtime_directory[i], self._nchk_beam, self._cufft_nx)
             if FILTERBANK_SOD:
                 command += "-g 1"
             else:
@@ -468,6 +501,7 @@ class Search(Pipeline):
         self._diskdb_execution_instances = []
         for command in self._diskdb_commands:
             execution_instance = ExecuteCommand(command)
+            #self._execution_instances.append(execution_instance)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._dbdisk_execution_instances.append(execution_instance)
 
@@ -475,16 +509,18 @@ class Search(Pipeline):
         self._baseband2filterbank_execution_instances = []
         for command in self._baseband2filterbank_commands:
             execution_instance = ExecuteCommand(command)
-            if not NVPROF:  # Do not check stderr if there is any third party software
+            self._execution_instances.append(execution_instance)
+            if not NVPROF:  # Do not check stderr or returncode if there is any third party software
                 execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
+                #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
-            execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             self._baseband2filterbank_execution_instances.append(execution_instance)
 
         if HEIMDALL:  # run heimdall if required
             self._heimdall_execution_instances = []
             for command in self._heimdall_commands:
                 execution_instance = ExecuteCommand(command)
+                self._execution_instances.append(execution_instance)
                 execution_instance.returncode_callbacks.add(
                     self._handle_execution_returncode)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -494,6 +530,7 @@ class Search(Pipeline):
             self._dbdisk_execution_instances = []
             for command in self._dbdisk_commands:
                 execution_instance = ExecuteCommand(command)
+                self._execution_instances.append(execution_instance)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
                 execution_instance.returncode_callbacks.add(
                     self._handle_execution_returncode)
@@ -529,7 +566,7 @@ class Search(Pipeline):
             
     def deconfigure(self):
         pass
-    
+        
 @register_pipeline("Search2Beams")
 class Search2Beams(Search):
 
@@ -600,8 +637,8 @@ if __name__ == "__main__":
         for j in range(1):
             print "\nStart it ...\n"
             search_mode.start()
-            print "\nStop it ...\n"
-            search_mode.stop()
-    
-        print "\nDeconfigure it ...\n"
-        search_mode.deconfigure()
+            #print "\nStop it ...\n"
+            #search_mode.stop()
+        
+        #print "\nDeconfigure it ...\n"
+        #search_mode.deconfigure()

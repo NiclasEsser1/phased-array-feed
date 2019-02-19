@@ -19,22 +19,20 @@ CU_FLAGS     = -Wno-deprecated-gpu-targets --default-stream per-thread #-arch=sm
 --ptxas-options=-v 	
 
 NVCC         = nvcc
-CC	     = gcc
-GXX          = g++
 SRC_DIR      = .
 OBJ_DIR      = .
 
 LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
-INCLUDE_DIRS = -I/usr/local/include 
+INCLUDE_DIRS = -I/usr/local/include -L/usr/local/cuda/include
 
 all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test scale_test scale1_test scale2_test accumulate_test unpack_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test clean
 
 capture_main:capture_main.o capture.o log.o
-	$(CC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
+	$(NVCC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
 
 dada2filterbank_main:dada2filterbank_main.o dada2filterbank.o log.o
-	$(CC) -o dada2filterbank_main dada2filterbank_main.o dada2filterbank.o log.o $(LIB_DIRS) $(LIBS)
+	$(NVCC) -o dada2filterbank_main dada2filterbank_main.o dada2filterbank.o log.o $(LIB_DIRS) $(LIBS)
 
 baseband2filterbank_main:baseband2filterbank_main.o baseband2filterbank.o kernel.o log.o
 	$(NVCC) -o baseband2filterbank_main baseband2filterbank_main.o baseband2filterbank.o kernel.o log.o $(LIB_DIRS) $(LIBS)
@@ -100,10 +98,10 @@ detect_faccumulate_pad_transpose_test:detect_faccumulate_pad_transpose_test.o ke
 	$(NVCC) -o detect_faccumulate_pad_transpose_test detect_faccumulate_pad_transpose_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 capture_main.o:capture_main.c
-	$(CC) -c capture_main.c $(INCLUDE_DIRS) ${C_FLAGS}
+	$(NVCC) -c capture_main.c $(INCLUDE_DIRS) ${C_FLAGS} 
 
 capture.o:capture.c
-	$(CC) -c capture.c $(INCLUDE_DIRS) ${C_FLAGS}
+	$(NVCC) -c capture.c $(INCLUDE_DIRS) ${C_FLAGS} 
 
 baseband2filterbank_main.o:baseband2filterbank_main.cu
 	$(NVCC) -c baseband2filterbank_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
@@ -178,13 +176,13 @@ kernel.o:kernel.cu
 	$(NVCC) -c kernel.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 dada2filterbank_main.o:dada2filterbank_main.c
-	$(CC) -c dada2filterbank_main.c $(INCLUDE_DIRS) ${C_FLAGS}
+	$(NVCC) -c dada2filterbank_main.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 dada2filterbank.o:dada2filterbank.c
-	$(CC) -c dada2filterbank.c $(INCLUDE_DIRS) ${C_FLAGS}
+	$(NVCC) -c dada2filterbank.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 log.o:log.c
-	$(CC) -c log.c $(INCLUDE_DIRS) ${C_FLAGS}
+	$(NVCC) -c log.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 clean:
 	rm -f *.o *~
