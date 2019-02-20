@@ -19,11 +19,11 @@ import os
 EXECUTE = True
 #EXECUTE        = False
 
-#NVPROF = True
-NVPROF         = False
+NVPROF = True
+#NVPROF         = False
 
-MEMCHECK       = True
-#MEMCHECK       = False
+#MEMCHECK       = True
+MEMCHECK       = False
 
 FILTERBANK_SOD = True   # Start filterbank data
 # FILTERBANK_SOD  = False  # Do not start filterbank data
@@ -250,7 +250,8 @@ class ExecuteCommand(object):
                         self.stdout = stdout + "; PROCESS_INDEX is " + str(self._process_index)
                     else:
                         self.stdout = stdout
-                    log.debug(self._command + " " + self.stdout)         
+                    #log.debug(self._command + " " + self.stdout)
+                    log.debug(stdout)
             if self._process.returncode and self._process.stderr.readline().rstrip("\n\r") == b"":
                 self.returncode = self._command + "; RETURNCODE is: " + str(self._process.returncode)
             
@@ -263,7 +264,7 @@ class ExecuteCommand(object):
                         self.stderr = self._command + "; STDERR is: " + stderr + "; PROCESS_INDEX is " + str(self._process_index)
                     else:
                         self.stderr = self._command + "; STDERR is: " + stderr
-                    log.debug(self.stderr)
+                    log.debug(stderr)
                     
 class Pipeline(object):
     def __init__(self):
@@ -914,7 +915,7 @@ class Spectral2Beams1Pol(Spectral):
         super(Spectral2Beams1Pol, self).__init__()
 
     def configure(self, ip):
-        super(Spectral2Beams1Pol, self).configure(ip, 1, SPECTRAL_CONFIG_1BEAM)
+        super(Spectral2Beams1Pol, self).configure(ip, 1, SPECTRAL_CONFIG_2BEAMS)
 
     def start(self):
         super(Spectral2Beams1Pol, self).start()
