@@ -783,7 +783,7 @@ void *buf_control(void *conf)
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "%s starts from port %d, packet loss rate %d %f %E %E", capture_conf->ip_alive[0], capture_conf->port_alive[0], rbuf_nblk * capture_conf->time_res_blk, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Packets counters, %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"", ndf_actual, ndf_expect, ndf_blk_actual, ndf_blk_expect);
       
-      fprintf(stdout, "CAPTURE_STATUS %d %f %E %E\n", capture_conf->process_index, rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
+      fprintf(stdout, "CAPTURE_STATUS %f %E %E\n", rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
       fflush(stdout);
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "After fflush stdout");
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Before mark filled");
@@ -1056,16 +1056,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command);
   
-  if((conf.process_index<0) || (conf.process_index>=NPROCESS_PER_NODE_MAX))
-    {
-      fprintf(stderr, "The process index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.process_index, NPROCESS_PER_NODE_MAX - 1, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "The process index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.", conf.process_index, NPROCESS_PER_NODE_MAX - 1, __FILE__, __LINE__);
-      
-      fclose(conf.log_file);
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We capture data with process %d", conf.process_index);
-  
   if((conf.beam_index<0) || (conf.beam_index>=NBEAM_MAX)) // More careful check later
     {
       fprintf(stderr, "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.beam_index, NBEAM_MAX - 1, __FILE__, __LINE__);
@@ -1230,7 +1220,6 @@ int default_arguments(conf_t *conf)
   conf->capture_ctrl     = 0;    // Default do not control the capture during the runtime;
   conf->cpu_bind       = 0;      // Default do not bind thread to cpu
   conf->pad            = 0;      // Default do not pad
-  conf->process_index  = -1;     // Default with an impossible value
   conf->beam_index     = -1;     // Default with an impossible value
   conf->ndf_per_chunk_rbuf = 0;  // Default with an impossible value
   conf->ndf_per_chunk_tbuf = 0;  // Default with an impossible value

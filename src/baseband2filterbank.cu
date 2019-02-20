@@ -283,7 +283,6 @@ int initialize_baseband2filterbank(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);    
     }
-  dada_cuda_dbregister(conf->hdu_out);
   
   /* make ourselves the write client */
   if(dada_hdu_lock_write(conf->hdu_out) < 0)
@@ -657,7 +656,6 @@ int destroy_baseband2filterbank(conf_t conf)
     }
   if(conf.db_out)
     {
-      dada_cuda_dbunregister(conf.hdu_out);
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }  

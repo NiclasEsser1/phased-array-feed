@@ -23,8 +23,8 @@ extern "C" {
 #define NPOL_FILTERBANK      1
 #define NBYTE_FILTERBANK     1    // uint8_t
   
-#define NDATA_PER_SAMP_FULL  6
-#define NDATA_PER_SAMP_RBUF  4
+#define NDATA_PER_SAMP_RT  6
+#define NDATA_PER_SAMP_FULL  4
 #define NBIT_SPECTRAL        32
 #define NBYTE_SPECTRAL       4    // float
   

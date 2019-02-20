@@ -37,9 +37,8 @@ void usage()
 	  " -o The name of instrument \n"
 	  " -p The source information, which is required for the case without capture control, in the format \"name;ra;dec\" \n"
 	  " -q Force to pad band edge \n"
-	  " -r The index of process \n"
-	  " -s The index of  beam \n"
-	   );
+	  " -r The index of  beam \n"
+	  );
 }
 
 int main(int argc, char **argv)
@@ -134,12 +133,8 @@ int main(int argc, char **argv)
 	case 'q':
 	  sscanf(optarg, "%d", &conf.pad);
 	  break;
-	  
+	  	  
 	case 'r':
-	  sscanf(optarg, "%d", &conf.process_index);
-	  break;
-	  
-	case 's':
 	  sscanf(optarg, "%d", &conf.beam_index);
 	  break;
 	}
