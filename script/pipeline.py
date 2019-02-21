@@ -281,7 +281,7 @@ class Pipeline(object):
         self._npol_samp_baseband = PAF_CONFIG["npol_samp_baseband"]
         self._mem_node           = PAF_CONFIG["mem_node"]
         self._over_samp_rate     = PAF_CONFIG["over_samp_rate"]
-        self._cleanup_commands = []
+        self._cleanup_commands   = []
         
     def __del__(self):
         class_name = self.__class__.__name__
