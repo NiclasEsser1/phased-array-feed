@@ -19,11 +19,11 @@ import os
 EXECUTE = True
 #EXECUTE        = False
 
-NVPROF = True
-#NVPROF         = False
+#NVPROF = True
+NVPROF         = False
 
-#MEMCHECK       = True
-MEMCHECK       = False
+MEMCHECK       = True
+#MEMCHECK       = False
 
 FILTERBANK_SOD = True   # Start filterbank data
 # FILTERBANK_SOD  = False  # Do not start filterbank data
@@ -60,7 +60,7 @@ PAF_CONFIG = {"instrument_name":    "PAF-BMF",
               "ncpu_numa":           10,  
               "mem_node":            60791751475, # has 10% spare
               "first_port":          17100,
-              }
+}
 
 SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,                 
                          "rbuf_baseband_nblk":      5,
@@ -89,7 +89,7 @@ SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                          "detect_thresh":           10,
                          "dm":                      [1, 10000],
                          "zap_chans":               [],
-                         }
+}
 
 SEARCH_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                        "rbuf_baseband_key":      ["dada"],
@@ -107,30 +107,30 @@ SEARCH_CONFIG_2BEAMS = {"dada_fname":              "{}/{}/{}_33chunks.dada".form
                         "nbeam":                   2,
                         "nport_beam":              3,
                         "nchk_port":               11,
-                        }
+}
 
 SPECTRAL_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,                 
-                         "rbuf_baseband_nblk":      5,
-                         "rbuf_baseband_nread":     1,                 
-                         "tbuf_baseband_ndf_chk":   128,
-
-                         "rbuf_spectral_ndf_chk":   16384,
-                         "rbuf_spectral_nblk":      2,
-                         "rbuf_spectral_nread":     1,
-
-                         "cufft_nx":                1024,
-                         "nbyte_spectral":          4,
-                         "ndf_stream":      	    1024,
-                         "nstream":                 2,
-
-                         "bind":                    1,
-                         "pad":                     0,
-                         "ndf_check_chk":           1024,
-                         }
+                           "rbuf_baseband_nblk":      5,
+                           "rbuf_baseband_nread":     1,                 
+                           "tbuf_baseband_ndf_chk":   128,
+                           
+                           "rbuf_spectral_ndf_chk":   16384,
+                           "rbuf_spectral_nblk":      2,
+                           "rbuf_spectral_nread":     1,
+                           
+                           "cufft_nx":                1024,
+                           "nbyte_spectral":          4,
+                           "ndf_stream":      	      1024,
+                           "nstream":                 2,
+                           
+                           "bind":                    1,
+                           "pad":                     0,
+                           "ndf_check_chk":           1024,
+}
 
 SPECTRAL_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                          "rbuf_baseband_key":      ["dada"],
-                         "rbuf_spectral_key":    ["dade"],
+                         "rbuf_spectral_key":      ["dade"],
                          "nbeam":                  1,
                          "nport_beam":             3,
                          "nchk_port":              16,
@@ -138,7 +138,7 @@ SPECTRAL_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".form
 
 SPECTRAL_CONFIG_2BEAMS = {"dada_fname":              "{}/{}/{}_33chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                           "rbuf_baseband_key":       ["dada", "dadc"],
-                          "rbuf_spectral_key":     ["dade", "dadg"],
+                          "rbuf_spectral_key":       ["dade", "dadg"],
                           "nbeam":                   2,
                           "nport_beam":              3,
                           "nchk_port":               11,
@@ -683,16 +683,7 @@ class Spectral(Pipeline):
         self._server = int(ip.split(".")[2])
         self._ptype = ptype
 
-        if self._ptype == 1:
-            self._ndim_pol_spectral = 1
-            self._npol_samp_spectral = 1
-        elif self._ptype == 2:
-            self._ndim_pol_spectral = 1
-            self._npol_samp_spectral = 2
-        elif self._ptype == 4:
-            self._ndim_pol_spectral = 2
-            self._npol_samp_spectral = 2
-        else:
+        if self._ptype not in [1, 2, 4]:  # We can only have three possibilities
             log.error("Pol type should be 1, 2 or 4, but it is {}".format(self._ptype))
             raise PipelineError("Pol type should be 1, 2 or 4, but it is {}".format(self._ptype))
         
@@ -714,12 +705,10 @@ class Spectral(Pipeline):
                                     self._df_dtsz * \
                                     self._rbuf_baseband_ndf_chk
         
-        self._rbuf_spectral_blksz = int(4 * self._nchan_baseband *
+        self._rbuf_spectral_blksz = int(4 * self._nchan_baseband * # Replace 4 with true pol numbers if we do not pad 0
                                         self._cufft_nx /
                                         self._over_samp_rate *
-                                        self._nbyte_spectral *
-                                        self._npol_samp_spectral *
-                                        self._ndim_pol_spectral)
+                                        self._nbyte_spectral)
         
         # To see if we can process baseband data with integer repeats
         if self._rbuf_baseband_ndf_chk % (self._ndf_stream * self._nstream):
@@ -891,40 +880,33 @@ class Spectral(Pipeline):
 
 @register_pipeline("Spectral1Beam1Pol")
 class Spectral1Beam1Pol(Spectral):
-
-    def __init__(self):
-        super(Spectral1Beam1Pol, self).__init__()
-
     def configure(self, ip):
         super(Spectral1Beam1Pol, self).configure(ip, 1, SPECTRAL_CONFIG_1BEAM)
 
-    def start(self):
-        super(Spectral1Beam1Pol, self).start()
-
-    def stop(self):
-        super(Spectral1Beam1Pol, self).stop()
-
-    def deconfigure(self):
-        super(Spectral1Beam1Pol, self).deconfigure()
-
-
 @register_pipeline("Spectral2Beams1Pol")
 class Spectral2Beams1Pol(Spectral):
-
-    def __init__(self):
-        super(Spectral2Beams1Pol, self).__init__()
-
     def configure(self, ip):
         super(Spectral2Beams1Pol, self).configure(ip, 1, SPECTRAL_CONFIG_2BEAMS)
 
-    def start(self):
-        super(Spectral2Beams1Pol, self).start()
+@register_pipeline("Spectral1Beam2Pols")
+class Spectral1Beam2Pols(Spectral):
+    def configure(self, ip):
+        super(Spectral1Beam2Pols, self).configure(ip, 2, SPECTRAL_CONFIG_1BEAM)
 
-    def stop(self):
-        super(Spectral2Beams1Pol, self).stop()
+@register_pipeline("Spectral2Beams2Pols")
+class Spectral2Beams2Pols(Spectral):
+    def configure(self, ip):
+        super(Spectral2Beams2Pols, self).configure(ip, 2, SPECTRAL_CONFIG_2BEAMS)
 
-    def deconfigure(self):
-        super(Spectral2Beams1Pol, self).deconfigure()
+@register_pipeline("Spectral1Beam4Pols")
+class Spectral1Beam4Pols(Spectral):
+    def configure(self, ip):
+        super(Spectral1Beam4Pols, self).configure(ip, 4, SPECTRAL_CONFIG_1BEAM)
+
+@register_pipeline("Spectral2Beams4Pols")
+class Spectral2Beams4Pols(Spectral):
+    def configure(self, ip):
+        super(Spectral2Beams4Pols, self).configure(ip, 4, SPECTRAL_CONFIG_2BEAMS)
 
 if __name__ == "__main__":
     logging.getLogger().addHandler(logging.NullHandler())
@@ -972,9 +954,13 @@ if __name__ == "__main__":
 
     log.info("Create pipeline ...")
     if beam == 1:
-        spectral_mode = Spectral1Beam1Pol()
+        #spectral_mode = Spectral1Beam1Pol()
+        spectral_mode = Spectral1Beam2Pols()
+        #spectral_mode = Spectral1Beam4Pols()
     if beam == 2:
-        spectral_mode = Spectral2Beams1Pol()
+        #spectral_mode = Spectral2Beams1Pol()
+        spectral_mode = Spectral2Beams2Pols()
+        #spectral_mode = Spectral2Beams4Pols()
     
     log.info("Configure it ...")
     spectral_mode.configure(ip)

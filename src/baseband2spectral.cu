@@ -406,7 +406,7 @@ int baseband2spectral(conf_t conf)
       spectral_saccumulate_kernel<<<conf.gridsize_spectral_saccumulate, conf.blocksize_spectral_saccumulate>>>(conf.dbuf_out, conf.ndata3, conf.nstream);  
       CudaSafeKernelLaunch();
       if(conf.p_type == 2)
-	CudaSafeCall(cudaMemcpy(conf.cbuf_out, &conf.dbuf_out[conf.ndata3 - conf.nsamp3  * NDATA_PER_SAMP_FULL], 2 * conf.nsamp3 * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
+	CudaSafeCall(cudaMemcpy(conf.cbuf_out, &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL], 2 * conf.nsamp3 * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
       else
 	CudaSafeCall(cudaMemcpy(conf.cbuf_out, conf.dbuf_out, conf.nsamp3  * conf.p_type * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
 

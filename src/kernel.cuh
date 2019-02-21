@@ -801,7 +801,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
   uint64_t i = threadIdx.x, j;
   uint64_t tid = i;
   uint64_t loc;
-  float aa, bb, ab, phi, u, v;
+  float aa, bb, u, v;
   int ndim = 6;
   
   for(j = 0 ; j < ndim; j ++)
@@ -811,12 +811,11 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     {
       loc = blockIdx.x*gridDim.y*n_accumulate + blockIdx.y*n_accumulate + i;
       aa = dbuf_in[loc].x*dbuf_in[loc].x + dbuf_in[loc].y*dbuf_in[loc].y;
-      bb = dbuf_in[loc + offset_in].x*dbuf_in[loc + offset_in].x + dbuf_in[loc + offset_in].y*dbuf_in[loc + offset_in].y;			       
+      bb = dbuf_in[loc + offset_in].x*dbuf_in[loc + offset_in].x + dbuf_in[loc + offset_in].y*dbuf_in[loc + offset_in].y;
       
-      ab = sqrtf(aa*bb);
       u = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].x + dbuf_in[loc].y * dbuf_in[loc + offset_in].y);
-      phi = acosf(0.5 * u / ab);
-      v = 2 * ab * sinf(phi);
+      v = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].y - dbuf_in[loc + offset_in].x * dbuf_in[loc].y);
+      // v = 2 * (dbuf_in[loc + offset_in].x * dbuf_in[loc].y - dbuf_in[loc].x * dbuf_in[loc + offset_in].y);
       
       spectral_sdata[tid] += (aa + bb);
       spectral_sdata[tid + blockDim.x] += (aa - bb);
