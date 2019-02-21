@@ -55,7 +55,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
   if(conf->nchan_edge<0) // Check the nchan_keep_band further
     {
-      fprintf(stderr, "nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf->nchan_edge, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf->nchan_edge, __FILE__, __LINE__);
       log_add(conf->log_file, "ERR", 1, log_mutex, "nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf->nchan_edge, __FILE__, __LINE__);
       
       log_close(conf->log_file);
@@ -205,7 +205,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   if(dada_hdu_connect(conf->hdu_in) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -216,21 +216,29 @@ int initialize_baseband2filterbank(conf_t *conf)
   if((conf->rbufin_size % conf->bufin_size != 0) || (conf->rbufin_size/conf->bufin_size)!= conf->nrepeat_per_blk)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);    
     }
-  
+
+  struct timespec start, stop;
+  double elapsed_time;
+  clock_gettime(CLOCK_REALTIME, &start);
   /* registers the existing host memory range for use by CUDA */
-  dada_cuda_dbregister(conf->hdu_in);  // To put this into capture does not help!!!
+  dada_cuda_dbregister(conf->hdu_in);  // To put this into capture does not improve the memcpy!!!
+  
+  clock_gettime(CLOCK_REALTIME, &stop);
+  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+  fprintf(stdout, "elapse_time for spectral for dbregister is %f\n", elapsed_time);
+  fflush(stdout);
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
   if(conf->hdrsz != DADA_HDRSZ)    // This number should match
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -241,7 +249,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   if(dada_hdu_lock_read(conf->hdu_in) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -254,7 +262,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   if(dada_hdu_connect(conf->hdu_out) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -266,7 +274,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -277,7 +285,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   if(conf->hdrsz != DADA_HDRSZ)    // This number should match
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -288,7 +296,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   if(dada_hdu_lock_write(conf->hdu_out) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -300,7 +308,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       if(ipcbuf_disable_sod(conf->db_out) < 0)
 	{
 	  log_add(conf->log_file, "ERR", 1, log_mutex, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
-	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  
 	  destroy_baseband2filterbank(*conf);
 	  fclose(conf->log_file);
@@ -350,7 +358,7 @@ int baseband2filterbank(conf_t conf)
   if(register_header(&conf))
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(conf);
       fclose(conf.log_file);
@@ -609,7 +617,7 @@ int offset_scale(conf_t conf)
   if(fp == NULL)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Can not open scale file, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(conf);
       fclose(conf.log_file);
@@ -674,7 +682,7 @@ int register_header(conf_t *conf)
   if (!hdrbuf_in)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -683,7 +691,7 @@ int register_header(conf_t *conf)
   if(hdrsz != DADA_HDRSZ)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Header size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -694,7 +702,7 @@ int register_header(conf_t *conf)
   if (!hdrbuf_out)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -703,7 +711,7 @@ int register_header(conf_t *conf)
   if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"PRIu64"", &file_size) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -712,7 +720,7 @@ int register_header(conf_t *conf)
   if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"PRIu64"", &bytes_per_seconds) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -721,7 +729,7 @@ int register_header(conf_t *conf)
   if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -731,7 +739,7 @@ int register_header(conf_t *conf)
   if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -745,7 +753,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -754,7 +762,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "BW", "%lf", -conf->bandwidth) < 0)  // Reverse frequency order
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -764,7 +772,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", conf->tsamp_out) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -774,7 +782,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -783,7 +791,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -792,7 +800,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -801,7 +809,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: BASEBAND2FILTERBANK_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -810,7 +818,7 @@ int register_header(conf_t *conf)
   if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_seconds) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -820,7 +828,7 @@ int register_header(conf_t *conf)
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -830,7 +838,7 @@ int register_header(conf_t *conf)
   if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -858,7 +866,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.ndf_per_chunk_rbufin == 0)
     {
-      fprintf(stderr, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -868,7 +876,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.nstream <= 0)
     {
-      fprintf(stderr, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nstream, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nstream, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -878,7 +886,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.ndf_per_chunk_stream == 0)
     {
-      fprintf(stderr, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -895,7 +903,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_MAX)    
     {
-      fprintf(stderr, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -905,7 +913,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.cufft_nx<=0)    
     {
-      fprintf(stderr, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.cufft_nx, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.cufft_nx, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -915,7 +923,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.nchan_out <= 0)
     {
-      fprintf(stderr, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -924,7 +932,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if((log2((double)conf.nchan_out) - floor(log2((double)conf.nchan_out))) != 0)
     {
-      fprintf(stderr, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -934,7 +942,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.nchan_keep_band<=0)    
     {
-      fprintf(stderr, "nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
       
       log_close(conf.log_file);

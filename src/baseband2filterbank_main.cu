@@ -45,6 +45,9 @@ int main(int argc, char *argv[])
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
 
+  struct timespec start, stop;
+  double elapsed_time;
+  
   /* Default argument */
   default_arguments(&conf);
   
@@ -118,14 +121,14 @@ int main(int argc, char *argv[])
     closedir(dir);
   else
     {
-      fprintf(stderr, "Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
   sprintf(log_fname, "%s/baseband2filterbank.log", conf.dir);
   conf.log_file = log_open(log_fname, "ab+");
   if(conf.log_file == NULL)
     {
-      fprintf(stderr, "Can not open log file %s\n", log_fname);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Can not open log file %s\n", log_fname);
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
@@ -134,8 +137,16 @@ int main(int argc, char *argv[])
   examine_record_arguments(conf, argv, argc);
   
   /* initialize */
+  clock_gettime(CLOCK_REALTIME, &start);
   initialize_baseband2filterbank(&conf);
+  clock_gettime(CLOCK_REALTIME, &stop);
+  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+  fprintf(stdout, "elapse_time for filterbank for initialize is %f\n", elapsed_time);
+  fflush(stdout);
 
+  fprintf(stderr, "FORCE TO QUIT\n");
+  exit(EXIT_FAILURE);
+  
   /* Play with data */
   baseband2filterbank(conf);
 

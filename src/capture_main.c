@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	case 'a':	  	  
 	  if(sscanf(optarg, "%x", &conf.key) != 1)
 	    {
-	      fprintf(stderr, "Could not parse key from %s, which happens at \"%s\", line [%d], has to abort.\n", optarg, __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: Could not parse key from %s, which happens at \"%s\", line [%d], has to abort.\n", optarg, __FILE__, __LINE__);
 	      usage();
 	      
 	      exit(EXIT_FAILURE);
@@ -146,14 +146,14 @@ int main(int argc, char **argv)
     closedir(dir);
   else
     {
-      fprintf(stderr, "Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
   sprintf(fname_log, "%s/capture.log", conf.dir);  // Open the log file
   conf.log_file = log_open(fname_log, "ab+");
   if(conf.log_file == NULL)
     {
-      fprintf(stderr, "Can not open log file %s, which happends at \"%s\", line [%d], has to abort\n", fname_log, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Can not open log file %s, which happends at \"%s\", line [%d], has to abort\n", fname_log, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "CAPTURE START");

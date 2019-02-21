@@ -234,7 +234,7 @@ int initialization(conf_t *conf)
       if(dada_hdu_connect(conf->hdu) < 0)
 	{
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-	  fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stderr, "DADA2FILTERBANK_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  exit(EXIT_FAILURE);    
 	}  
       conf->db = (ipcbuf_t *) conf->hdu->data_block;      
@@ -242,13 +242,13 @@ int initialization(conf_t *conf)
       if(hdrsz != DADA_HDRSZ)    // This number should match
 	{
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "data buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-	  fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stderr, "DADA2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  exit(EXIT_FAILURE);    
 	}
       if(dada_hdu_lock_read(conf->hdu) < 0) // make ourselves the read client 
 	{
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "open_hdu: could not lock write, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-	  fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stderr, "DADA2FILTERBANK_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  exit(EXIT_FAILURE);
 	}      
     }

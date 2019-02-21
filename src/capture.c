@@ -70,7 +70,7 @@ void *do_capture(void *conf)
     {
       log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Can not bind to %s_%d, which happens at \"%s\", line [%d], has to abort",
 		  inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      fprintf(stderr, "Can not bind to %s_%d, which happens at \"%s\", line [%d], has to abort.\n",
+      fprintf(stderr, "CAPTURE_ERROR: Can not bind to %s_%d, which happens at \"%s\", line [%d], has to abort.\n",
 	      inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
       
       quit = 2;
@@ -119,7 +119,7 @@ void *do_capture(void *conf)
       	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort",
 		      inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-	  fprintf(stderr, "Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort.\n",
+	  fprintf(stderr, "CAPTURE_ERROR: Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort.\n",
 		  inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 	  
       	  quit = 2;
@@ -139,7 +139,7 @@ void *do_capture(void *conf)
       if (chunk_index<0 || chunk_index > (capture_conf->nchunk-1))
 	{      
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", capture_conf->nchunk, __FILE__, __LINE__);
-	  fprintf(stderr, "Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort.\n",
+	  fprintf(stderr, "CAPTURE_ERROR: Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort.\n",
 		  capture_conf->nchunk, __FILE__, __LINE__);
 	  
 	  quit = 2;
@@ -231,7 +231,7 @@ int initialize_capture(conf_t *conf)
   if(conf->nchunk_alive == 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "None alive chunks, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "None alive chunks, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: None alive chunks, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
@@ -252,7 +252,7 @@ int initialize_capture(conf_t *conf)
   if(abs(conf->seconds_from_1970 - now) > 10 * PERIOD)  // No plan to offset the reference time by 10 times of period
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       fclose(conf->log_file);
       exit(EXIT_FAILURE);      
@@ -274,7 +274,7 @@ int initialize_capture(conf_t *conf)
   if(dada_hdu_connect(conf->hdu) < 0)
     { 
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       destroy_capture(*conf);
       log_close(conf->log_file);
@@ -284,7 +284,7 @@ int initialize_capture(conf_t *conf)
   if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       destroy_capture(*conf);
       log_close(conf->log_file);
@@ -299,7 +299,7 @@ int initialize_capture(conf_t *conf)
   if(conf->blksz_rbuf != ipcbuf_get_bufsz(conf->data_block))  // Check the ring buffer blovk size
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf->blksz_rbuf, ipcbuf_get_bufsz(conf->data_block), __FILE__, __LINE__);
-      fprintf(stderr, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d], has to abort.\n", conf->blksz_rbuf, ipcbuf_get_bufsz(conf->data_block), __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d], has to abort.\n", conf->blksz_rbuf, ipcbuf_get_bufsz(conf->data_block), __FILE__, __LINE__);
       
       destroy_capture(*conf);
       log_close(conf->log_file);
@@ -311,7 +311,7 @@ int initialize_capture(conf_t *conf)
       if(ipcbuf_disable_sod(conf->data_block) < 0)
 	{
 	  log_add(conf->log_file, "ERR", 1, log_mutex, "Can not write data before start, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  	 
 	  destroy_capture(*conf);
 	  log_close(conf->log_file);	  
@@ -348,7 +348,7 @@ int initialize_capture(conf_t *conf)
   if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not bind to %s_%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      fprintf(stderr, "Can not bind to %s_%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Can not bind to %s_%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
       
       free(dbuf);
       close(sock);
@@ -360,7 +360,7 @@ int initialize_capture(conf_t *conf)
   if(recvfrom(sock, (void *)dbuf, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-      fprintf(stderr, "Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort.\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 
       free(dbuf);
       close(sock);
@@ -378,7 +378,7 @@ int initialize_capture(conf_t *conf)
   if(beam_index != conf->beam_index) // Check the beam index
     {      
       log_add(conf->log_file, "ERR", 1, log_mutex, "beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort", beam_index, conf->beam_index, __FILE__, __LINE__);
-      fprintf(stderr, "beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort\n", beam_index, conf->beam_index, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort\n", beam_index, conf->beam_index, __FILE__, __LINE__);
       
       free(dbuf);
       close(sock);
@@ -389,7 +389,7 @@ int initialize_capture(conf_t *conf)
   if((int)((double)seconds_from_epoch - (double)conf->seconds_from_epoch) % PERIOD) // The difference in seconds should be multiple times of period    
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "the difference in seconds is not multiple times of period, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "the difference in seconds is not multiple times of period, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: the difference in seconds is not multiple times of period, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       free(dbuf);
       close(sock);
@@ -408,7 +408,7 @@ int initialize_capture(conf_t *conf)
 	  if(cbuf == NULL)
 	    {
 	      log_add(conf->log_file, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
 	      free(dbuf);
 	      close(sock);
@@ -420,7 +420,7 @@ int initialize_capture(conf_t *conf)
 	  if(ipcbuf_mark_filled(conf->data_block, conf->blksz_rbuf) < 0) // write nothing to it
 	    {
 	      log_add(conf->log_file, "ERR", 1, log_mutex, "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	      fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
 	      free(dbuf);
 	      close(sock);
@@ -446,7 +446,7 @@ int initialize_capture(conf_t *conf)
   if(cbuf == NULL)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       log_close(conf->log_file);
       destroy_capture(*conf);
@@ -493,7 +493,7 @@ int register_dada_header(conf_t conf)
   if(!hdrbuf)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error getting header_buf, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -502,7 +502,7 @@ int register_dada_header(conf_t conf)
   if(!conf.dada_header_template)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Please specify header file, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Please specify header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -511,7 +511,7 @@ int register_dada_header(conf_t conf)
   if(fileread(conf.dada_header_template, hdrbuf, DADA_HDRSZ) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error reading header file, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error reading header file, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -522,7 +522,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "UTC_START", "%s", conf.utc_start) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting UTC_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
@@ -531,7 +531,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "RA", "%s", conf.ra) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting RA, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting RA, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -541,7 +541,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "DEC", "%s", conf.dec) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting DEC, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting DEC, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -551,7 +551,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "SOURCE", "%s", conf.source) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting SOURCE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);      
@@ -561,7 +561,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", conf.instrument_name) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);     
@@ -571,7 +571,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, conf.picoseconds) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -580,7 +580,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "FREQ", "%.6lf", conf.center_freq) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -589,7 +589,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "MJD_START", "%.10lf", conf.mjd_start) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -598,7 +598,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "NCHAN", "%d", conf.nchan) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -608,7 +608,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "BEAM_ID", "%d", conf.beam_index) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -617,7 +617,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &conf.freq_res) < 0)
     {
       log_add(conf.log_file, "ERR", 1,  log_mutex, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -627,7 +627,7 @@ int register_dada_header(conf_t conf)
   if(ascii_header_set(hdrbuf, "BW", "%.6lf", conf.bandwidth) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -637,7 +637,7 @@ int register_dada_header(conf_t conf)
   if(ipcbuf_mark_filled(conf.header_block, DADA_HDRSZ) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error header_fill, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
@@ -753,7 +753,7 @@ void *buf_control(void *conf)
       if(quit == 2)
 	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after the buffer transit state change, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "Quit with ERROR just after the buffer transit state change, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the buffer transit state change, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  
 	  pthread_exit(NULL);
 	}
@@ -783,7 +783,7 @@ void *buf_control(void *conf)
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "%s starts from port %d, packet loss rate %d %f %E %E", capture_conf->ip_alive[0], capture_conf->port_alive[0], rbuf_nblk * capture_conf->time_res_blk, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Packets counters, %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"", ndf_actual, ndf_expect, ndf_blk_actual, ndf_blk_expect);
       
-      fprintf(stdout, "CAPTURE_STATUS %f %E %E\n", rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
+      fprintf(stdout, "CAPTURE_STATUS: %f %E %E\n", rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
       fflush(stdout);
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "After fflush stdout");
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Before mark filled");
@@ -792,7 +792,7 @@ void *buf_control(void *conf)
       if(ipcbuf_mark_filled(capture_conf->data_block, capture_conf->blksz_rbuf) < 0)
 	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  
 	  quit = 2;
 	  pthread_exit(NULL);
@@ -806,7 +806,7 @@ void *buf_control(void *conf)
       if(ipcbuf_get_nfull(capture_conf->data_block) >= (ipcbuf_get_nbufs(capture_conf->data_block) - 1)) 
 	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "buffers are all full, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
-	  fprintf(stderr, "buffers are all full, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: buffers are all full, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  	  
 	  quit = 2;
 	  pthread_exit(NULL);
@@ -819,7 +819,7 @@ void *buf_control(void *conf)
       if(cbuf == NULL)
 	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  
 	  quit = 2;
 	  pthread_exit(NULL);
@@ -860,7 +860,7 @@ void *buf_control(void *conf)
       if(quit == 2)
 	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after the second transit state change, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "Quit with ERROR just after the second transit state change, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the second transit state change, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  pthread_exit(NULL);
 	}
 
@@ -891,7 +891,7 @@ void *buf_control(void *conf)
   if(ipcbuf_mark_filled(capture_conf->data_block, capture_conf->blksz_rbuf) < 0)
     {
       log_add(capture_conf->log_file, "ERR", 1, log_mutex, "ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       quit = 2;
       pthread_exit(NULL);
@@ -920,7 +920,7 @@ void *capture_control(void *conf)
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
       log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       quit = 1;
       pthread_exit(NULL);
@@ -966,7 +966,7 @@ void *capture_control(void *conf)
       if(quit == 2)
 	{
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after checking the unix socket, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "Quit with ERROR just after checking the unix socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after checking the unix socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  close(sock);
 	  pthread_exit(NULL);
 	}
@@ -974,6 +974,8 @@ void *capture_control(void *conf)
       if(strstr(capture_control_command, "END-OF-CAPTURE") != NULL)
 	{
 	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got END-OF-CAPTURE signal, has to quit");      
+	  fprintf(stdout, "GET END-OF-CAPTURE\n");
+	  fflush(stdout);
 	  
 	  quit = 1;	      
 	  if(ipcbuf_is_writing(capture_conf->data_block))
@@ -985,6 +987,9 @@ void *capture_control(void *conf)
 	}  
       if(strstr(capture_control_command, "END-OF-DATA") != NULL)
 	{
+	  fprintf(stdout, "GET END-OF-DATA\n");
+	  fflush(stdout);
+	  
 	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got END-OF-DATA signal, has to enable eod");
 	  ipcbuf_enable_eod(capture_conf->data_block);
 	  memset(capture_control_command, 0, MSTR_LEN);
@@ -992,6 +997,9 @@ void *capture_control(void *conf)
 	  
       if(strstr(capture_control_command, "START-OF-DATA") != NULL)
 	{
+	  fprintf(stdout, "GET START-OF-DATA\n");
+	  fflush(stdout);
+	  
 	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got START-OF-DATA signal, has to enable sod");
 	  
 	  sscanf(capture_control_command, "%[^_]_%[^_]_%[^_]_%[^_]_%"SCNd64"", capture_control_keyword, capture_conf->source, capture_conf->ra, capture_conf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
@@ -1020,7 +1028,7 @@ void *capture_control(void *conf)
 	  if(ipcbuf_get_nfull(capture_conf->header_block) >= (ipcbuf_get_nbufs(capture_conf->header_block) - 1)) 
 	    {
 	      log_add(capture_conf->log_file, "ERR", 1, log_mutex, "buffers are all full, has to abort, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	      fprintf(stderr, "buffers are all full, has to abort, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: buffers are all full, has to abort, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      
 	      quit = 2;
 	      close(sock);
@@ -1058,7 +1066,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if((conf.beam_index<0) || (conf.beam_index>=NBEAM_MAX)) // More careful check later
     {
-      fprintf(stderr, "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.beam_index, NBEAM_MAX - 1, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.beam_index, NBEAM_MAX - 1, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.", conf.beam_index, NBEAM_MAX - 1, __FILE__, __LINE__);
       
       fclose(conf.log_file);
@@ -1070,7 +1078,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if((conf.dfsz_seek != 0) && (conf.dfsz_seek != DF_HDRSZ)) // The seek bytes has to be 0 or DF_HDRSZ
     {
-      fprintf(stderr, "The start point of packet is %d, but it should be 0 or %d, happens at \"%s\", line [%d], has to abort.\n", conf.dfsz_seek, DF_HDRSZ, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: The start point of packet is %d, but it should be 0 or %d, happens at \"%s\", line [%d], has to abort.\n", conf.dfsz_seek, DF_HDRSZ, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "The start point of packet is %d, but it should be 0 or %d, happens at \"%s\", line [%d], has to abort.", conf.dfsz_seek, DF_HDRSZ, __FILE__, __LINE__);
       
       fclose(conf.log_file);
@@ -1080,7 +1088,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.nport_alive == 0)  // Can not work without alive ports
     {
-      fprintf(stderr, "We do not have alive port, happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: We do not have alive port, happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "We do not have alive port, happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
       
       fclose(conf.log_file);
@@ -1102,7 +1110,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   if(conf.center_freq > BAND_LIMIT_UP || conf.center_freq < BAND_LIMIT_DOWN)
     // The reference information has to be reasonable, later more careful check
     {
-      fprintf(stderr, "center_freq %f is not in (%f %f), happens at \"%s\", line [%d], has to abort.\n",conf.center_freq, BAND_LIMIT_DOWN, BAND_LIMIT_UP, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: center_freq %f is not in (%f %f), happens at \"%s\", line [%d], has to abort.\n",conf.center_freq, BAND_LIMIT_DOWN, BAND_LIMIT_UP, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "center_freq %f is not in (%f %f), happens at \"%s\", line [%d], has to abort.",conf.center_freq, BAND_LIMIT_DOWN, BAND_LIMIT_UP, __FILE__, __LINE__);
       
       fclose(conf.log_file);
@@ -1113,7 +1121,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   if((conf.days_from_1970 <= 0) || (conf.df_in_period >= NDF_PER_CHUNK_PER_PERIOD))
     // The reference information has to be reasonable, later more careful check
     {
-      fprintf(stderr, "The reference information is not right, days_from_1970 is %d and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.\n", conf.days_from_1970, conf.df_in_period, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: The reference information is not right, days_from_1970 is %d and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.\n", conf.days_from_1970, conf.df_in_period, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "The reference information is not right, days_from_1970 is %d and df_in_period is %"PRId64", happens at \"%s\", line [%d], has to abort.", conf.days_from_1970, conf.df_in_period, __FILE__, __LINE__);
       
       fclose(conf.log_file);
@@ -1137,7 +1145,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       if(i == conf.nport_alive)  // We can not bind all capture threads to one cpu
 	{
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "We can not bind all \"capture\" threads into one single CPU, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);	  
 	  exit(EXIT_FAILURE);
@@ -1149,7 +1157,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	{      
 	  if((conf.source == "unset") && ((conf.ra == "unset") || (conf.dec == "unset")))
 	    {
-	      fprintf(stderr, "We have to setup target information if we do not enable capture control, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: We have to setup target information if we do not enable capture control, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
 	      log_add(conf.log_file, "ERR", 1, log_mutex, "We have to setup target information if we do not enable capture control, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	      
 	      log_close(conf.log_file);
@@ -1164,7 +1172,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if(conf.ndf_per_chunk_rbuf==0)  // The actual size of it will be checked later
     {      
-      fprintf(stderr, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbuf, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbuf, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbuf, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -1174,7 +1182,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.ndf_per_chunk_tbuf==0)  // The actual size of it will be checked later
     {      
-      fprintf(stderr, "ndf_per_chunk_tbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_tbuf, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: ndf_per_chunk_tbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_tbuf, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_tbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_tbuf, __FILE__, __LINE__);
       
       log_close(conf.log_file);
@@ -1186,7 +1194,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     log_add(conf.log_file, "INFO", 1, log_mutex, "The name of header template of PSRDADA is %s", conf.dada_header_template);
   else
     {        
-      fprintf(stderr, "dada_header_template %s is not exist, which happens at \"%s\", line [%d], has to abort\n", conf.dada_header_template, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: dada_header_template %s is not exist, which happens at \"%s\", line [%d], has to abort\n", conf.dada_header_template, __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "dada_header_template %s is not exist, which happens at \"%s\", line [%d], has to abort", conf.dada_header_template, __FILE__, __LINE__);
       
       log_close(conf.log_file);

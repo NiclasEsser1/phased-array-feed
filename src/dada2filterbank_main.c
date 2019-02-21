@@ -68,7 +68,7 @@ int main(int argc, char **argv)
   conf.log_file = log_open(log_fname, "ab+");
   if(conf.log_file == NULL)
     {
-      fprintf(stderr, "Can not open log file %s\n", log_fname);
+      fprintf(stderr, "DADA2FILTERBANK_ERROR: Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "DADA2FILTERBANK START");
