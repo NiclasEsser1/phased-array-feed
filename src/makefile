@@ -26,7 +26,7 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include -L/usr/local/cuda/include
 
-all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test scale_test scale1_test scale2_test accumulate_test unpack_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test clean
+all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test scale_test scale1_test scale2_test accumulate_test unpack_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
 
 capture_main:capture_main.o capture.o log.o
 	$(NVCC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
@@ -180,6 +180,12 @@ dada2filterbank_main.o:dada2filterbank_main.c
 
 dada2filterbank.o:dada2filterbank.c
 	$(NVCC) -c dada2filterbank.c $(INCLUDE_DIRS) ${C_FLAGS}
+
+fitswriter_interface_test:fitswriter_interface_test.o
+	$(NVCC) -o fitswriter_interface_test fitswriter_interface_test.o $(LIB_DIRS) $(LIBS)
+
+fitswriter_interface_test.o:fitswriter_interface_test.c
+	$(NVCC) -c fitswriter_interface_test.c $(INCLUDE_DIRS) ${C_FLAGS}
 
 log.o:log.c
 	$(NVCC) -c log.c $(INCLUDE_DIRS) ${C_FLAGS}

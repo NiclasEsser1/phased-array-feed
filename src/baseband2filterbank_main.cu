@@ -58,7 +58,6 @@ int main(int argc, char *argv[])
 	{
 	case 'h':
 	  usage();
-	  fprintf (stderr, "BASEBAND2FILTERBANK_ERROR:\tno input, which happens at \"%s\", line [%d].\n",  __FILE__, __LINE__);
 	  exit(EXIT_FAILURE);
 	  
 	case 'a':	  
