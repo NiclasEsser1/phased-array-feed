@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-# docker run --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --rm -it --ulimit memlock=40000000000 -v host_dir:doc_dir --net=host fold_mode
-# docker run --runtime=nvidia tells the container that we will use nvidia/cuda library at runtime;
+# nvidia-docker run -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all --rm -it --ulimit memlock=40000000000 -v host_dir:doc_dir --net=host fold_mode
+# nvidia-docker run tells the container that we will use nvidia/cuda library at runtime;
 # --rm means the container will be released once it finishs;
 # -i means it is a interactive container;
 # -t oallocate a pseudo-TTY;
@@ -40,11 +40,9 @@ if(numa == 1):
     cpuset_cpus = "10-19"
     
 if root:
-    comline = "docker run --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it -f --rm --runtime=nvidia --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
-    #comline = "docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia --net=host -v {} -v {} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
+    comline = "nvidia-docker run --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it -f --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
 else:    
-    comline = "docker run --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -u 50000:50000 -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
-    #comline = "docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --runtime=nvidia --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -u 50000:50000 -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems=0,1 --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, cpuset_cpus, container_name, image)
+    comline = "nvidia-docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -u 50000:50000 -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
 
 print comline
 print "\nYou are going to a docker container with the name {}!\n".format(image, numa)

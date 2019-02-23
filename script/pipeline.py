@@ -16,8 +16,6 @@ import threading
 import inspect
 import os
 
-# Why the second container runs on the first GPU?
-
 EXECUTE = True
 #EXECUTE        = False
 

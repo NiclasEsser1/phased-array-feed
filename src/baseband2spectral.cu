@@ -355,8 +355,6 @@ int baseband2spectral(conf_t conf)
       memset(fits.data, 0x00, sizeof(fits.data));
 	
       fits.chan_width = conf.bandwidth / (double)conf.nchan_out;
-      fprintf(stdout, "HERE to check the chan_width:\t%f\t%f\t%d\n\n\n\n", fits.chan_width, conf.bandwidth, conf.nchan_out);
-      fflush(stdout);
       
       fits.center_freq = conf.center_freq;
       fits.tsamp = time_res_blk;
