@@ -270,7 +270,8 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
-   
+  dada_cuda_dbregister(conf->hdu_out);  // To put this into capture does not improve the memcpy!!!
+  
   if(conf->rbufout_size % conf->bufout_size != 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -342,7 +343,7 @@ int baseband2filterbank(conf_t conf)
   dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
   uint64_t cbufsz;
   int first = 1;
-  double time_res_blk, elapsed_time = 0;
+  double time_res_blk, time_offset = 0;
   
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
@@ -355,7 +356,7 @@ int baseband2filterbank(conf_t conf)
   fflush(stdout);
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   
-  if(register_header(&conf))
+  if(read_register_header(&conf))
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -364,8 +365,8 @@ int baseband2filterbank(conf_t conf)
       fclose(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after register_header, in seconds
-  log_add(conf.log_file, "INFO", 1, log_mutex, "register_header done");
+  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
+  log_add(conf.log_file, "INFO", 1, log_mutex, "read_register_header done");
   
   while(!ipcbuf_eod(conf.db_in))
     {
@@ -453,8 +454,8 @@ int baseband2filterbank(conf_t conf)
       ipcbuf_mark_cleared(conf.db_in);
       log_add(conf.log_file, "INFO", 1, log_mutex, "after closing old buffer block");
 
-      elapsed_time += time_res_blk;
-      fprintf(stdout, "BASEBAND2FILTERBANK, finished %f seconds data\n", elapsed_time);
+      time_offset += time_res_blk;
+      fprintf(stdout, "BASEBAND2FILTERBANK, finished %f seconds data\n", time_offset);
       fflush(stdout);
     }
 
@@ -664,6 +665,7 @@ int destroy_baseband2filterbank(conf_t conf)
     }
   if(conf.db_out)
     {
+      dada_cuda_dbunregister(conf.hdu_out);
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }  
@@ -672,11 +674,11 @@ int destroy_baseband2filterbank(conf_t conf)
   return EXIT_SUCCESS;
 }
 
-int register_header(conf_t *conf)
+int read_register_header(conf_t *conf)
 {
   uint64_t hdrsz;
   char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
-  uint64_t file_size, bytes_per_seconds;
+  uint64_t file_size, bytes_per_second;
   
   hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!hdrbuf_in)
@@ -708,7 +710,7 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }  
-  if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"PRIu64"", &file_size) < 0)  
+  if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"SCNu64"", &file_size) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -716,8 +718,10 @@ int register_header(conf_t *conf)
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
-    }   
-  if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"PRIu64"", &bytes_per_seconds) < 0)  
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", file_size);
+  
+  if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"SCNu64"", &bytes_per_second) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -725,7 +729,9 @@ int register_header(conf_t *conf)
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
-    }  
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", bytes_per_second);
+  
   if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -734,7 +740,9 @@ int register_header(conf_t *conf)
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
-    }   
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
+  
   /* Get utc_start from hdrin */
   if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
     {
@@ -745,10 +753,12 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %f", conf->utc_start);
+  
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
   
   file_size = (uint64_t)(file_size * conf->scale_dtsz);
-  bytes_per_seconds = (uint64_t)(bytes_per_seconds * conf->scale_dtsz);
+  bytes_per_second = (uint64_t)(bytes_per_second * conf->scale_dtsz);
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
     {
@@ -759,7 +769,9 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  if (ascii_header_set(hdrbuf_out, "BW", "%lf", -conf->bandwidth) < 0)  // Reverse frequency order
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
+  
+  if (ascii_header_set(hdrbuf_out, "BW", "%f", -conf->bandwidth) < 0)  // Reverse frequency order
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -768,8 +780,10 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BW to DADA header is %f", -conf->bandwidth);
+  
   conf->tsamp_out = conf->tsamp_in * conf->cufft_nx;
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", conf->tsamp_out) < 0)  
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -778,7 +792,8 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
+  
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -788,6 +803,8 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_FILTERBANK);
+  
   if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -797,6 +814,8 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", NDIM_FILTERBANK);
+  
   if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_FILTERBANK) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -806,6 +825,8 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", NPOL_FILTERBANK);
+  
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -815,7 +836,9 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_seconds) < 0)  
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
+  
+  if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_second) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -824,7 +847,8 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-    
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
+  
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);

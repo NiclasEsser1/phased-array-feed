@@ -16,20 +16,22 @@ import threading
 import inspect
 import os
 
+# Why the second container runs on the first GPU?
+
 EXECUTE = True
 #EXECUTE        = False
 
 #NVPROF = True
 NVPROF         = False
 
-MEMCHECK       = True
-#MEMCHECK       = False
+#MEMCHECK       = True
+MEMCHECK       = False
 
-FILTERBANK_SOD = True   # Start filterbank data
-# FILTERBANK_SOD  = False  # Do not start filterbank data
+FITSWRITER = True
+#FITSWRITER = False
 
-SPECTRAL_SOD = True   # Start filterbank data
-# SPECTRAL_SOD  = False  # Do not start filterbank data
+SOD = True   # Start filterbank data
+# SOD  = False  # Do not start filterbank data
 
 HEIMDALL = False   # To run heimdall on filterbank file or not
 #HEIMDALL       = True   # To run heimdall on filterbank file or not
@@ -126,6 +128,8 @@ SPECTRAL_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                            "bind":                    1,
                            "pad":                     0,
                            "ndf_check_chk":           1024,
+                           "ip":                      '134.104.70.90',
+                           "port":                    17106,
 }
 
 SPECTRAL_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
@@ -449,7 +453,7 @@ class Search(Pipeline):
             #            "-f {} -i {} -j {} ").format(baseband2filterbank, self._rbuf_baseband_key[i], self._rbuf_filterbank_key[i],
             #                                         self._rbuf_filterbank_ndf_chk, self._nstream, self._ndf_stream,
             #                                         self._runtime_directory[i], self._nchk_beam, self._cufft_nx)
-            if FILTERBANK_SOD:
+            if SOD:
                 command += "-g 1"
             else:
                 command += "-g 0"
@@ -654,7 +658,9 @@ class Spectral(Pipeline):
         self._diskdb_execution_instances = []
         self._baseband2spectral_execution_instances = []
 
-        self._pad = SPECTRAL_CONFIG_GENERAL["pad"]
+        self._ip_out   = SPECTRAL_CONFIG_GENERAL["ip"]
+        self._port_out = SPECTRAL_CONFIG_GENERAL["port"]
+        self._pad  = SPECTRAL_CONFIG_GENERAL["pad"]
         self._bind = SPECTRAL_CONFIG_GENERAL["bind"]
         self._nstream = SPECTRAL_CONFIG_GENERAL["nstream"]
         self._cufft_nx = SPECTRAL_CONFIG_GENERAL["cufft_nx"]
@@ -758,10 +764,13 @@ class Spectral(Pipeline):
             command += "{} -a {} -c {} -d {} -e {} -f {} -g {} -i {} -j {} ".format(baseband2spectral, self._rbuf_baseband_key[i],
                                                                               self._rbuf_spectral_ndf_chk, self._nstream, self._ndf_stream,
                                                                               self._runtime_directory[i], self._nchk_beam, self._cufft_nx, self._ptype)
-            if SPECTRAL_SOD:
-                command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
+            if not FITSWRITER:
+                if SOD:
+                    command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
+                else:
+                    command += "-b k_{}_0".format(self._rbuf_spectral_key[i])
             else:
-                command += "-b k_{}_0".format(self._rbuf_spectral_key[i])
+                command += "-b n_{}_{}".format(self._ip_out, self._port_out)
             self._baseband2spectral_commands.append(command)
 
             # Command to create spectral ring buffer
@@ -834,7 +843,7 @@ class Spectral(Pipeline):
             self._baseband2spectral_execution_instances.append(execution_instance)
             process_index += 1 
                 
-        if DBDISK:   # Run dbdisk if required
+        if not FITSWRITER:   # Run dbdisk if required
             process_index = 0
             self._dbdisk_execution_instances = []
             for command in self._dbdisk_commands:
@@ -846,7 +855,7 @@ class Spectral(Pipeline):
                 process_index += 1
 
     def stop(self):
-        if DBDISK:
+        if not FITSWRITER:
             for execution_instance in self._dbdisk_execution_instances:
                 execution_instance.finish()
 

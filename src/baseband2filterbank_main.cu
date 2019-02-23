@@ -143,8 +143,8 @@ int main(int argc, char *argv[])
   fprintf(stdout, "elapse_time for filterbank for initialize is %f\n", elapsed_time);
   fflush(stdout);
 
-  fprintf(stderr, "FORCE TO QUIT\n");
-  exit(EXIT_FAILURE);
+  //fprintf(stderr, "FORCE TO QUIT\n");
+  //exit(EXIT_FAILURE);
   
   /* Play with data */
   baseband2filterbank(conf);

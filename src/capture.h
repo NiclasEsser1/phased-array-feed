@@ -37,7 +37,7 @@ typedef struct conf_t
   int nchunk_alive_expect_on_port[NPORT_MAX], nchunk_alive_actual_on_port[NPORT_MAX], nchunk_dead_on_port[NPORT_MAX];;  // For each port;
   int nchan, nchunk, nchunk_alive;
   
-  char dir[MSTR_LEN], dada_header_template[MSTR_LEN], instrument_name[MSTR_LEN];
+  char dir[MSTR_LEN], dada_header_template[MSTR_LEN];
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
 
   double center_freq, freq_res, bandwidth;

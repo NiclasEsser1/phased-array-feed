@@ -8,6 +8,10 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <math.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/types.h>
 
 #include "baseband2spectral.cuh"
 #include "cudautil.cuh"
@@ -32,7 +36,7 @@ int default_arguments(conf_t *conf)
   conf->port = -1;
   conf->cufft_nx = -1;
   conf->output_network = -1;
-  conf->p_type = -1;
+  conf->pol_type = -1;
   conf->ndim_out = -1;
   conf->npol_out = -1;
   
@@ -52,7 +56,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->nchan_keep_chan = (int)(conf->cufft_nx / OVER_SAMP_RATE);
   conf->nchan_out       = conf->nchan_in * conf->nchan_keep_chan;
   conf->cufft_mod       = (int)(0.5 * conf->cufft_nx / OVER_SAMP_RATE);
-  conf->scale_dtsz      = NBYTE_SPECTRAL * NDATA_PER_SAMP_FULL * conf->nchan_in * conf->nchan_keep_chan / (double)(NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND * conf->ndf_per_chunk_rbufin * conf->nchan_in * NSAMP_DF); // replace NDATA_PER_SAMP_FULL with conf->p_type if we do not fill 0 for other pols
+  conf->scale_dtsz      = NBYTE_SPECTRAL * NDATA_PER_SAMP_FULL * conf->nchan_in * conf->nchan_keep_chan / (double)(NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND * conf->ndf_per_chunk_rbufin * conf->nchan_in * NSAMP_DF); // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
 
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
@@ -230,10 +234,11 @@ int initialize_baseband2spectral(conf_t *conf)
 	}
       conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
       conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+      dada_cuda_dbregister(conf->hdu_out); // To put this into capture does not improve the memcpy!!!
       
       if(conf->rbufout_size != conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL)
 	{
-	  // replace NDATA_PER_SAMP_FULL with conf->p_type if we do not fill 0 for other pols
+	  // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
 	  log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout_size, conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].\n", conf->rbufout_size, conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
 	  
@@ -277,6 +282,17 @@ int initialize_baseband2spectral(conf_t *conf)
 	    }
 	}
     }
+  if(conf->output_network == 1)
+    {
+      conf->nchunk_network = conf->nchan_in; // We send spectral of one input channel per udp packet;
+      conf->nchan_per_chunk_network = conf->nchan_out/conf->nchunk_network;
+      conf->data_size_network = sizeof(float) * conf->nchan_per_chunk_network;
+      conf->pktsz_network     = conf->data_size_network + 3 * sizeof(float) + 6 * sizeof(int) + FITS_TIME_STAMP_LEN;
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->data_size_network);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network);
+    }
   
   return EXIT_SUCCESS;
 }
@@ -290,8 +306,18 @@ int baseband2spectral(conf_t conf)
   dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
   dim3 gridsize_spectral_saccumulate, blocksize_spectral_saccumulate;
   uint64_t cbufsz;
-  double time_res_blk, elapsed_time = 0;
+  double time_res_blk, time_offset = 0;
   float *h_stokes_i = (float *)malloc(conf.nchan_out * sizeof(float));
+  uint64_t memcpy_offset;
+  double time_stamp_f;
+  time_t time_stamp_i;
+  
+  struct sockaddr_in sa_udp;
+  socklen_t tolen = sizeof(sa_udp);
+  int sock_udp;
+  int enable = 1;
+  struct tm tm_stamp;
+  fits_t fits;
   
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
@@ -305,19 +331,58 @@ int baseband2spectral(conf_t conf)
   fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
   fflush(stdout);
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL_READY");
-  
-  if(register_header(&conf))
+
+  read_dada_header(&conf);
+  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after register_dada_header, in seconds
+  if(conf.output_network == 0)
     {
-      log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2spectral(conf);
-      free(h_stokes_i);
-      fclose(conf.log_file);
-      exit(EXIT_FAILURE);
+      if(register_dada_header(&conf))
+	{
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  
+	  destroy_baseband2spectral(conf);
+	  free(h_stokes_i);
+	  fclose(conf.log_file);
+	  exit(EXIT_FAILURE);
+	}
     }
-  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after register_header, in seconds
-  log_add(conf.log_file, "INFO", 1, log_mutex, "register_header done");
+  if(conf.output_network == 1)
+    {      
+      fits.nchan = conf.nchan_out;
+      fits.pol_type = conf.pol_type;
+      fits.nchunk   = conf.nchan_in;
+      memset(fits.data, 0x00, sizeof(fits.data));
+	
+      fits.chan_width = conf.bandwidth / (double)conf.nchan_out;
+      fprintf(stdout, "HERE to check the chan_width:\t%f\t%f\t%d\n\n\n\n", fits.chan_width, conf.bandwidth, conf.nchan_out);
+      fflush(stdout);
+      
+      fits.center_freq = conf.center_freq;
+      fits.tsamp = time_res_blk;
+      fits.beam_index = conf.beam_index;
+      strptime(conf.utc_start, DADA_TIMESTR, &tm_stamp);
+      time_stamp_f = mktime(&tm_stamp) + conf.picoseconds / 1.0E12 + 0.5 * fits.tsamp;
+      
+      if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	{
+	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  
+	  destroy_baseband2spectral(conf);
+	  free(h_stokes_i);
+	  fclose(conf.log_file);
+	  exit(EXIT_FAILURE);
+	}
+      memset((char *) &sa_udp, 0, sizeof(sa_udp));
+      sa_udp.sin_family      = AF_INET;
+      sa_udp.sin_port        = htons(conf.port);
+      sa_udp.sin_addr.s_addr = inet_addr(conf.ip);
+      setsockopt(sock_udp, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+    }
+  fprintf(stdout, "HERE AFTER REGISTER HEADER\n");
+  
+  log_add(conf.log_file, "INFO", 1, log_mutex, "register_dada_header done");
   
   while(!ipcbuf_eod(conf.db_in))
     {
@@ -325,9 +390,11 @@ int baseband2spectral(conf_t conf)
       
       log_add(conf.log_file, "INFO", 1, log_mutex, "before getting new buffer block");
       conf.cbuf_in  = ipcbuf_get_next_read(conf.db_in, &cbufsz);
-      conf.cbuf_out = ipcbuf_get_next_write(conf.db_out);
-      log_add(conf.log_file, "INFO", 1, log_mutex, "after getting new buffer block");
-      
+      if(conf.output_network == 0)
+	{
+	  conf.cbuf_out = ipcbuf_get_next_write(conf.db_out);
+	  log_add(conf.log_file, "INFO", 1, log_mutex, "after getting new buffer block");
+	}
       for(i = 0; i < conf.nrepeat_per_blk; i ++)
 	{
 	  for(j = 0; j < conf.nstream; j++)
@@ -406,22 +473,60 @@ int baseband2spectral(conf_t conf)
 
       spectral_saccumulate_kernel<<<conf.gridsize_spectral_saccumulate, conf.blocksize_spectral_saccumulate>>>(conf.dbuf_out, conf.ndata3, conf.nstream);  
       CudaSafeKernelLaunch();
-      if(conf.p_type == 2)
-	CudaSafeCall(cudaMemcpy(conf.cbuf_out, &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL], 2 * conf.nsamp3 * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
-      else
-	CudaSafeCall(cudaMemcpy(conf.cbuf_out, conf.dbuf_out, conf.nsamp3  * conf.p_type * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
+      if(conf.output_network == 0)
+	{
+	  if(conf.pol_type == 2)
+	    CudaSafeCall(cudaMemcpy(conf.cbuf_out, &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL], 2 * conf.nsamp3 * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
+	  else
+	    CudaSafeCall(cudaMemcpy(conf.cbuf_out, conf.dbuf_out, conf.nsamp3  * conf.pol_type * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
+	}
+      if(conf.output_network == 1)
+	{
+	  time_stamp_i = (time_t)time_stamp_f;
+	  strftime (fits.time_stamp, FITS_TIME_STAMP_LEN, FITS_TIMESTR, gmtime(&time_stamp_i));    // String start time without fraction second
+	  sprintf(fits.time_stamp, "%s.%04dUTC ", fits.time_stamp, (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));// To put the fraction part in and make sure that it rounds to closest integer
+	  
+	  for(i = 0; i < NDATA_PER_SAMP_FULL; i++)
+	    {
+	      fits.pol_index = i;
+	      for(j = 0; j < conf.nchunk_network; j++)
+		{
+		  memcpy_offset = i * fits.nchan + j * conf.nchan_per_chunk_network;
+		  fits.chunk_index = j;
+		  if((conf.pol_type == 2) && (i < 2))
+		    CudaSafeCall(cudaMemcpy(fits.data, &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL + memcpy_offset], conf.data_size_network, cudaMemcpyDeviceToHost));
+		  if(conf.pol_type != 2)
+		    CudaSafeCall(cudaMemcpy(fits.data, &conf.dbuf_out[memcpy_offset], conf.data_size_network, cudaMemcpyDeviceToHost));
+		  
+		  if(sendto(sock_udp, (void *)&fits, conf.pktsz_network, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
+		    {
+		      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+		      log_add(conf.log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
+		      destroy_baseband2spectral(conf);
+		      free(h_stokes_i);
+		      fclose(conf.log_file);
+		      exit(EXIT_FAILURE);
+		    }
+		}
+	    }
+	  time_stamp_f += fits.tsamp;
+	}
+      
       // Always copy Stokes I to host for later use, make a figure with it or record it to a file
       // We can also copy full stokes to host
       CudaSafeCall(cudaMemcpy(h_stokes_i, conf.dbuf_out, conf.nchan_out * NBYTE_SPECTRAL, cudaMemcpyDeviceToHost));
-      
-      log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
-      ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
+
+      if(conf.output_network == 0)
+	{
+	  log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
+	  ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
+	}
       ipcbuf_mark_cleared(conf.db_in);
       log_add(conf.log_file, "INFO", 1, log_mutex, "after closing old buffer block");
 
-      elapsed_time += time_res_blk;
-      fprintf(stdout, "BASEBAND2SPECTRAL, finished %f seconds data\n", elapsed_time);
+      time_offset += time_res_blk;
+      fprintf(stdout, "BASEBAND2SPECTRAL, finished %f seconds data\n", time_offset);
       fflush(stdout);
     }
 
@@ -458,8 +563,10 @@ int destroy_baseband2spectral(conf_t conf)
       dada_hdu_unlock_read(conf.hdu_in);
       dada_hdu_destroy(conf.hdu_in);
     }
-  if(conf.db_out)
+  
+  if(conf.db_out && (!conf.output_network))
     {
+      dada_cuda_dbunregister(conf.hdu_out);
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }  
@@ -468,14 +575,12 @@ int destroy_baseband2spectral(conf_t conf)
   return EXIT_SUCCESS;
 }
 
-int register_header(conf_t *conf)
-{
+int read_dada_header(conf_t *conf)
+{  
   uint64_t hdrsz;
-  char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
-  uint64_t file_size, bytes_per_seconds;
   
-  hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
-  if (!hdrbuf_in)
+  conf->hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
+  if (!conf->hdrbuf_in)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -493,18 +598,41 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-
-  hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
-  if (!hdrbuf_out)
+  
+  if(ascii_header_get(conf->hdrbuf_in, "BW", "%lf", &(conf->bandwidth)) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
+      log_close(conf->log_file);
       exit(EXIT_FAILURE);
-    }  
-  if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"PRIu64"", &file_size) < 0)  
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BW from DADA header is %f MHz", conf->bandwidth);
+  
+  if(ascii_header_get(conf->hdrbuf_in, "PICOSECONDS", "%"SCNu64"", &(conf->picoseconds)) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      log_close(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
+  
+  if(ascii_header_get(conf->hdrbuf_in, "FREQ", "%lf", &(conf->center_freq)) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error egtting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      log_close(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FREQ from DADA header is %f", conf->center_freq);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "FILE_SIZE", "%"SCNu64"", &conf->file_size_in) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -513,7 +641,9 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }   
-  if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"PRIu64"", &bytes_per_seconds) < 0)  
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", conf->file_size_in);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "BYTES_PER_SECOND", "%"SCNu64"", &conf->bytes_per_second_in) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -521,8 +651,10 @@ int register_header(conf_t *conf)
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
-    }  
-  if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", conf->bytes_per_second_in);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -530,9 +662,22 @@ int register_header(conf_t *conf)
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
-    }   
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BEAM_INDEX, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
+  
   /* Get utc_start from hdrin */
-  if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
+  if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
@@ -541,76 +686,7 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-  
-  file_size = (uint64_t)(file_size * conf->scale_dtsz);
-  bytes_per_seconds = (uint64_t)(bytes_per_seconds * conf->scale_dtsz);
-  
-  if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
-  conf->tsamp_out = conf->tsamp_in * conf->ndf_per_chunk_rbufin * NSAMP_DF;
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%lf", conf->tsamp_out) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
-
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_SPECTRAL) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
-  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", conf->ndim_out) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
-  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", conf->npol_out) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
-  if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: BASEBAND2SPECTRAL_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
-  if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_seconds) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      exit(EXIT_FAILURE);
-    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %f", conf->utc_start);
     
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
@@ -621,6 +697,107 @@ int register_header(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
+  return EXIT_SUCCESS;
+}
+
+int register_dada_header(conf_t *conf)
+{
+  char *hdrbuf_out = NULL;
+  uint64_t file_size, bytes_per_second;
+  
+  hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
+  if (!hdrbuf_out)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }  
+  memcpy(hdrbuf_out, conf->hdrbuf_in, DADA_HDRSZ); // Pass the header
+  
+  file_size = (uint64_t)(conf->file_size_in * conf->scale_dtsz);
+  bytes_per_second = (uint64_t)(conf->bytes_per_second_in * conf->scale_dtsz);
+  
+  if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
+  
+  conf->tsamp_out = conf->tsamp_in * conf->ndf_per_chunk_rbufin * NSAMP_DF;
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
+  
+  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_SPECTRAL) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_SPECTRAL);
+  
+  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", conf->ndim_out) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", conf->ndim_out);
+  
+  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", conf->npol_out) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", conf->npol_out);
+  
+  if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: BASEBAND2SPECTRAL_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
+  
+  if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_second) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
+  
   /* donot set header parameters anymore - acqn. doesn't start */
   if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
     {
@@ -752,15 +929,15 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
 
-  if(conf.p_type == -1)
+  if(conf.pol_type == -1)
     {
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: p_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "p_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "p_type is %d", conf.p_type, __FILE__, __LINE__);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "pol_type is %d", conf.pol_type, __FILE__, __LINE__);
   log_add(conf.log_file, "INFO", 1, log_mutex, "npol_out is %d", conf.npol_out, __FILE__, __LINE__);
   log_add(conf.log_file, "INFO", 1, log_mutex, "ndim_out is %d", conf.ndim_out, __FILE__, __LINE__);
   

@@ -37,6 +37,7 @@ pthread_mutex_t log_mutex                = PTHREAD_MUTEX_INITIALIZER;
 
 void *do_capture(void *conf)
 {
+  int enable = 1;
   double freq;
   char *dbuf = NULL;
   int sock, chunk_index; 
@@ -60,7 +61,7 @@ void *do_capture(void *conf)
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&capture_conf->tout, sizeof(capture_conf->tout));
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(capture_conf->port_alive[thread_index]);
@@ -201,6 +202,7 @@ void *do_capture(void *conf)
 
 int initialize_capture(conf_t *conf)
 {
+  int enable = 1;
   int i, sock, nblk_behind = 0;
   time_t seconds_from_1970;
 
@@ -257,9 +259,9 @@ int initialize_capture(conf_t *conf)
       fclose(conf->log_file);
       exit(EXIT_FAILURE);      
     }
-  conf->picoseconds_ref   = 1E6 * round(1.0E6 * (PERIOD - floor(conf->time_res_df * conf->df_in_period)));
+  conf->picoseconds_ref   = 1E6 * round(1.0E6 * (conf->time_res_df * conf->df_in_period - floor(conf->time_res_df * conf->df_in_period)));
   log_add(conf->log_file, "INFO", 1, log_mutex, "picoseconds_ref is %"PRIu64"", conf->picoseconds_ref);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "seconds_from_1970 is %lun", (unsigned long)conf->seconds_from_1970);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "seconds_from_1970 is %lu", (unsigned long)conf->seconds_from_1970);
   
   conf->tout.tv_sec     = PERIOD;
   conf->tout.tv_usec    = 0;
@@ -291,8 +293,6 @@ int initialize_capture(conf_t *conf)
       exit(EXIT_FAILURE);
     }
 
-  //dada_cuda_dbregister(conf->hdu);
-  
   conf->data_block   = (ipcbuf_t *)(conf->hdu->data_block);
   conf->header_block = (ipcbuf_t *)(conf->hdu->header_block);
   
@@ -339,7 +339,7 @@ int initialize_capture(conf_t *conf)
   dbuf = (char *)malloc(sizeof(char) * DFSZ);  
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&conf->tout, sizeof(conf->tout));
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
   memset(&sa, 0x00, sizeof(sa));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(conf->port_alive[0]);
@@ -476,17 +476,19 @@ int destroy_capture(conf_t conf)
 
   if(conf.data_block)
     {
-      //dada_cuda_dbunregister(conf.hdu);
       dada_hdu_unlock_write(conf.hdu);
+      dada_hdu_destroy(conf.hdu); // it has disconnect
     }
-  dada_hdu_destroy(conf.hdu); // it has disconnect
-  
   return EXIT_SUCCESS;
 }
 
 int register_dada_header(conf_t conf)
 {
   char *hdrbuf = NULL;
+  int nchan_template;
+  double bandwidth_template;
+  uint64_t file_size_template, bytes_per_second_template;
+  uint64_t file_size_out, bytes_per_second_out;  
   
   /* Register header */
   hdrbuf = ipcbuf_get_next_write(conf.header_block);
@@ -517,8 +519,90 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
+
+  /* get value from template */
+  if(ascii_header_get(hdrbuf, "BW", "%lf", &bandwidth_template) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error getting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error getting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BW from DADA header is %f", bandwidth_template);
+  
+  if(ascii_header_get(hdrbuf, "NCHAN", "%d", &nchan_template) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error getting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error getting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "NCHAN from DADA header is %d", nchan_template);
+
+  if(ascii_header_get(hdrbuf, "BYTES_PER_SECOND", "%"SCNu64"", &bytes_per_second_template) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", bytes_per_second_template);
+
+  if(ascii_header_get(hdrbuf, "FILE_SIZE", "%"SCNu64"", &file_size_template) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", file_size_template);
+
   
   /* Setup DADA header with given values */
+  bytes_per_second_out = (uint64_t)(bytes_per_second_template * conf.nchan/(double)nchan_template);  
+  if(ascii_header_set(hdrbuf, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_second_out) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second_out);
+  
+  file_size_out = (uint64_t)(file_size_template * conf.nchan/(double)nchan_template);  
+  if(ascii_header_set(hdrbuf, "FILE_SIZE", "%"PRIu64"", file_size_out) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting FILE_SIZE, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting FILE_SIZE, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size_out);
+  
+  conf.bandwidth = conf.nchan * bandwidth_template/(double)nchan_template;
+  if(ascii_header_set(hdrbuf, "BW", "%.6f", conf.bandwidth) < 0)
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_capture(conf);
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BW to DADA header is %f", conf.bandwidth);
+  
   if(ascii_header_set(hdrbuf, "UTC_START", "%s", conf.utc_start) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting UTC_START, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -527,6 +611,7 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "UTC_START to DADA header is %s", conf.utc_start);
   
   if(ascii_header_set(hdrbuf, "RA", "%s", conf.ra) < 0)  
     {
@@ -537,7 +622,6 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  
   if(ascii_header_set(hdrbuf, "DEC", "%s", conf.dec) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting DEC, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -547,6 +631,7 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "RA and DEC to DADA header are %s %s", conf.ra, conf.dec);
   
   if(ascii_header_set(hdrbuf, "SOURCE", "%s", conf.source) < 0)  
     {
@@ -557,18 +642,9 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);      
       exit(EXIT_FAILURE);
     }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "SOURCE to DADA header is %s", conf.source);
   
-  if(ascii_header_set(hdrbuf, "INSTRUMENT", "%s", conf.instrument_name) < 0)  
-    {
-      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: Error setting INSTRUMENT, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-      destroy_capture(conf);
-      log_close(conf.log_file);     
-      exit(EXIT_FAILURE);
-    }
-  
-  if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64, conf.picoseconds) < 0)  
+  if(ascii_header_set(hdrbuf, "PICOSECONDS", "%"PRIu64"", conf.picoseconds) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "CAPTURE_ERROR: Error setting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -576,8 +652,10 @@ int register_dada_header(conf_t conf)
       destroy_capture(conf);
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
-    }    
-  if(ascii_header_set(hdrbuf, "FREQ", "%.6lf", conf.center_freq) < 0)
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "PICOSECONDS to DADA header is %"PRIu64"", conf.picoseconds);
+  
+  if(ascii_header_set(hdrbuf, "FREQ", "%.6f", conf.center_freq) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "CAPTURE_ERROR: Error setting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -586,7 +664,9 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  if(ascii_header_set(hdrbuf, "MJD_START", "%.10lf", conf.mjd_start) < 0)
+  log_add(conf.log_file, "INFO", 1, log_mutex, "FREQ to DADA header is %f", conf.center_freq);
+  
+  if(ascii_header_set(hdrbuf, "MJD_START", "%.15f", conf.mjd_start) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting MJD_START, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "CAPTURE_ERROR: Error setting MJD_START, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
@@ -595,6 +675,8 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "MJD_START to DADA header is %f", conf.mjd_start);
+  
   if(ascii_header_set(hdrbuf, "NCHAN", "%d", conf.nchan) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -604,35 +686,19 @@ int register_dada_header(conf_t conf)
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf.nchan);
   
-  if(ascii_header_set(hdrbuf, "BEAM_ID", "%d", conf.beam_index) < 0)
+  if(ascii_header_set(hdrbuf, "BEAM_INDEX", "%d", conf.beam_index) < 0)
     {
-      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: Error setting BEAM_ID, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-      destroy_capture(conf);
-      log_close(conf.log_file);
-      exit(EXIT_FAILURE);
-    }  
-  if(ascii_header_get(hdrbuf, "RESOLUTION", "%lf", &conf.freq_res) < 0)
-    {
-      log_add(conf.log_file, "ERR", 1,  log_mutex, "Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: Error getting RESOLUTION, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BEAM_INDEX, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting BEAM_INDEX, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  conf.bandwidth = conf.freq_res * conf.nchan;
-  if(ascii_header_set(hdrbuf, "BW", "%.6lf", conf.bandwidth) < 0)
-    {
-      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: Error setting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-      destroy_capture(conf);
-      log_close(conf.log_file);
-      exit(EXIT_FAILURE);
-    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BEAM_INDEX to DADA header is %d", conf.beam_index);
+  
   /* donot set header parameters anymore - acqn. doesn't start */
   if(ipcbuf_mark_filled(conf.header_block, DADA_HDRSZ) < 0)
     {
@@ -915,6 +981,7 @@ void *capture_control(void *conf)
   uint64_t picoseconds_offset; // The seconds_offset fraction part in picoseconds
   int msg_len;
   time_t seconds_from_1970;
+  int enable = 1;
   
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
@@ -925,9 +992,9 @@ void *capture_control(void *conf)
       quit = 1;
       pthread_exit(NULL);
     }
-  
+
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&capture_conf->tout, sizeof(capture_conf->tout));
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
   memset(&sa, 0, sizeof(struct sockaddr_un));
   sa.sun_family = AF_UNIX;
   strncpy(sa.sun_path, capture_conf->capture_ctrl_addr, strlen(capture_conf->capture_ctrl_addr));
@@ -1011,7 +1078,7 @@ void *capture_control(void *conf)
 	  seconds_offset = start_buf * capture_conf->time_res_blk; // Only work with buffer number
 	  picoseconds_offset = 1E6 * (round(1.0E6 * (seconds_offset - floor(seconds_offset))));
 	  
-	  capture_conf->picoseconds = picoseconds_offset +capture_conf->picoseconds_ref;
+	  capture_conf->picoseconds = picoseconds_offset + capture_conf->picoseconds_ref;
 	  seconds_from_1970 = capture_conf->seconds_from_1970 + floor(seconds_offset);
 	  if(!(capture_conf->picoseconds < 1E12))
 	    {
@@ -1201,8 +1268,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       exit(EXIT_FAILURE);
     }
   
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The name of instrument is %s", conf.instrument_name); // Instrument name is not critical
-  
   if(conf.pad==1)
     log_add(conf.log_file, "INFO", 1, log_mutex, "We will pad frequency chunks to fake full bandwidth data");
   else
@@ -1237,14 +1302,12 @@ int default_arguments(conf_t *conf)
   memset(conf->dec, 0x00, sizeof(conf->dec));
   memset(conf->dir, 0x00, sizeof(conf->dir));
   memset(conf->dada_header_template, 0x00, sizeof(conf->dada_header_template));
-  memset(conf->instrument_name, 0x00, sizeof(conf->instrument_name));
   
   sprintf(conf->source, "unset");          // Default with "unset"
   sprintf(conf->ra, "unset");              // Default with "unset"
   sprintf(conf->dec, "unset");             // Default with "unset"
   sprintf(conf->dir, "unset");             // Default with "unset"
   sprintf(conf->dada_header_template, "unset"); // Default with "unset"
-  sprintf(conf->instrument_name, "unset"); // Default with "unset"
   
   for(i = 0; i < NPORT_MAX; i++)
     {      

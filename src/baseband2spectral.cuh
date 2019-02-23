@@ -1,5 +1,5 @@
-#ifndef _BASEBAND2FILTERBANK_CUH
-#define _BASEBAND2FILTERBANK_CUH
+#ifndef _BASEBAND2SPECTRAL_CUH
+#define _BASEBAND2SPECTRAL_CUH
 
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -15,20 +15,52 @@
 #include "futils.h"
 #include "constants.h"
 
+typedef struct fits_t
+{
+  int beam_index;
+  char time_stamp[FITS_TIME_STAMP_LEN];
+  float tsamp;
+  int nchan;
+  float center_freq;
+  float chan_width;
+  int pol_type;
+  int pol_index;
+  int nchunk;
+  int chunk_index;
+  float data[UDP_PAYLOAD_SIZE_MAX]; // Can not alloc dynamic
+}fits_t;
+
 typedef struct conf_t
 {
+  uint64_t picoseconds;
+  double center_freq;
+  int beam_index;
   FILE *log_file;
-
+  int naccumulate;
+  int pol_type, ndim_out, npol_out;
+  int output_network;
+  char ip[MSTR_LEN];
+  int port;
   int nrepeat_per_blk;
-  int nchunk_in, nchan_in;
+  int nchunk_in, nchan_in, nchan_out;
   int cufft_nx, cufft_mod;
-  int nchan_keep_band, nchan_out, nchan_keep_chan, nchan_edge;
-  double inverse_nchan_rate, bandwidth, scale_dtsz;
-    
+  int nchan_keep_chan;
+  double bandwidth, scale_dtsz;
+
+  char *hdrbuf_in;
+  
   int ndf_per_chunk_stream;
   int nstream;
   float ndim_scale;
   int sod;
+
+  uint64_t file_size_in;
+  uint64_t bytes_per_second_in;
+  
+  int nchunk_network;
+  int nchan_per_chunk_network;
+  int data_size_network;
+  int pktsz_network;
   
   char dir[MSTR_LEN];
   char utc_start[MSTR_LEN];
@@ -39,7 +71,7 @@ typedef struct conf_t
   ipcbuf_t *db_in, *db_out;
   char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;
-  uint8_t *dbuf_out;
+  float *dbuf_out;
   double tsamp_in, tsamp_out;
   
   uint64_t ndf_per_chunk_rbufin;
@@ -50,34 +82,33 @@ typedef struct conf_t
   cufftComplex *buf_rt1, *buf_rt2;
   uint64_t hbufin_offset, dbufin_offset;
   uint64_t bufrt1_offset, bufrt2_offset;
-  uint64_t dbufout_offset, hbufout_offset;
+  uint64_t dbufout_offset;
   uint64_t nsamp1, npol1, ndata1;
   uint64_t nsamp2, npol2, ndata2;
-  uint64_t nsamp3, npol3, ndata3; // For search part
+  uint64_t nsamp3, ndata3; 
   
   uint64_t hdrsz, rbufin_size, rbufout_size; // HDR size for both HDU and ring buffer size of input HDU;
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   
-  cufftComplex *offset_scale_d, *offset_scale_h;
   cudaStream_t *streams;
   cufftHandle *fft_plans;
   
   dim3 gridsize_unpack, blocksize_unpack;
-  dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
-  dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
-  dim3 gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose;
-  dim3 gridsize_taccumulate, blocksize_taccumulate;
-  dim3 gridsize_scale, blocksize_scale;
-  int naccumulate_pad, naccumulate_scale, naccumulate;
+  dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
+  dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
+  dim3 gridsize_spectral_saccumulate, blocksize_spectral_saccumulate;
+
+  //fits_t fits;
 }conf_t; 
 
-int initialize_baseband2filterbank(conf_t *conf);
-int baseband2filterbank(conf_t conf);
-int offset_scale(conf_t conf);
-int read_register_header(conf_t *conf);
+int initialize_baseband2spectral(conf_t *conf);
+int baseband2spectral(conf_t conf);
 
-int destroy_baseband2filterbank(conf_t conf);
+int register_dada_header(conf_t *conf);
+int read_dada_header(conf_t *conf);
+
+int destroy_baseband2spectral(conf_t conf);
 int default_arguments(conf_t *conf);
 int examine_record_arguments(conf_t conf, char **argv, int argc);
 

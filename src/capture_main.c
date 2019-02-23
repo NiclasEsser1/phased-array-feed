@@ -34,10 +34,9 @@ void usage()
 	  " -l The number of data frames in each buffer block of each frequency chunk\n"
 	  " -m The number of data frames in each temp buffer of each frequency chunk\n"
 	  " -n The name of header template for PSRDADA\n"
-	  " -o The name of instrument \n"
-	  " -p The source information, which is required for the case without capture control, in the format \"name;ra;dec\" \n"
-	  " -q Force to pad band edge \n"
-	  " -r The index of  beam \n"
+	  " -o The source information, which is required for the case without capture control, in the format \"name;ra;dec\" \n"
+	  " -p Force to pad band edge \n"
+	  " -q The index of  beam \n"
 	  );
 }
 
@@ -52,7 +51,7 @@ int main(int argc, char **argv)
   default_arguments(&conf);
 
   /* read in argument from command line */
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:")) != -1)
     {
       switch(arg)
 	{
@@ -121,20 +120,16 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'o':
-	  sscanf(optarg, "%s", conf.instrument_name);
-	  break;
-	  
-	case 'p':
 	  {
 	    sscanf(optarg, "%[^_]_%[^_]_%s", conf.source, conf.ra, conf.dec);
 	    break;
 	  }
 	  
-	case 'q':
+	case 'p':
 	  sscanf(optarg, "%d", &conf.pad);
 	  break;
 	  	  
-	case 'r':
+	case 'q':
 	  sscanf(optarg, "%d", &conf.beam_index);
 	  break;
 	}

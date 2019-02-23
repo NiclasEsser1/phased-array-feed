@@ -4,34 +4,25 @@ import socket
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import struct
+
+FITS_TIME_STAMP_LEN = 28
+NCHAN  = 199584
+NCHUNK = 231
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 server_address = ('134.104.70.90', 17106)
-#server_address = ("10.17.0.2", 17100)
 sock.bind(server_address)
 while (1):
     data, server = sock.recvfrom(1<<16)
-    print len(data)
-    print "HERE"
+    print "The length of the packet is {} bytes.\n".format(len(data))
     
-    nchan    = np.fromstring(data[0 : 4], dtype='int32')
-    flux     = np.fromstring(data[4 : (nchan[0] * 4 + 4)], dtype='float32')
-    tsamp    = np.fromstring(data[(nchan[0] * 4 + 4) : (nchan[0] * 4 + 8)], dtype='float32')
-    utc_time = np.fromstring(data[(nchan[0] * 4 + 8) : (nchan[0] * 4 + 36)], dtype='c')
-    beam     = np.fromstring(data[(nchan[0] * 4 + 36) : (nchan[0] * 4 + 40)], dtype='int32')    
-    ra       = np.fromstring(data[(nchan[0] * 4 + 40) : (nchan[0] * 4 + 44)], dtype='float32')
-    dec      = np.fromstring(data[(nchan[0] * 4 + 44) : (nchan[0] * 4 + 48)], dtype='float32')
-    mjd_i    = np.fromstring(data[(nchan[0] * 4 + 48) : (nchan[0] * 4 + 52)], dtype='int32')
-    mjd_f    = np.fromstring(data[(nchan[0] * 4 + 52) : (nchan[0] * 4 + 56)], dtype='float32')
-    az       = np.fromstring(data[(nchan[0] * 4 + 56) : (nchan[0] * 4 + 60)], dtype='float32')
-    el       = np.fromstring(data[(nchan[0] * 4 + 60) : (nchan[0] * 4 + 64)], dtype='float32')
-    
-    print nchan[0], tsamp[0], utc_time, beam[0], ra[0], dec[0], mjd_i[0], mjd_f[0], az[0], el[0]
-    #print nchan[0], tsamp[0], utc_time, beam[0], ra[0], dec[0], mjd_i[0], mjd_f[0], az[0], el[0]
-    #print nchan[0]
-    
-    plt.figure()
-    plt.plot(flux)
-    plt.show()
+    nchan      = np.fromstring(data[8 + FITS_TIME_STAMP_LEN : 12 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
+    nchunk     = np.fromstring(data[28 + FITS_TIME_STAMP_LEN : 32 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
+    nchan_per_chunk = nchan/nchunk
+
+    unpack_data = struct.unpack("i28cfiffiiii{}f".format(nchan_per_chunk), data)
+    print unpack_data

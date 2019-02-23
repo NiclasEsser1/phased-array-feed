@@ -7,6 +7,7 @@ extern "C" {
 #define FITS_TIMESTR  "%Y-%m-%dT%H:%M:%S"
 
 #define FITS_TIME_STAMP_LEN 28
+#define UDP_PAYLOAD_SIZE_MAX     65507
   
 #define TILE_DIM  32
 #define NROWBLOCK_TRANS 8
@@ -17,11 +18,14 @@ extern "C" {
 #define DADA_HDRSZ     4096
 
 #define NBYTE_RT             8    // cudaComplex, for one pol
-  
+
+#define NBIT_BASEBAND        16
 #define NPOL_BASEBAND        2
 #define NDIM_BASEBAND        2
 #define NBYTE_BASEBAND       2    // int16_t
+#define TSAMP_BASEBAND       0.84375
   
+#define FREQ_RESOLUTION_BASEBAND 1.0 // MHz
 #define NBIT_FILTERBANK      8
 #define NDIM_FILTERBANK      1
 #define NPOL_FILTERBANK      1

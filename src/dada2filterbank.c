@@ -162,7 +162,7 @@ int dada_header(conf_t *conf)
   ascii_header_get(hdrbuf, "TSAMP", "%lf", &conf->tsamp);
   ascii_header_get(hdrbuf, "BW", "%lf", &conf->bw);
   //ascii_header_get(hdrbuf, "NBEAM", "%d", &conf->nbeams);
-  ascii_header_get(hdrbuf, "BEAM_ID", "%d", &conf->beam_id);
+  ascii_header_get(hdrbuf, "BEAM_INDEX", "%d", &conf->beam_id);
 
   if(conf->file == 0)
     ipcbuf_mark_cleared(conf->hdu->header_block);
