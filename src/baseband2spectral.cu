@@ -796,7 +796,7 @@ int register_dada_header(conf_t *conf)
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
   
-  /* donot set header parameters anymore - acqn. doesn't start */
+  /* donot set header parameters anymore */
   if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);

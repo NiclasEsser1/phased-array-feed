@@ -135,47 +135,47 @@ int main(int argc, char *argv[])
   switch (blocksize_detect_faccumulate_pad_transpose1.x)
     {
     case 1024:
-      detect_faccumulate_pad_transpose_kernel1<1024><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<1024><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 512:
-      detect_faccumulate_pad_transpose_kernel1< 512><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel< 512><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 256:
-      detect_faccumulate_pad_transpose_kernel1< 256><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel< 256><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 128:
-      detect_faccumulate_pad_transpose_kernel1< 128><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel< 128><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 64:
-      detect_faccumulate_pad_transpose_kernel1<  64><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<  64><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 32:
-      detect_faccumulate_pad_transpose_kernel1<  32><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<  32><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 16:
-      detect_faccumulate_pad_transpose_kernel1<  16><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<  16><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 8:
-      detect_faccumulate_pad_transpose_kernel1<   8><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<   8><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 4:
-      detect_faccumulate_pad_transpose_kernel1<   4><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<   4><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 2:
-      detect_faccumulate_pad_transpose_kernel1<   2><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<   2><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
       
     case 1:
-      detect_faccumulate_pad_transpose_kernel1<   1><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
+      detect_faccumulate_pad_transpose1_kernel<   1><<<gridsize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1, blocksize_detect_faccumulate_pad_transpose1.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate);
       break;
     }
   CudaSafeKernelLaunch();

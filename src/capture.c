@@ -33,7 +33,7 @@ uint64_t seconds_from_epoch_ref[NPORT_MAX];
 
 pthread_mutex_t ref_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t ndf_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
-pthread_mutex_t log_mutex                = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t log_mutex            = PTHREAD_MUTEX_INITIALIZER;
 
 void *do_capture(void *conf)
 {
@@ -699,7 +699,7 @@ int register_dada_header(conf_t conf)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "BEAM_INDEX to DADA header is %d", conf.beam_index);
   
-  /* donot set header parameters anymore - acqn. doesn't start */
+  /* donot set header parameters anymore */
   if(ipcbuf_mark_filled(conf.header_block, DADA_HDRSZ) < 0)
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);

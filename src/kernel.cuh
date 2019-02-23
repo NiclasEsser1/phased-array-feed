@@ -601,7 +601,7 @@ __global__ void reduce9_kernel(cufftComplex *dbuf_in, cufftComplex *offset_scale
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
 template <unsigned int blockSize>
-__global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, uint64_t n_accumulate, cufftComplex *offset_scale)
+__global__ void detect_faccumulate_scale2_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, uint64_t n_accumulate, cufftComplex *offset_scale)
 {
   extern volatile __shared__ float scale_sdata[];
   uint64_t i   = threadIdx.x;
@@ -701,7 +701,7 @@ __global__ void detect_faccumulate_scale_kernel2(cufftComplex *dbuf_in, uint8_t 
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */
 template <unsigned int blockSize>
-__global__ void detect_faccumulate_pad_transpose_kernel1(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t n_accumulate)
+__global__ void detect_faccumulate_pad_transpose1_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t n_accumulate)
 {
   extern volatile __shared__ float scale_sdata[];
   uint64_t i   = threadIdx.x;
@@ -802,9 +802,8 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
   uint64_t tid = i;
   uint64_t loc;
   float aa, bb, u, v;
-  int ndim = 6;
   
-  for(j = 0 ; j < ndim; j ++)
+  for(j = 0 ; j < NDATA_PER_SAMP_RT; j ++)
     spectral_sdata[tid + j*blockDim.x] = 0;
 
   while (i < n_accumulate)
@@ -832,7 +831,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     {
       if (tid < 512)
 	{
-	  for(j = 0; j < ndim; j++)
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 512];
 	}
     }
@@ -842,7 +841,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     {
       if (tid < 256)
 	{	  
-	  for(j = 0; j < ndim; j++)
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 256];
 	}
     }
@@ -852,7 +851,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     {
       if (tid < 128)
 	{
-	  for(j = 0; j < ndim; j++)
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 128];
 	}
     }
@@ -862,7 +861,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     {
       if (tid < 64)
 	{
-	  for(j = 0; j < ndim; j++)
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 64];
 	}
     }
@@ -874,7 +873,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	{
 	  if (tid < 32)
 	    {	      
-	      for(j = 0; j < ndim; j++)
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 32];
 	    }
 	}
@@ -882,7 +881,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	{
 	  if (tid < 16)
 	    {	      
-	      for(j = 0; j < ndim; j++)
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 16];
 	    }
 	}
@@ -890,7 +889,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	{
 	  if (tid < 8)
 	    {	      
-	      for(j = 0; j < ndim; j++)
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 8];
 	    }
 	}
@@ -898,7 +897,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	{
 	  if (tid < 4)
 	    {     
-	      for(j = 0; j < ndim; j++)
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 4];
 	    }
 	}
@@ -906,7 +905,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	{
 	  if (tid < 2)
 	    {	      
-	      for(j = 0; j < ndim; j++)
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 2];
 	    }
 	}
@@ -914,7 +913,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 	{
 	  if (tid < 1)
 	    {  
-	      for(j = 0; j < ndim; j++)
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
 		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 1];
 	    }
 	}
@@ -922,7 +921,7 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
   
   if (tid == 0)
     {
-      for(j = 0; j < ndim; j++)	
+      for(j = 0; j < NDATA_PER_SAMP_RT; j++)	
 	dbuf_out[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] += spectral_sdata[j*blockDim.x];
     }
 }
