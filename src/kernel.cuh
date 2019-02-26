@@ -25,11 +25,14 @@ __global__ void mean_kernel(cufftComplex *buf_in, uint64_t offset_in, float *dda
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_uint8);
 __global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_uint8);
 __global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_uint8);
+__global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, int nstream, float scl_nsig, float scl_uint8);
 
 /* The following are only for search mode */
 __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, float *ddat_offs, float *ddat_scl);
 __global__ void detect_faccumulate_scale1_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, cufftComplex *offset_scale);
 __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in);
+
+__global__ void spectral_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
 
 // Modified from the example here, https://devtalk.nvidia.com/default/topic/1038617/cuda-programming-and-performance/understanding-and-adjusting-mark-harriss-array-reduction/
 // The original code is given by Mark Harris 
@@ -457,8 +460,8 @@ __global__ void reduce8_kernel(cufftComplex *dbuf_in, float *ddat_offs, float *d
   
   if (tid == 0)
     {
-      ddat_offs[blockIdx.x * gridDim.y + blockIdx.y]    += sdata[0].x/scl_ndim;
-      dsquare_mean[blockIdx.x * gridDim.y + blockIdx.y] += sdata[0].y/scl_ndim;
+      ddat_offs[blockIdx.x * gridDim.y + blockIdx.y]    += (sdata[0].x/scl_ndim);
+      dsquare_mean[blockIdx.x * gridDim.y + blockIdx.y] += (sdata[0].y/scl_ndim);
     }
 }
 
@@ -696,6 +699,153 @@ __global__ void detect_faccumulate_scale2_kernel(cufftComplex *dbuf_in, uint8_t 
     }
 }
 
+
+/*
+  This kernel will detect data, accumulate it in frequency and scale it;
+  The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
+ */
+template <unsigned int blockSize>
+__global__ void detect_faccumulate_scale2_spectral_faccumulate_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out1, float *dbuf_out2, uint64_t offset_in, uint64_t offset_out, uint64_t n_accumulate, cufftComplex *offset_scale)
+{
+  extern volatile __shared__ float scale_sdata[];
+  uint64_t i   = threadIdx.x, j;
+  uint64_t tid = i;
+  uint64_t loc;
+  int loc_freq;
+  float aa, bb, u, v;
+    
+  for(j = 0 ; j < NDATA_PER_SAMP_RT; j ++)
+    scale_sdata[tid + j*blockDim.x] = 0;
+  
+  while (i < n_accumulate)
+    {
+      loc = blockIdx.x*gridDim.y*n_accumulate + blockIdx.y*n_accumulate + i;
+      aa = dbuf_in[loc].x*dbuf_in[loc].x + dbuf_in[loc].y*dbuf_in[loc].y;
+      bb = dbuf_in[loc + offset_in].x*dbuf_in[loc + offset_in].x + dbuf_in[loc + offset_in].y*dbuf_in[loc + offset_in].y;
+      
+      u = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].x + dbuf_in[loc].y * dbuf_in[loc + offset_in].y);
+      v = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].y - dbuf_in[loc + offset_in].x * dbuf_in[loc].y);
+      // v = 2 * (dbuf_in[loc + offset_in].x * dbuf_in[loc].y - dbuf_in[loc].x * dbuf_in[loc + offset_in].y);
+      
+      scale_sdata[tid] += (aa + bb);
+      scale_sdata[tid + blockDim.x] += (aa - bb);
+      scale_sdata[tid + blockDim.x*2] += u;
+      scale_sdata[tid + blockDim.x*3] += v;
+      scale_sdata[tid + blockDim.x*4] += aa;
+      scale_sdata[tid + blockDim.x*5] += bb;
+      
+      i += blockSize;
+    }  
+  __syncthreads();
+
+  if (blockSize >= 1024)
+    {
+      if (tid < 512)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 512];
+	}
+    }
+  __syncthreads();
+  
+  if (blockSize >= 512)
+    {
+      if (tid < 256)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 256];
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 256)
+    {
+      if (tid < 128)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 128];
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 128)
+    {
+      if (tid < 64)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 64];
+	}
+    }
+  __syncthreads();
+    
+  if (tid < 32)
+    {
+      if (blockSize >= 64)
+	{
+	  if (tid < 32)
+	    {
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 32];
+	    }
+	}
+      if (blockSize >= 32)
+	{
+	  if (tid < 16)
+	    {
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 16];
+	    }
+	}
+      if (blockSize >= 16)
+	{
+	  if (tid < 8)
+	    {
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 8];
+	    }
+	}
+      if (blockSize >= 8)
+	{
+	  if (tid < 4)
+	    {
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 4];
+	    }
+	}
+      if (blockSize >= 4)
+	{
+	  if (tid < 2)
+	    {
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 2];
+	    }
+	}
+      if (blockSize >= 2)
+	{
+	  if (tid < 1)
+	    {
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		scale_sdata[tid + j*blockDim.x] += scale_sdata[tid + j*blockDim.x + 1];
+	    }
+	}
+    }
+  
+  if (tid == 0)
+    {
+      loc_freq = blockIdx.y;
+
+      if(offset_scale[loc_freq].y == 0.0)
+	//dbuf_out1[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(scale_sdata[0]);
+	dbuf_out1[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(scale_sdata[0]); // Reverse frequency order
+      else
+	//dbuf_out1[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((scale_sdata[0] - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8);
+	dbuf_out1[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((scale_sdata[0] - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
+      
+      for(j = 0; j < NDATA_PER_SAMP_RT; j++)	
+	dbuf_out2[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] = scale_sdata[j*blockDim.x];
+    }
+}
+
 /*
   This kernel will detect data, accumulate it in frequency;
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
@@ -926,6 +1076,124 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
     }
 }
 
-__global__ void spectral_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
+// reduce9 + cufftComplex output + unblock
+template <unsigned int blockSize>
+__global__ void reduce10_kernel(cufftComplex *dbuf_in, cufftComplex *offset_scale, uint64_t n_accumulate, float scl_ndim)
+{
+  extern volatile __shared__ cufftComplex sdata[];
+  uint64_t i   = threadIdx.x;
+  uint64_t tid = i;
+  uint64_t loc; 
+
+  sdata[tid].x = 0;
+  sdata[tid].y = 0;
+  
+  while (i < n_accumulate)
+    {
+      loc = blockIdx.x*gridDim.y*n_accumulate + blockIdx.y*n_accumulate + i;
+      sdata[tid].x += dbuf_in[loc].x;
+      sdata[tid].y += dbuf_in[loc].y;
+      i += blockSize;
+    }
+  __syncthreads();
+  
+  if (blockSize >= 1024)
+    {
+      if (tid < 512)
+	{
+	  sdata[tid].x += sdata[tid + 512].x;
+	  sdata[tid].y += sdata[tid + 512].y;
+	}
+    }
+  __syncthreads();
+  
+  if (blockSize >= 512)
+    {
+      if (tid < 256)
+	{
+	  sdata[tid].x += sdata[tid + 256].x;
+	  sdata[tid].y += sdata[tid + 256].y;
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 256)
+    {
+      if (tid < 128)
+	{
+	  sdata[tid].x += sdata[tid + 128].x;
+	  sdata[tid].y += sdata[tid + 128].y;
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 128)
+    {
+      if (tid < 64)
+	{
+	  sdata[tid].x += sdata[tid + 64].x;
+	  sdata[tid].y += sdata[tid + 64].y;
+	}
+    }
+  __syncthreads();
+    
+  if (tid < 32)
+    {
+      if (blockSize >= 64)
+	{
+	  if (tid < 32)
+	    {
+	      sdata[tid].x += sdata[tid + 32].x;
+	      sdata[tid].y += sdata[tid + 32].y;
+	    }
+	}
+      if (blockSize >= 32)
+	{
+	  if (tid < 16)
+	    {
+	      sdata[tid].x += sdata[tid + 16].x;
+	      sdata[tid].y += sdata[tid + 16].y;
+	    }
+	}
+      if (blockSize >= 16)
+	{
+	  if (tid < 8)
+	    {
+	      sdata[tid].x += sdata[tid + 8].x;
+	      sdata[tid].y += sdata[tid + 8].y;
+	    }
+	}
+      if (blockSize >= 8)
+	{
+	  if (tid < 4)
+	    {
+	      sdata[tid].x += sdata[tid + 4].x;
+	      sdata[tid].y += sdata[tid + 4].y;
+	    }
+	}
+      if (blockSize >= 4)
+	{
+	  if (tid < 2)
+	    {
+	      sdata[tid].x += sdata[tid + 2].x;
+	      sdata[tid].y += sdata[tid + 2].y;
+	    }
+	}
+      if (blockSize >= 2)
+	{
+	  if (tid < 1)
+	    {
+	      sdata[tid].x += sdata[tid + 1].x;
+	      sdata[tid].y += sdata[tid + 1].y;
+	    }
+	}
+    }
+  
+  if (tid == 0)
+    {
+      offset_scale[blockIdx.x * gridDim.y + blockIdx.y].x += sdata[0].x/scl_ndim;
+      offset_scale[blockIdx.x * gridDim.y + blockIdx.y].y += sdata[0].y/scl_ndim;
+    }
+}
 
 #endif

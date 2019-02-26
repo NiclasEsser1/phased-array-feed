@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <dirent.h>
 #include <errno.h>
+#include <cuda_profiler_api.h>
 
 #include "baseband2filterbank.cuh"
 #include "cudautil.cuh"
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
   initialize_baseband2filterbank(&conf);
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "elapse_time for filterbank for initialize is %f\n", elapsed_time);
+  fprintf(stdout, "elapsed_time for filterbank for initialize is %f\n", elapsed_time);
   fflush(stdout);
 
   //fprintf(stderr, "FORCE TO QUIT\n");
@@ -157,6 +158,12 @@ int main(int argc, char *argv[])
   /* Destory log interface */  
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
   log_close(conf.log_file);
+  fprintf(stdout, "HERE AFTER LOG CLOSE\n");
+  fflush(stdout);
+  
+  CudaSafeCall(cudaProfilerStop());
+  fprintf(stdout, "HERE AFTER ProfilerStop\n");
+  fflush(stdout);
   
   return EXIT_SUCCESS;
 }

@@ -26,7 +26,7 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include -L/usr/local/cuda/include
 
-all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test scale_test scale1_test scale2_test accumulate_test unpack_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
+all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test accumulate_test unpack_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
 
 capture_main:capture_main.o capture.o log.o
 	$(NVCC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
@@ -52,6 +52,9 @@ reduce8_test:reduce8_test.o kernel.o
 reduce9_test:reduce9_test.o kernel.o 
 	$(NVCC) -o reduce9_test reduce9_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
+reduce10_test:reduce10_test.o kernel.o 
+	$(NVCC) -o reduce10_test reduce10_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
 scale_test:scale_test.o kernel.o 
 	$(NVCC) -o scale_test scale_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
@@ -60,6 +63,9 @@ scale1_test:scale1_test.o kernel.o
 
 scale2_test:scale2_test.o kernel.o 
 	$(NVCC) -o scale2_test scale2_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+scale3_test:scale3_test.o kernel.o 
+	$(NVCC) -o scale3_test scale3_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 accumulate_test:accumulate_test.o kernel.o 
 	$(NVCC) -o accumulate_test accumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
@@ -142,6 +148,9 @@ reduce8_test.o:reduce8_test.cu
 reduce9_test.o:reduce9_test.cu
 	$(NVCC) -c reduce9_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
+reduce10_test.o:reduce10_test.cu
+	$(NVCC) -c reduce10_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
 scale_test.o:scale_test.cu
 	$(NVCC) -c scale_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
@@ -150,6 +159,9 @@ scale1_test.o:scale1_test.cu
 
 scale2_test.o:scale2_test.cu
 	$(NVCC) -c scale2_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+scale3_test.o:scale3_test.cu
+	$(NVCC) -c scale3_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 swap_select_transpose_ptf_test.o:swap_select_transpose_ptf_test.cu
 	$(NVCC) -c swap_select_transpose_ptf_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}

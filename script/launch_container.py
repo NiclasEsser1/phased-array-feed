@@ -40,11 +40,12 @@ if(numa == 1):
     cpuset_cpus = "10-19"
     
 if root:
-    comline = "nvidia-docker run --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it -f --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
+    #comline = "docker run --runtime=nvidia --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
+    comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
 else:    
-    comline = "nvidia-docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -u 50000:50000 -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
+    comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v /tmp:/tmp -u 50000:50000 -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(dvolume, hvolume, numa, numa, cpuset_cpus, container_name, image)
 
 print comline
-print "\nYou are going to a docker container with the name {}!\n".format(image, numa)
+print "\nYou are going to a docker container with the name {}{}!\n".format(image, numa)
 
 os.system(comline)

@@ -7,8 +7,8 @@ extern "C" {
 #define FITS_TIMESTR  "%Y-%m-%dT%H:%M:%S"
 
 #define FITS_TIME_STAMP_LEN 28
-#define UDP_PAYLOAD_SIZE_MAX     65507
-  
+  //#define UDP_PAYLOAD_SIZE_MAX     65507
+#define UDP_PAYLOAD_SIZE_MAX  7895
 #define TILE_DIM  32
 #define NROWBLOCK_TRANS 8
   

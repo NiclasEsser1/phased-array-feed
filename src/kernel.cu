@@ -329,6 +329,22 @@ __global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float 
 }
 
 /*
+  This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
+*/
+__global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, int nstream, float scl_nsig, float scl_uint8)
+{
+  int i;
+  uint64_t loc_freq  = threadIdx.x;
+  for(i = 1; i < nstream; i++)
+    {
+      offset_scale[loc_freq].x += offset_scale[loc_freq + i * offset_in].x;
+      offset_scale[loc_freq].y += offset_scale[loc_freq + i * offset_in].y;
+    }
+  
+  offset_scale[loc_freq].y = scl_nsig * sqrtf(offset_scale[loc_freq].y - offset_scale[loc_freq].x * offset_scale[loc_freq].x) / scl_uint8;
+}
+
+/*
   This kernel will detect data, accumulate it in frequency and scale it;
   The accumulation here is different from the normal accumulation as we need to put two polarisation togethere here;
  */

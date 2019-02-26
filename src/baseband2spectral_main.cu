@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <dirent.h>
 #include <errno.h>
+#include <cuda_profiler_api.h>
 
 #include "baseband2spectral.cuh"
 #include "cudautil.cuh"
@@ -183,6 +184,7 @@ int main(int argc, char *argv[])
   /* Destory log interface */  
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL END");  
   log_close(conf.log_file);
-  
+
+  CudaSafeCall(cudaProfilerStop());
   return EXIT_SUCCESS;
 }

@@ -16,10 +16,6 @@
 
 #include "constants.h"
 
-#define SCL_UINT8            64.0f          // uint8_t, detected samples should vary in 0.5 * range(uint8_t) = 127, to be safe, use 0.25
-#define SCL_NSIG             3.0f
-
-
 extern "C" void usage ()
 {
   fprintf (stdout,

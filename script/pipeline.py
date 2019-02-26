@@ -19,12 +19,6 @@ import os
 EXECUTE = True
 #EXECUTE        = False
 
-#NVPROF = True
-NVPROF         = False
-
-#MEMCHECK       = True
-MEMCHECK       = False
-
 FITSWRITER = True
 #FITSWRITER = False
 
@@ -313,7 +307,7 @@ class Pipeline(object):
     def _handle_execution_stderr(self, stderr, callback):
         if EXECUTE:
             log.error(stderr)
-            raise PipelineError(stderr)
+            #raise PipelineError(stderr)
 
     def cleanup(self):
         # Kill existing process and free shared memory if there is any
@@ -435,22 +429,15 @@ class Search(Pipeline):
 
             # diskdb command
             diskdb_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline                                      
-            self._diskdb_commands.append("taskset -c {} dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(diskdb_cpu, self._rbuf_baseband_key[i], self._dada_fname, 0))
+            self._diskdb_commands.append("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(self._rbuf_baseband_key[i], self._dada_fname, 0))
 
             # baseband2filterbank command
             baseband2filterbank_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 1
-            command = "taskset -c {} ".format(baseband2filterbank_cpu)
-            if NVPROF:
-                command += "nvprof "
-            command += ("{} -a {} -b {} -c {} -d {} -e {} "
-                        "-f {} -i {} -j {} -k {} -l {} ").format(baseband2filterbank, self._rbuf_baseband_key[i], self._rbuf_filterbank_key[i],
-                                                                 self._rbuf_filterbank_ndf_chk, self._nstream, self._ndf_stream,
-                                                                 self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
-                                                                 self._nchan_filterbank, self._nchan_keep_band)
-            #command += ("{} -a {} -b {} -c {} -d {} -e {} "
-            #            "-f {} -i {} -j {} ").format(baseband2filterbank, self._rbuf_baseband_key[i], self._rbuf_filterbank_key[i],
-            #                                         self._rbuf_filterbank_ndf_chk, self._nstream, self._ndf_stream,
-            #                                         self._runtime_directory[i], self._nchk_beam, self._cufft_nx)
+            command = ("{} -a {} -b {} -c {} -d {} -e {} "
+                       "-f {} -i {} -j {} -k {} -l {} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
+                                                                self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
+                                                                self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
+                                                                self._nchan_filterbank, self._nchan_keep_band)
             if SOD:
                 command += "-g 1"
             else:
@@ -459,34 +446,32 @@ class Search(Pipeline):
 
             # Command to create filterbank ring buffer
             dadadb_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 2
-            self._filterbank_create_buffer_commands.append(("taskset -c {} dada_db -l -p -k {:} "
-                                                            "-b {:} -n {:} -r {:}").format(dadadb_cpu, self._rbuf_filterbank_key[i],
+            self._filterbank_create_buffer_commands.append(("dada_db -l -p -k {:} "
+                                                            "-b {:} -n {:} -r {:}").format(self._rbuf_filterbank_key[i],
                                                                                            self._rbuf_filterbank_blksz,
                                                                                            self._rbuf_filterbank_nblk,
                                                                                            self._rbuf_filterbank_nread))
 
             # command to create baseband ring buffer
-            self._baseband_create_buffer_commands.append(("taskset -c {} dada_db -l -p -k {:} "
-                                                          "-b {:} -n {:} -r {:}").format(dadadb_cpu, self._rbuf_baseband_key[i],
+            self._baseband_create_buffer_commands.append(("dada_db -l -p -k {:} "
+                                                          "-b {:} -n {:} -r {:}").format(self._rbuf_baseband_key[i],
                                                                                          self._rbuf_baseband_blksz,
                                                                                          self._rbuf_baseband_nblk,
                                                                                          self._rbuf_baseband_nread))
 
             # command to delete filterbank ring buffer
             self._filterbank_delete_buffer_commands.append(
-                "taskset -c {} dada_db -d -k {:}".format(dadadb_cpu, self._rbuf_filterbank_key[i]))
+                "dada_db -d -k {:}".format(self._rbuf_filterbank_key[i]))
 
             # command to delete baseband ring buffer
             self._baseband_delete_buffer_commands.append(
-                "taskset -c {} dada_db -d -k {:}".format(dadadb_cpu, self._rbuf_baseband_key[i]))
+                "dada_db -d -k {:}".format(self._rbuf_baseband_key[i]))
 
             # Command to run heimdall
             heimdall_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 3
-            command = "taskset -c {} ".format(heimdall_cpu)
-            if NVPROF:
-                command += "nvprof "
-            command += ("heimdall -k {} -detect_thresh {} -output_dir {} ").format(self._rbuf_filterbank_key[i],
-                                                                                   self._detect_thresh, runtime_directory)
+            command = ("heimdall -k {} -detect_thresh {} -output_dir {} ").format(
+                self._rbuf_filterbank_key[i],
+                self._detect_thresh, runtime_directory)
             if self._zap_chans:
                 zap = ""
                 for zap_chan in self._zap_chans:
@@ -537,10 +522,9 @@ class Search(Pipeline):
         self._baseband2filterbank_execution_instances = []
         for command in self._baseband2filterbank_commands:
             execution_instance = ExecuteCommand(command, process_index)
-            if not NVPROF:  # Do not check stderr or returncode if there is any third party software
-                execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
-                #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
-            execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
+            execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
+            #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
+            #execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._baseband2filterbank_execution_instances.append(execution_instance)
             process_index += 1 
 
@@ -750,18 +734,17 @@ class Spectral(Pipeline):
 
             # diskdb command
             diskdb_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline                                      
-            self._diskdb_commands.append("taskset -c {} dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(diskdb_cpu, self._rbuf_baseband_key[i], self._dada_fname, 0))
+            self._diskdb_commands.append("dada_diskdb -k {:s} -f {:s} -o {:d} -s".format(
+                self._rbuf_baseband_key[i], self._dada_fname, 0))
 
             # baseband2spectral command
             baseband2spectral_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 1
-            command = "taskset -c {} ".format(baseband2spectral_cpu)
-            if NVPROF:
-                command += "nvprof "
-            if MEMCHECK:
-                command += "cuda-memcheck "
-            command += "{} -a {} -c {} -d {} -e {} -f {} -g {} -i {} -j {} ".format(baseband2spectral, self._rbuf_baseband_key[i],
-                                                                              self._rbuf_spectral_ndf_chk, self._nstream, self._ndf_stream,
-                                                                              self._runtime_directory[i], self._nchk_beam, self._cufft_nx, self._ptype)
+            command = "{} -a {} -c {} -d {} -e {} -f {} -g {} -i {} -j {} ".format(
+                baseband2spectral,
+                self._rbuf_baseband_key[i],self._rbuf_spectral_ndf_chk,
+                self._nstream, self._ndf_stream,
+                self._runtime_directory[i], self._nchk_beam,
+                self._cufft_nx, self._ptype)
             if not FITSWRITER:
                 if SOD:
                     command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
@@ -773,26 +756,30 @@ class Spectral(Pipeline):
 
             # Command to create spectral ring buffer
             dadadb_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 2
-            self._spectral_create_buffer_commands.append(("taskset -c {} dada_db -l -p -k {:} "
-                                                            "-b {:} -n {:} -r {:}").format(dadadb_cpu, self._rbuf_spectral_key[i],
-                                                                                           self._rbuf_spectral_blksz,
-                                                                                           self._rbuf_spectral_nblk,
-                                                                                           self._rbuf_spectral_nread))
+            self._spectral_create_buffer_commands.append(("dada_db -l -p -k {:} "
+                                                          "-b {:} -n {:} -r {:}").format(
+                                                              dadadb_cpu, self._rbuf_spectral_key[i],
+                                                              self._rbuf_spectral_blksz,
+                                                              self._rbuf_spectral_nblk,
+                                                              self._rbuf_spectral_nread))
 
             # command to create baseband ring buffer
-            self._baseband_create_buffer_commands.append(("taskset -c {} dada_db -l -p -k {:} "
-                                                          "-b {:} -n {:} -r {:}").format(dadadb_cpu, self._rbuf_baseband_key[i],
-                                                                                         self._rbuf_baseband_blksz,
-                                                                                         self._rbuf_baseband_nblk,
-                                                                                         self._rbuf_baseband_nread))
-
+            self._baseband_create_buffer_commands.append(("dada_db -l -p -k {:} "
+                                                          "-b {:} -n {:} -r {:}").format(
+                                                              self._rbuf_baseband_key[i],
+                                                              self._rbuf_baseband_blksz,
+                                                              self._rbuf_baseband_nblk,
+                                                              self._rbuf_baseband_nread))
+            
             # command to delete spectral ring buffer
             self._spectral_delete_buffer_commands.append(
-                "taskset -c {} dada_db -d -k {:}".format(dadadb_cpu, self._rbuf_spectral_key[i]))
+                "dada_db -d -k {:}".format(
+                    self._rbuf_spectral_key[i]))
 
             # command to delete baseband ring buffer
             self._baseband_delete_buffer_commands.append(
-                "taskset -c {} dada_db -d -k {:}".format(dadadb_cpu, self._rbuf_baseband_key[i]))
+                "dada_db -d -k {:}".format(
+                    self._rbuf_baseband_key[i]))
 
             # Command to run dbdisk
             dbdisk_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 4
@@ -834,9 +821,8 @@ class Spectral(Pipeline):
         self._baseband2spectral_execution_instances = []
         for command in self._baseband2spectral_commands:
             execution_instance = ExecuteCommand(command, process_index)
-            if not NVPROF:  # Do not check stderr or returncode if there is any third party software
-                execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
-                #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
+            execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
+            #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._baseband2spectral_execution_instances.append(execution_instance)
             process_index += 1 
@@ -915,6 +901,7 @@ class Spectral2Beams4Pols(Spectral):
     def configure(self, ip):
         super(Spectral2Beams4Pols, self).configure(ip, 4, SPECTRAL_CONFIG_2BEAMS)
 
+# nvprof -f --profile-child-processes -o profile.nvprof%p ./pipeline.py -a 0 -b 2 -c search -d 10
 if __name__ == "__main__":
     logging.getLogger().addHandler(logging.NullHandler())
     log = logging.getLogger('mpikat')
@@ -931,51 +918,63 @@ if __name__ == "__main__":
                         help='The ID of numa node')
     parser.add_argument('-b', '--beam', type=int, nargs='+',
                         help='The number of beams')
+    parser.add_argument('-c', '--pipeline', type=str, nargs='+',
+                        help='The pipeline to run')
+    parser.add_argument('-d', '--nconfigure', type=int, nargs='+',
+                        help='How many times to repeat the configure')
 
     args = parser.parse_args()
     numa = args.numa[0]
     beam = args.beam[0]
+    pipeline = args.pipeline[0]    
+    nconfigure = args.nconfigure[0]
+    
     ip = "10.17.{}.{}".format(host_id, numa + 1)
 
     if beam == 1:
         freq = 1340.5
     if beam == 2:
         freq = 1337.0
-        
-    #log.info("Create pipeline ...")
-    #if beam == 1:
-    #    search_mode = Search1Beam()
-    #if beam == 2:
-    #    search_mode = Search2Beams()
-    #
-    #log.info("Configure it ...")
-    #search_mode.configure(ip)
-    #
-    #log.info("Start it ...")
-    #search_mode.start()
-    #log.info("Stop it ...")
-    #search_mode.stop()
-    #    
-    #log.info("Deconfigure it ...")
-    #search_mode.deconfigure()
 
-    log.info("Create pipeline ...")
-    if beam == 1:
-        #spectral_mode = Spectral1Beam1Pol()
-        spectral_mode = Spectral1Beam2Pols()
-        #spectral_mode = Spectral1Beam4Pols()
-    if beam == 2:
-        #spectral_mode = Spectral2Beams1Pol()
-        spectral_mode = Spectral2Beams2Pols()
-        #spectral_mode = Spectral2Beams4Pols()
-    
-    log.info("Configure it ...")
-    spectral_mode.configure(ip)
-    
-    log.info("Start it ...")
-    spectral_mode.start()
-    log.info("Stop it ...")
-    spectral_mode.stop()
+    if pipeline == "search":
+        for i in range(nconfigure):
+            log.info("Create pipeline ...")
+            if beam == 1:
+                search_mode = Search1Beam()
+            if beam == 2:
+                search_mode = Search2Beams()
+
+            log.info("Configure it ...")
+            search_mode.configure(ip)
         
-    log.info("Deconfigure it ...")
-    spectral_mode.deconfigure()
+            log.info("Start it ...")
+            search_mode.start()
+        
+            log.info("Stop it ...")
+            search_mode.stop()
+        
+            log.info("Deconfigure it ...")
+            search_mode.deconfigure()
+        
+    if pipeline == "spectral":
+        for i in range(nconfigure):
+            log.info("Create pipeline ...")
+            if beam == 1:
+                #spectral_mode = Spectral1Beam1Pol()
+                spectral_mode = Spectral1Beam2Pols()
+                #spectral_mode = Spectral1Beam4Pols()
+            if beam == 2:
+                #spectral_mode = Spectral2Beams1Pol()
+                spectral_mode = Spectral2Beams2Pols()
+                #spectral_mode = Spectral2Beams4Pols()
+    
+            log.info("Configure it ...")
+            spectral_mode.configure(ip)
+        
+            log.info("Start it ...")
+            spectral_mode.start()
+            log.info("Stop it ...")
+            spectral_mode.stop()
+        
+            log.info("Deconfigure it ...")
+            spectral_mode.deconfigure()

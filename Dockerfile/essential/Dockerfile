@@ -14,7 +14,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # To use bash during build
 SHELL ["/bin/bash", "-c"]          
 
-# Create space for ssh daemon and update the system
+# update the system
 RUN apt-get -y check && \
     apt-get -y update && \
     apt-get -y upgrade && \

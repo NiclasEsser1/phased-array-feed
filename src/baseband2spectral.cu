@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <cuda_profiler_api.h>
 
 #include "baseband2spectral.cuh"
 #include "cudautil.cuh"
@@ -170,6 +171,7 @@ int initialize_baseband2spectral(conf_t *conf)
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
@@ -181,6 +183,7 @@ int initialize_baseband2spectral(conf_t *conf)
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
 
@@ -204,6 +207,7 @@ int initialize_baseband2spectral(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   
@@ -215,6 +219,7 @@ int initialize_baseband2spectral(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -230,6 +235,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  
 	  destroy_baseband2spectral(*conf);
 	  fclose(conf->log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);    
 	}
       conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
@@ -244,6 +250,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  
 	  destroy_baseband2spectral(*conf);
 	  fclose(conf->log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);    
 	}
       
@@ -255,6 +262,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  
 	  destroy_baseband2spectral(*conf);
 	  fclose(conf->log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);    
 	}
       
@@ -266,6 +274,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  
 	  destroy_baseband2spectral(*conf);
 	  fclose(conf->log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       
@@ -278,6 +287,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	      
 	      destroy_baseband2spectral(*conf);
 	      fclose(conf->log_file);
+	      CudaSafeCall(cudaProfilerStop());
 	      exit(EXIT_FAILURE);
 	    }
 	}
@@ -344,6 +354,7 @@ int baseband2spectral(conf_t conf)
 	  destroy_baseband2spectral(conf);
 	  free(h_stokes_i);
 	  fclose(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
     }
@@ -370,6 +381,7 @@ int baseband2spectral(conf_t conf)
 	  destroy_baseband2spectral(conf);
 	  free(h_stokes_i);
 	  fclose(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       memset((char *) &sa_udp, 0, sizeof(sa_udp));
@@ -504,6 +516,7 @@ int baseband2spectral(conf_t conf)
 		      destroy_baseband2spectral(conf);
 		      free(h_stokes_i);
 		      fclose(conf.log_file);
+		      CudaSafeCall(cudaProfilerStop());
 		      exit(EXIT_FAILURE);
 		    }
 		}
@@ -585,6 +598,7 @@ int read_dada_header(conf_t *conf)
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   if(hdrsz != DADA_HDRSZ)
@@ -594,6 +608,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   
@@ -604,6 +619,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BW from DADA header is %f MHz", conf->bandwidth);
@@ -615,6 +631,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
@@ -626,6 +643,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "FREQ from DADA header is %f", conf->center_freq);
@@ -637,6 +655,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }   
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", conf->file_size_in);
@@ -648,6 +667,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", conf->bytes_per_second_in);
@@ -659,6 +679,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
@@ -670,6 +691,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
@@ -682,6 +704,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %f", conf->utc_start);
@@ -693,6 +716,7 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   return EXIT_SUCCESS;
@@ -711,6 +735,7 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }  
   memcpy(hdrbuf_out, conf->hdrbuf_in, DADA_HDRSZ); // Pass the header
@@ -725,6 +750,7 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
@@ -737,6 +763,7 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
@@ -748,6 +775,7 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_SPECTRAL);
@@ -759,6 +787,7 @@ int register_dada_header(conf_t *conf)
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", conf->ndim_out);
@@ -770,6 +799,7 @@ int register_dada_header(conf_t *conf)
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", conf->npol_out);
@@ -781,6 +811,7 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
@@ -792,6 +823,7 @@ int register_dada_header(conf_t *conf)
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
@@ -804,6 +836,7 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -832,6 +865,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
@@ -842,6 +876,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
@@ -852,6 +887,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
@@ -871,6 +907,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "The sod should be 0 or 1 when we use ring buffer to send spectral data, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       else
@@ -885,6 +922,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "We are going to send spectral data with network interface, but no ip is given, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       if(conf.port == -1)
@@ -893,6 +931,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "We are going to send spectral data with network interface, but no port is given, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       else
@@ -904,6 +943,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "The method to send spectral data is not configured, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   
@@ -913,6 +953,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }  
   log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk_in);
@@ -923,6 +964,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
@@ -933,6 +975,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "pol_type is %d", conf.pol_type, __FILE__, __LINE__);

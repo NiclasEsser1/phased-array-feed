@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <math.h>
+#include <cuda_profiler_api.h>
 
 #include "baseband2filterbank.cuh"
 #include "cudautil.cuh"
@@ -28,7 +29,7 @@
 // Filterbank data and spectrum data will out with separate buffers
 // Send the data once the buffer block is done
 
-// Make the scale calculation unblock;
+// Make the scale calculation unblock, done;
 extern pthread_mutex_t log_mutex;
 
 int default_arguments(conf_t *conf)
@@ -73,6 +74,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf->nchan_edge, __FILE__, __LINE__);
       
       log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf->nchan_keep_band); 
@@ -142,9 +144,9 @@ int initialize_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
 
-  CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nchan_out * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * sizeof(cufftComplex)));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nchan_out * sizeof(cufftComplex)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nstream * conf->nchan_out * sizeof(cufftComplex)));// We have to clear the memory for this parameter
   
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->ndf_per_chunk_stream;
@@ -223,6 +225,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
@@ -234,6 +237,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
 
@@ -245,7 +249,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "elapse_time for spectral for dbregister is %f\n", elapsed_time);
+  fprintf(stdout, "elapsed_time for filterbank for dbregister is %f\n", elapsed_time);
   fflush(stdout);
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
@@ -256,6 +260,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   
@@ -267,6 +272,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -280,6 +286,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
@@ -293,6 +300,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   
@@ -304,6 +312,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   
@@ -315,6 +324,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -327,6 +337,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 	  
 	  destroy_baseband2filterbank(*conf);
 	  fclose(conf->log_file);
+	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
     }
@@ -377,6 +388,7 @@ int baseband2filterbank(conf_t conf)
       
       destroy_baseband2filterbank(conf);
       fclose(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
@@ -472,7 +484,7 @@ int baseband2filterbank(conf_t conf)
       fprintf(stdout, "BASEBAND2FILTERBANK, finished %f seconds data\n", time_offset);
       fflush(stdout);
     }
-
+  
   log_add(conf.log_file, "INFO", 1, log_mutex, "FINISH the process");
 
   return EXIT_SUCCESS;
@@ -577,54 +589,55 @@ int offset_scale(conf_t conf)
 	      break;
 	    }
 	  CudaSafeKernelLaunch();
+	  
+	  switch (blocksize_taccumulate.x)
+	    {
+	    case 1024:
+	      reduce10_kernel<1024><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 512:
+	      reduce10_kernel< 512><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 256:
+	      reduce10_kernel< 256><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 128:
+	      reduce10_kernel< 128><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 64:
+	      reduce10_kernel<  64><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 32:
+	      reduce10_kernel<  32><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 16:
+	      reduce10_kernel<  16><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 8:
+	      reduce10_kernel<   8><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 4:
+	      reduce10_kernel<   4><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 2:
+	      reduce10_kernel<   2><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    case 1:
+	      reduce10_kernel<   1><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.offset_scale_d[j*conf.nchan_out], conf.naccumulate, conf.ndim_scale);
+	      break;
+	    }
+	  CudaSafeKernelLaunch();
 	}
-      CudaSynchronizeCall(); // Sync here is for multiple streams
-      
-      switch (blocksize_taccumulate.x)
-        {
-        case 1024:
-          reduce9_kernel<1024><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 512:
-          reduce9_kernel< 512><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 256:
-          reduce9_kernel< 256><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 128:
-          reduce9_kernel< 128><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 64:
-          reduce9_kernel<  64><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 32:
-          reduce9_kernel<  32><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 16:
-          reduce9_kernel<  16><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 8:
-          reduce9_kernel<   8><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 4:
-          reduce9_kernel<   4><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 2:
-          reduce9_kernel<   2><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        case 1:
-          reduce9_kernel<   1><<<gridsize_taccumulate, blocksize_taccumulate, blocksize_taccumulate.x * NBYTE_RT>>>(conf.buf_rt1, conf.offset_scale_d, conf.bufrt1_offset, conf.naccumulate, conf.nstream, conf.ndim_scale);
-          break;
-        }
-      CudaSafeKernelLaunch();
     }
+  CudaSynchronizeCall(); // Sync here is for multiple streams
   
   /* Get the scale of each chanel */
-  scale2_kernel<<<gridsize_scale, blocksize_scale>>>(conf.offset_scale_d, SCL_NSIG, SCL_UINT8);
+  scale3_kernel<<<gridsize_scale, blocksize_scale>>>(conf.offset_scale_d, conf.nchan_out, conf.nstream, SCL_NSIG, SCL_UINT8);
   CudaSafeKernelLaunch();
   CudaSynchronizeCall();
   
   CudaSafeCall(cudaMemcpy(conf.offset_scale_h, conf.offset_scale_d, sizeof(cufftComplex) * conf.nchan_out, cudaMemcpyDeviceToHost));
+  CudaSynchronizeCall();
   
   /* Record scale into file */
   sprintf(fname, "%s/%s_scale.txt", conf.dir, conf.utc_start);
@@ -636,6 +649,7 @@ int offset_scale(conf_t conf)
       
       destroy_baseband2filterbank(conf);
       fclose(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   for (i = 0; i < conf.nchan_out; i++)
@@ -702,6 +716,7 @@ int read_register_header(conf_t *conf)
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   if(hdrsz != DADA_HDRSZ)
@@ -711,6 +726,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -722,6 +738,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }  
   if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"SCNu64"", &file_size) < 0)  
@@ -731,6 +748,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", file_size);
@@ -742,6 +760,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", bytes_per_second);
@@ -753,6 +772,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
@@ -765,6 +785,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %f", conf->utc_start);
@@ -781,6 +802,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
@@ -792,6 +814,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BW to DADA header is %f", -conf->bandwidth);
@@ -804,6 +827,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
@@ -815,6 +839,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_FILTERBANK);
@@ -826,6 +851,7 @@ int read_register_header(conf_t *conf)
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", NDIM_FILTERBANK);
@@ -837,6 +863,7 @@ int read_register_header(conf_t *conf)
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", NPOL_FILTERBANK);
@@ -848,6 +875,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
@@ -859,6 +887,7 @@ int read_register_header(conf_t *conf)
       
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
@@ -870,6 +899,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   /* donot set header parameters anymore */
@@ -880,6 +910,7 @@ int read_register_header(conf_t *conf)
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -908,6 +939,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
@@ -918,6 +950,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
@@ -928,6 +961,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
@@ -945,6 +979,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }  
   log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk_in);
@@ -955,6 +990,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
@@ -965,6 +1001,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -974,6 +1011,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
@@ -984,6 +1022,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
       
       log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band); 
