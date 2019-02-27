@@ -119,8 +119,8 @@ int main(int argc, char *argv[])
       	}
     }
   nchan_per_chunk = fits.nchan/fits.nchunk;
-  data_size = sizeof(float) * nchan_per_chunk;
-  net_pktsz = data_size + FITS_TIME_STAMP_LEN + 6 * sizeof(int) + 3 * sizeof(float);  // be careful here    
+  data_size = NBYTE_FLOAT * nchan_per_chunk;
+  net_pktsz = data_size + FITS_TIME_STAMP_LEN + 6 * NBYTE_INT + 3 * NBYTE_FLOAT;  // be careful here    
   fprintf(stdout, "The configuration is: ip %s, port %d, nchan %d, pol_type %d, nchunk %d, nchan_per_chunk is %d, data_size is %d, net_pktsz is %d, file name %s, beam index is %d, center frequency is %f MHz and channel width is %f MHz\n", ip_udp, port_udp, fits.nchan, fits.pol_type, fits.nchunk, nchan_per_chunk, data_size, net_pktsz, fname, fits.beam_index, fits.cfreq, fits.chan_wdith);
 
   /* 
@@ -130,9 +130,9 @@ int main(int argc, char *argv[])
      create network interface
   */
   srand(time(NULL));
-  spectral_buffer_size = sizeof(float) * fits.nchan * NDATA_PER_SAMP_FULL;
+  spectral_buffer_size = NBYTE_FLOAT * fits.nchan * NDATA_PER_SAMP_FULL;
   //spectral_buffer = (float *)malloc(spectral_buffer_size);  // Always create a spectral_buffer for 4 pols
-  spectral_buffer = (float *)calloc(fits.nchan * NDATA_PER_SAMP_FULL, sizeof(float));  // Always create a spectral_buffer for 4 pols
+  spectral_buffer = (float *)calloc(fits.nchan * NDATA_PER_SAMP_FULL, NBYTE_FLOAT);  // Always create a spectral_buffer for 4 pols
   fp = fopen(fname, "w");
   for(i = 0; i < fits.pol_type; i++)
     {

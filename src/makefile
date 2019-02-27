@@ -26,7 +26,7 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include -L/usr/local/cuda/include
 
-all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test accumulate_test unpack_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
+all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test accumulate_test taccumulate_complex_test taccumulate_float_test unpack_test transpose_test swap_select_transpose_ptf_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale2_spectral_faccumulate_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
 
 capture_main:capture_main.o capture.o log.o
 	$(NVCC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
@@ -67,11 +67,17 @@ scale2_test:scale2_test.o kernel.o
 scale3_test:scale3_test.o kernel.o 
 	$(NVCC) -o scale3_test scale3_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
-accumulate_test:accumulate_test.o kernel.o 
-	$(NVCC) -o accumulate_test accumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
+taccumulate_complex_test:taccumulate_complex_test.o kernel.o 
+	$(NVCC) -o taccumulate_complex_test taccumulate_complex_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+taccumulate_float_test:taccumulate_float_test.o kernel.o 
+	$(NVCC) -o taccumulate_float_test taccumulate_float_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 unpack_test:unpack_test.o kernel.o 
 	$(NVCC) -o unpack_test unpack_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+transpose_test:transpose_test.o kernel.o 
+	$(NVCC) -o transpose_test transpose_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 swap_select_transpose_ptf_test:swap_select_transpose_ptf_test.o kernel.o 
 	$(NVCC) -o swap_select_transpose_ptf_test swap_select_transpose_ptf_test.o kernel.o $(LIB_DIRS) $(LIBS)
@@ -79,8 +85,8 @@ swap_select_transpose_ptf_test:swap_select_transpose_ptf_test.o kernel.o
 spectral_taccumulate_test:spectral_taccumulate_test.o kernel.o 
 	$(NVCC) -o spectral_taccumulate_test spectral_taccumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
-spectral_saccumulate_test:spectral_saccumulate_test.o kernel.o 
-	$(NVCC) -o spectral_saccumulate_test spectral_saccumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
+saccumulate_test:saccumulate_test.o kernel.o 
+	$(NVCC) -o saccumulate_test saccumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 swap_select_transpose_pft_test:swap_select_transpose_pft_test.o kernel.o 
 	$(NVCC) -o swap_select_transpose_pft_test swap_select_transpose_pft_test.o kernel.o $(LIB_DIRS) $(LIBS)
@@ -96,6 +102,10 @@ detect_faccumulate_scale_test:detect_faccumulate_scale_test.o kernel.o
 
 detect_faccumulate_scale1_test:detect_faccumulate_scale1_test.o kernel.o 
 	$(NVCC) -o detect_faccumulate_scale1_test detect_faccumulate_scale1_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+detect_faccumulate_scale2_spectral_faccumulate_test:detect_faccumulate_scale2_spectral_faccumulate_test.o kernel.o 
+	$(NVCC) -o detect_faccumulate_scale2_spectral_faccumulate_test detect_faccumulate_scale2_spectral_faccumulate_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
 
 detect_faccumulate_pad_transpose1_test:detect_faccumulate_pad_transpose1_test.o kernel.o 
 	$(NVCC) -o detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose1_test.o kernel.o $(LIB_DIRS) $(LIBS)
@@ -123,6 +133,9 @@ baseband2spectral.o:baseband2spectral.cu
 
 detect_faccumulate_scale2_test.o:detect_faccumulate_scale2_test.cu
 	$(NVCC) -c detect_faccumulate_scale2_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+detect_faccumulate_scale2_spectral_faccumulate_test.o:detect_faccumulate_scale2_spectral_faccumulate_test.cu
+	$(NVCC) -c detect_faccumulate_scale2_spectral_faccumulate_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 detect_faccumulate_scale_test.o:detect_faccumulate_scale_test.cu
 	$(NVCC) -c detect_faccumulate_scale_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
@@ -175,14 +188,20 @@ swap_select_transpose_pft1_test.o:swap_select_transpose_pft1_test.cu
 spectral_taccumulate_test.o:spectral_taccumulate_test.cu
 	$(NVCC) -c spectral_taccumulate_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
-spectral_saccumulate_test.o:spectral_saccumulate_test.cu
-	$(NVCC) -c spectral_saccumulate_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+saccumulate_test.o:saccumulate_test.cu
+	$(NVCC) -c saccumulate_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
-accumulate_test.o:accumulate_test.cu
-	$(NVCC) -c accumulate_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+taccumulate_complex_test.o:taccumulate_complex_test.cu
+	$(NVCC) -c taccumulate_complex_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+taccumulate_float_test.o:taccumulate_float_test.cu
+	$(NVCC) -c taccumulate_float_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 unpack_test.o:unpack_test.cu
 	$(NVCC) -c unpack_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+transpose_test.o:transpose_test.cu
+	$(NVCC) -c transpose_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 kernel.o:kernel.cu
 	$(NVCC) -c kernel.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}

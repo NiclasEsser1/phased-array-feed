@@ -67,14 +67,14 @@ int main(int argc, char *argv[])
   fprintf(stdout, "configuration for kernel is (%d, %d, %d) and (%d, %d, %d)", gridsize_scale.x, gridsize_scale.y, gridsize_scale.z, blocksize_scale.x, blocksize_scale.y, blocksize_scale.z);
 
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&h_offs, nchan * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&h_mean, nchan * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&h_scl,  nchan * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result_scl, nchan * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&h_offs, nchan * NBYTE_FLOAT));
+  CudaSafeCall(cudaMallocHost((void **)&h_mean, nchan * NBYTE_FLOAT));
+  CudaSafeCall(cudaMallocHost((void **)&h_scl,  nchan * NBYTE_FLOAT));
+  CudaSafeCall(cudaMallocHost((void **)&g_result_scl, nchan * NBYTE_FLOAT));
   
-  CudaSafeCall(cudaMalloc((void **)&g_offs, nchan * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&g_mean, nchan * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&g_out_scl, nchan * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&g_offs, nchan * NBYTE_FLOAT));
+  CudaSafeCall(cudaMalloc((void **)&g_mean, nchan * NBYTE_FLOAT));
+  CudaSafeCall(cudaMalloc((void **)&g_out_scl, nchan * NBYTE_FLOAT));
 
   /* prepare data and calculate on CPU*/
   srand(time(NULL));
@@ -88,12 +88,12 @@ int main(int argc, char *argv[])
     }
 
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(g_offs, h_offs, nchan * sizeof(float), cudaMemcpyHostToDevice));
-  CudaSafeCall(cudaMemcpy(g_mean, h_mean, nchan * sizeof(float), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_offs, h_offs, nchan * NBYTE_FLOAT, cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_mean, h_mean, nchan * NBYTE_FLOAT, cudaMemcpyHostToDevice));
   scale_kernel<<<gridsize_scale, blocksize_scale>>>(g_offs, g_mean, g_out_scl, SCL_NSIG, SCL_UINT8);
   CudaSafeKernelLaunch();
   
-  CudaSafeCall(cudaMemcpy(g_result_scl, g_out_scl, nchan * sizeof(float), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result_scl, g_out_scl, nchan * NBYTE_FLOAT, cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < nchan; i++)

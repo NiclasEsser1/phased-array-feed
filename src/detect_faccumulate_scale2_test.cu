@@ -15,8 +15,6 @@
 
 #include "constants.h"
 
-#define NBYTE   4
-
 extern "C" void usage ()
 {
   fprintf (stdout,
@@ -102,13 +100,13 @@ int main(int argc, char *argv[])
   nchan                                = grid_y;
   
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&mean_scale_h, nchan * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&data,  npol * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result,  nout * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&mean_scale_h, nchan * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&data,  npol * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&h_result,  nout * NBYTE_FLOAT));
   CudaSafeCall(cudaMallocHost((void **)&g_result,  nout * sizeof(uint8_t)));
   CudaSafeCall(cudaMalloc((void **)&g_out,  nout * sizeof(uint8_t)));
-  CudaSafeCall(cudaMalloc((void **)&mean_scale_d, nchan * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_in,  npol * sizeof(cufftComplex)));  
+  CudaSafeCall(cudaMalloc((void **)&mean_scale_d, nchan * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_in,  npol * NBYTE_CUFFT_COMPLEX));  
     
   /* cauculate on CPU */
   srand(time(NULL));
@@ -142,53 +140,53 @@ int main(int argc, char *argv[])
     }
     
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
-  CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_in, data, npol * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
     
   switch (blocksize_detect_faccumulate_scale.x)
     {
     case 1024:
-      detect_faccumulate_scale2_kernel<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 512:
-      detect_faccumulate_scale2_kernel< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 256:
-      detect_faccumulate_scale2_kernel< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 128:
-      detect_faccumulate_scale2_kernel< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 64:
-      detect_faccumulate_scale2_kernel<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 32:
-      detect_faccumulate_scale2_kernel<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 16:
-      detect_faccumulate_scale2_kernel<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 8:
-      detect_faccumulate_scale2_kernel<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 4:
-      detect_faccumulate_scale2_kernel<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 2:
-      detect_faccumulate_scale2_kernel<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
       
     case 1:
-      detect_faccumulate_scale2_kernel<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
+      detect_faccumulate_scale2_kernel<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, n_accumulate, mean_scale_d);
       break;
     }
   CudaSafeKernelLaunch();

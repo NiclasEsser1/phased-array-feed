@@ -179,6 +179,74 @@ __global__ void swap_select_transpose_pft1_kernel(cufftComplex* dbuf_in, cufftCo
     }
 }
 
+//__global__ void transposeGPUcoalescing(double* matIn, int n, int m, double* matTran)
+//{
+//  __shared__ double tile[TILE_DIM][TILE_DIM];
+//  int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
+//  int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // <- threadIdx.y only between 0 and 7
+//  
+//  // Load matrix into tile
+//  // Every Thread loads in this case 4 elements into tile.
+//  int i;
+//  for (i = 0; i < TILE_DIM; i += BLOCK_ROWS)
+//    {
+//      if(i_n < n  && (i_m+i) < m)
+//	tile[threadIdx.y+i][threadIdx.x] = matIn[(i_m+i)*n + i_n];
+//    }
+//  __syncthreads();
+//  
+//  i_n = blockIdx.y * TILE_DIM + threadIdx.x; 
+//  i_m = blockIdx.x * TILE_DIM + threadIdx.y;
+//  
+//  for (i = 0; i < TILE_DIM; i += BLOCK_ROWS)
+//    {
+//      if(i_n < m  && (i_m+i) < n)
+//	matTran[(i_m+i)*m + i_n] = tile[threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
+//    }
+//}
+
+/*
+  This kernel is purely for the transpose of PTF data into PFT 
+ */
+__global__ void transpose_kernel(float* dbuf_in, float *dbuf_out, uint64_t offset, int n, int m)
+{
+  int i, j;
+  int64_t loc_in, loc_out;
+  
+  __shared__ float tile[NDATA_PER_SAMP_RT][TILE_DIM][TILE_DIM + 1];
+  
+  // Load matrix into tile
+  // Every Thread loads in this case 4 elements into tile.  
+  int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
+  int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // 
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      if(i_n < n  && (i_m+i) < m)
+  	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    {
+	      loc_in = j*offset + (i_m+i)*n + i_n;
+	      tile[j][threadIdx.y+i][threadIdx.x] = dbuf_in[loc_in];
+	    }
+	}
+    }
+  __syncthreads();
+  
+  i_n = blockIdx.y * TILE_DIM + threadIdx.x; 
+  i_m = blockIdx.x * TILE_DIM + threadIdx.y;
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      if(i_n < m  && (i_m+i) < n)
+  	{	  
+  	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+  	    {
+	      loc_out = j*offset + (i_m+i)*m + i_n;
+  	      dbuf_out[loc_out] = tile[j][threadIdx.x][threadIdx.y+i];
+  	    }
+  	}
+    }
+}
+
 ///* A example of accumulate */
 //template <unsigned int blockSize>
 //__global__ void reduce6(int *g_idata, int *g_odata, unsigned int n)
@@ -247,7 +315,7 @@ __global__ void swap_select_transpose_pft1_kernel(cufftComplex* dbuf_in, cufftCo
 /*
   This kernel accumulates all elements in each channel
 */
-__global__ void accumulate_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out)
+__global__ void taccumulate_complex_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out)
 {
   extern volatile __shared__ cufftComplex accumulate_sdata[];
   uint64_t tid, loc, s;
@@ -512,7 +580,7 @@ __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, c
     }
 }
 
-__global__ void spectral_saccumulate_kernel(float *dbuf, uint64_t offset, int nstream)
+__global__ void saccumulate_kernel(float *dbuf, uint64_t offset, int nstream)
 {
   int i;
   uint64_t loc;

@@ -18,29 +18,28 @@
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "reduce6_test - Test the reduce6 kernel \n"
+	   "taccumulate_complex_test - Test the accumulate kernel \n"
 	   "\n"
-	   "Usage: reduce6_test [options]\n"
+	   "Usage: taccumulate_complex_test [options]\n"
 	   " -a  Grid size in X\n"
 	   " -b  Grid size in Y\n"
 	   " -c  Block size in X\n"
-	   " -d  Number of samples to accumulate in each block\n"
 	   " -h  show help\n");
 }
 
-// ./reduce6_test -a 512 -b 1 -c 512 -d 1024
+// ./taccumulate_complex_test -a 512 -b 1 -c 512
 int main(int argc, char *argv[])
 {
   int i, j, arg;
   int grid_x, grid_y, block_x;
   uint64_t n_accumulate;
   uint64_t len_in, len_out, idx;
-  dim3 gridsize_reduce6, blocksize_reduce6;
+  dim3 gridsize_accumulate, blocksize_accumulate;
   float h_total = 0, g_total = 0;
   cufftComplex *h_result = NULL, *g_result = NULL, *data = NULL, *g_in = NULL, *g_out = NULL;
   
   /* Read in parameters, the arguments here have the same name  */
-  while((arg=getopt(argc,argv,"a:b:hc:d:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:")) != -1)
     {
       switch(arg)
 	{
@@ -71,29 +70,20 @@ int main(int argc, char *argv[])
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
-	  
-	case 'd':	  
-	  if (sscanf (optarg, "%"SCNu64"", &n_accumulate) != 1)
-	    {
-	      fprintf (stderr, "Does not get n_accumulate, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      exit(EXIT_FAILURE);
-	    }
-	  fprintf(stdout, "n_accumulate is %"SCNu64"\n",  n_accumulate);
-	  break;
 	}
     }
-
+  n_accumulate = block_x * 2;
   fprintf(stdout, "grid_x is %d, grid_y is %d, block_x is %d and n_accumulate is %"SCNu64"\n", grid_x, grid_y, block_x, n_accumulate);
   
   /* Setup size */
-  gridsize_reduce6.x  = grid_x;
-  gridsize_reduce6.y  = grid_y;
-  gridsize_reduce6.z  = 1;
-  blocksize_reduce6.x = block_x;
-  blocksize_reduce6.y = 1;
-  blocksize_reduce6.z = 1;
-  len_out             = grid_x*grid_y;
-  len_in              = len_out*n_accumulate;
+  gridsize_accumulate.x  = grid_x;
+  gridsize_accumulate.y  = grid_y;
+  gridsize_accumulate.z  = 1;
+  blocksize_accumulate.x = block_x;
+  blocksize_accumulate.y = 1;
+  blocksize_accumulate.z = 1;
+  len_out                = grid_x*grid_y;
+  len_in                 = len_out*n_accumulate;
 
   /* Create buffer */
   CudaSafeCall(cudaMallocHost((void **)&data,     len_in * NBYTE_CUFFT_COMPLEX));
@@ -121,53 +111,9 @@ int main(int argc, char *argv[])
   
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, len_in * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
-  switch (blocksize_reduce6.x)
-    {
-    case 1024:
-      reduce6_kernel<1024><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 512:
-      reduce6_kernel< 512><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 256:
-      reduce6_kernel< 256><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 128:
-      reduce6_kernel< 128><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 64:
-      reduce6_kernel<  64><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 32:
-      reduce6_kernel<  32><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 16:
-      reduce6_kernel<  16><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 8:
-      reduce6_kernel<   8><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 4:
-      reduce6_kernel<   4><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 2:
-      reduce6_kernel<   2><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-      
-    case 1:
-      reduce6_kernel<   1><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
-      break;
-    }
+  taccumulate_complex_kernel<<<gridsize_accumulate, blocksize_accumulate, blocksize_accumulate.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out);
   CudaSafeKernelLaunch();
+
   CudaSafeCall(cudaMemcpy(g_result, g_out, len_out * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */

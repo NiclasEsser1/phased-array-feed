@@ -18,29 +18,32 @@
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "reduce6_test - Test the reduce6 kernel \n"
+	   "reduce10_test - Test the reduce10 kernel \n"
 	   "\n"
-	   "Usage: reduce6_test [options]\n"
+	   "Usage: reduce10_test [options]\n"
 	   " -a  Grid size in X\n"
 	   " -b  Grid size in Y\n"
 	   " -c  Block size in X\n"
 	   " -d  Number of samples to accumulate in each block\n"
+	   " -e  Number of samples to average\n"
 	   " -h  show help\n");
 }
 
-// ./reduce6_test -a 512 -b 1 -c 512 -d 1024
+// ./reduce10_test -a 512 -b 1 -c 512 -d 1024 -e 1.0
 int main(int argc, char *argv[])
 {
-  int i, j, arg;
+  int i, j;
+  int arg;
   int grid_x, grid_y, block_x;
   uint64_t n_accumulate;
   uint64_t len_in, len_out, idx;
-  dim3 gridsize_reduce6, blocksize_reduce6;
+  dim3 gridsize_reduce10, blocksize_reduce10;
   float h_total = 0, g_total = 0;
-  cufftComplex *h_result = NULL, *g_result = NULL, *data = NULL, *g_in = NULL, *g_out = NULL;
+  cufftComplex *data = NULL, *g_in = NULL, *g_out = NULL, *g_result = NULL, *h_result = NULL;
+  float scl_ndim;
   
   /* Read in parameters, the arguments here have the same name  */
-  while((arg=getopt(argc,argv,"a:b:hc:d:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:d:e:")) != -1)
     {
       switch(arg)
 	{
@@ -78,93 +81,106 @@ int main(int argc, char *argv[])
 	      fprintf (stderr, "Does not get n_accumulate, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      exit(EXIT_FAILURE);
 	    }
-	  fprintf(stdout, "n_accumulate is %"SCNu64"\n",  n_accumulate);
+	  fprintf(stdout, "n_accumulate is %"PRIu64"\n",  n_accumulate);
+	  break;
+	  	  
+	case 'e':	  
+	  if (sscanf (optarg, "%f", &scl_ndim) != 1)
+	    {
+	      fprintf (stderr, "Does not get scl_ndim, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      exit(EXIT_FAILURE);
+	    }
+	  fprintf(stdout, "scl_ndim is %f\n",  scl_ndim);
 	  break;
 	}
     }
 
-  fprintf(stdout, "grid_x is %d, grid_y is %d, block_x is %d and n_accumulate is %"SCNu64"\n", grid_x, grid_y, block_x, n_accumulate);
+  fprintf(stdout, "grid_x is %d, grid_y is %d, block_x is %d, n_accumulate is %"SCNu64" and scl_ndim is %f\n", grid_x, grid_y, block_x, n_accumulate, scl_ndim);
   
   /* Setup size */
-  gridsize_reduce6.x  = grid_x;
-  gridsize_reduce6.y  = grid_y;
-  gridsize_reduce6.z  = 1;
-  blocksize_reduce6.x = block_x;
-  blocksize_reduce6.y = 1;
-  blocksize_reduce6.z = 1;
+  gridsize_reduce10.x  = grid_x;
+  gridsize_reduce10.y  = grid_y;
+  gridsize_reduce10.z  = 1;
+  blocksize_reduce10.x = block_x;
+  blocksize_reduce10.y = 1;
+  blocksize_reduce10.z = 1;
   len_out             = grid_x*grid_y;
   len_in              = len_out*n_accumulate;
 
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&data,     len_in * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&data, len_in * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_in,     len_in * NBYTE_CUFFT_COMPLEX));
+  
   CudaSafeCall(cudaMallocHost((void **)&h_result, len_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&g_result, len_out * NBYTE_CUFFT_COMPLEX));
-  CudaSafeCall(cudaMalloc((void **)&g_in,         len_in * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMalloc((void **)&g_out,        len_out * NBYTE_CUFFT_COMPLEX));
-
+  
+  CudaSafeCall(cudaMemset((void *)g_out,  0,      len_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMemset((void *)h_result, 0,    len_out * NBYTE_CUFFT_COMPLEX));
+  
   /* cauculate on CPU */
   srand(time(NULL));
   for(i = 0; i < len_out; i ++)
     {
       h_result[i].x = 0;
-      h_result[i].y = 0;
+      h_result[i].y= 0;
       for(j = 0; j < n_accumulate; j++)
 	{
 	  idx = i * n_accumulate + j;
 	  data[idx].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
 	  data[idx].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-
-	  h_result[i].x += data[idx].x;
-	  h_result[i].y += data[idx].y;
+	  
+	  h_result[i].x += (data[idx].x/scl_ndim);
+	  h_result[i].y += (data[idx].y/scl_ndim);
 	}
     }
   
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, len_in * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
-  switch (blocksize_reduce6.x)
+  switch (blocksize_reduce10.x)
     {
     case 1024:
-      reduce6_kernel<1024><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<1024><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 512:
-      reduce6_kernel< 512><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel< 512><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 256:
-      reduce6_kernel< 256><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel< 256><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 128:
-      reduce6_kernel< 128><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel< 128><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 64:
-      reduce6_kernel<  64><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<  64><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 32:
-      reduce6_kernel<  32><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<  32><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 16:
-      reduce6_kernel<  16><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<  16><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 8:
-      reduce6_kernel<   8><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<   8><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 4:
-      reduce6_kernel<   4><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<   4><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 2:
-      reduce6_kernel<   2><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<   2><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
       
     case 1:
-      reduce6_kernel<   1><<<gridsize_reduce6, blocksize_reduce6, blocksize_reduce6.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate);
+      reduce10_kernel<   1><<<gridsize_reduce10, blocksize_reduce10, blocksize_reduce10.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, n_accumulate, scl_ndim);
       break;
     }
   CudaSafeKernelLaunch();
@@ -180,11 +196,11 @@ int main(int argc, char *argv[])
   fprintf(stdout, "CPU:\t%f\nGPU:\t%f\n%E\n", h_total, g_total, (g_total - h_total)/h_total);
   
   /* Free buffer */
+  CudaSafeCall(cudaFree(g_in));
+  CudaSafeCall(cudaFree(g_out));
   CudaSafeCall(cudaFreeHost(data));
   CudaSafeCall(cudaFreeHost(h_result));
   CudaSafeCall(cudaFreeHost(g_result));
-  CudaSafeCall(cudaFree(g_in));
-  CudaSafeCall(cudaFree(g_out));
   
   return EXIT_SUCCESS;
 }

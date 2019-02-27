@@ -15,8 +15,6 @@
 
 #include "constants.h"
 
-#define NBYTE   4
-
 extern "C" void usage ()
 {
   fprintf (stdout,
@@ -92,13 +90,13 @@ int main(int argc, char *argv[])
   nchan                                = grid_y;
   
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&mean_scale_h, nchan * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&data,  npol * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result,  nout * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&mean_scale_h, nchan * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&data,  npol * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&h_result,  nout * NBYTE_FLOAT));
   CudaSafeCall(cudaMallocHost((void **)&g_result,  nout * sizeof(uint8_t)));
   CudaSafeCall(cudaMalloc((void **)&g_out,  nout * sizeof(uint8_t)));
-  CudaSafeCall(cudaMalloc((void **)&mean_scale_d, nchan * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_in,  npol * sizeof(cufftComplex)));  
+  CudaSafeCall(cudaMalloc((void **)&mean_scale_d, nchan * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_in,  npol * NBYTE_CUFFT_COMPLEX));  
     
   /* cauculate on CPU */
   srand(time(NULL));
@@ -132,9 +130,9 @@ int main(int argc, char *argv[])
     }
     
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
-  CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
-  detect_faccumulate_scale1_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE>>>(g_in, g_out, nsamp, mean_scale_d);
+  CudaSafeCall(cudaMemcpy(mean_scale_d, mean_scale_h, nchan * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_in, data, npol * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
+  detect_faccumulate_scale1_kernel<<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp, mean_scale_d);
   CudaSafeKernelLaunch();
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  

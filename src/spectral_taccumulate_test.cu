@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
   dim3 grid_size, block_size;
   uint64_t nsamp_in, nsamp_out, npol_in, npol_out, idx_in, idx_out;
   cufftComplex *data = NULL, *g_in = NULL;
-  float *h_result = NULL, *g_result = NULL, *g_out = NULL, aa, bb, ab, phi, I, Q, U, V;
+  float *h_result = NULL, *g_result = NULL, *g_out = NULL, aa, bb, u, v;
   
   /* Read in parameters */
   while((arg=getopt(argc,argv,"a:b:hc:")) != -1)
@@ -124,18 +124,13 @@ int main(int argc, char *argv[])
 
 	      aa = data[idx_in].x * data[idx_in].x + data[idx_in].y * data[idx_in].y;
 	      bb = data[idx_in+nsamp_in].x * data[idx_in+nsamp_in].x + data[idx_in+nsamp_in].y * data[idx_in+nsamp_in].y;
-	      ab = sqrtf(aa*bb);
-	      
-	      I = aa + bb;
-	      Q = aa - bb;
-	      U = 2 * (data[idx_in].x * data[idx_in+nsamp_in].x + data[idx_in].y * data[idx_in+nsamp_in].y);
-	      phi = acosf(0.5 * U / ab);
-	      V = 2 * ab * sinf(phi);
-	      
-	      h_result[idx_out] += I;
-	      h_result[idx_out + nsamp_out] += Q;
-	      h_result[idx_out + nsamp_out*2] += U;
-	      h_result[idx_out + nsamp_out*3] += V;
+	      u = 2 * (data[idx_in].x * data[idx_in+nsamp_in].x + data[idx_in].y * data[idx_in+nsamp_in].y);
+	      v = 2 * (data[idx_in].x * data[idx_in+nsamp_in].y - data[idx_in].y * data[idx_in+nsamp_in].x);
+	      	      
+	      h_result[idx_out] += (aa + bb);
+	      h_result[idx_out + nsamp_out] += (aa - bb);
+	      h_result[idx_out + nsamp_out*2] += u;
+	      h_result[idx_out + nsamp_out*3] += v;
 	      h_result[idx_out + nsamp_out*4] += aa;
 	      h_result[idx_out + nsamp_out*5] += bb;
 	    }

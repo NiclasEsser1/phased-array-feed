@@ -16,8 +16,6 @@
 #include "kernel.cuh"
 #include "constants.h"
 
-#define NBYTE_RT  8
-
 extern "C" void usage ()
 {
   fprintf (stdout,
@@ -85,9 +83,9 @@ int main(int argc, char *argv[])
   /* Create buffer */
   CudaSafeCall(cudaMallocHost((void **)&data_int16, ndata * sizeof(int16_t)));
   CudaSafeCall(cudaMalloc((void **)&g_in,           nsamp * sizeof(int64_t)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result,   npol * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result,   npol * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_out,          npol * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMallocHost((void **)&h_result,   npol * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&g_result,   npol * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_out,          npol * NBYTE_CUFFT_COMPLEX));
 
   /* Prepare data */
   srand(time(NULL));
@@ -126,7 +124,7 @@ int main(int argc, char *argv[])
   unpack_kernel<<<gridsize_unpack, blocksize_unpack>>>(g_in, g_out, nsamp);
   CudaSafeKernelLaunch();
 
-  CudaSafeCall(cudaMemcpy(g_result, g_out, npol * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result, g_out, npol * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < nsamp; i++)

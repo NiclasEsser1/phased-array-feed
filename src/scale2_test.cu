@@ -64,10 +64,10 @@ int main(int argc, char *argv[])
   fprintf(stdout, "configuration for kernel is (%d, %d, %d) and (%d, %d, %d)", gridsize_scale2.x, gridsize_scale2.y, gridsize_scale2.z, blocksize_scale2.x, blocksize_scale2.y, blocksize_scale2.z);
 
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&data, nchan * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result,  nchan * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result, nchan * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g, nchan * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMallocHost((void **)&data, nchan * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&h_result,  nchan * NBYTE_FLOAT));
+  CudaSafeCall(cudaMallocHost((void **)&g_result, nchan * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g, nchan * NBYTE_CUFFT_COMPLEX));
   /* prepare data and calculate on CPU*/
   srand(time(NULL));
   for(i = 0; i < nchan; i++)
@@ -80,11 +80,11 @@ int main(int argc, char *argv[])
     }
 
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(g, data, nchan * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g, data, nchan * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
   scale2_kernel<<<gridsize_scale2, blocksize_scale2>>>(g, SCL_NSIG, SCL_UINT8);
   CudaSafeKernelLaunch();
   
-  CudaSafeCall(cudaMemcpy(g_result, g, nchan * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result, g, nchan * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < nchan; i++)

@@ -23,114 +23,114 @@ int filterbank_header(conf_t conf)
     
   /* Write filterbank header */
   length = 12;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "HEADER_START");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   
   length = 12;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "telescope_id");
-  fwrite(field, sizeof(char), length, conf.f_fp);
-  fwrite((char*)&conf.telescope_id, sizeof(int), 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.telescope_id, NBYTE_INT, 1, conf.f_fp);
     
   length = 9;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "data_type");
-  fwrite(field, sizeof(char), length, conf.f_fp);
-  fwrite((char*)&conf.data_type, sizeof(int), 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.data_type, NBYTE_INT, 1, conf.f_fp);
  
   length = 5;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "tsamp");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.tsamp, sizeof(double), 1, conf.f_fp);
   
   length = 6;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "tstart");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.mjd_start, sizeof(double), 1, conf.f_fp);
   
   length = 5;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "nbits");
-  fwrite(field, sizeof(char), length, conf.f_fp);
-  fwrite((char*)&conf.nbits, sizeof(int), 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.nbits, NBYTE_INT, 1, conf.f_fp);
 
   length = 4;
   conf.nifs = conf.npol * conf.ndim;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "nifs");
-  fwrite(field, sizeof(char), length, conf.f_fp);
-  fwrite((char*)&conf.nifs, sizeof(int), 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.nifs, NBYTE_INT, 1, conf.f_fp);
   
   length = 4;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "fch1");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.fch1, sizeof(double), 1, conf.f_fp);
   
   length = 4;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "foff");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.foff, sizeof(double), 1, conf.f_fp);
     
   length = 6;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "nchans");
-  fwrite(field, sizeof(char), length, conf.f_fp);
-  fwrite((char*)&conf.nchans, sizeof(int), 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.nchans, NBYTE_INT, 1, conf.f_fp);
  
   length = 11;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "source_name");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   length = strlen(conf.source_name);
   strncpy(field, conf.source_name, length);
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
 
   length = 7;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "src_raj");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   length = strlen(conf.ra);
   strncpy(field, conf.ra, length);
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
 
   length = 7;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "src_dej");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   length = strlen(conf.dec);
   strncpy(field, conf.dec, length);
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   
   length = 10;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "machine_id");
-  fwrite(field, sizeof(char), length, conf.f_fp);
-  fwrite((char*)&conf.machine_id, sizeof(int), 1, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.machine_id, NBYTE_INT, 1, conf.f_fp);
   
   //length = 6;
-  //fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   //strcpy(field, "nbeams");
-  //fwrite(field, sizeof(char), length, conf.f_fp);
-  //fwrite((char*)&conf.nbeams, sizeof(int), 1, conf.f_fp);
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&conf.nbeams, NBYTE_INT, 1, conf.f_fp);
   
   //length = 7;
-  //fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   //strcpy(field, "beam_id");
-  //fwrite(field, sizeof(char), length, conf.f_fp);
-  //fwrite((char*)&conf.beam_id, sizeof(int), 1, conf.f_fp);
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&conf.beam_id, NBYTE_INT, 1, conf.f_fp);
   
   length = 10;
-  fwrite((char*)&length, sizeof(int), 1, conf.f_fp);
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "HEADER_END");
-  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
     
   return EXIT_SUCCESS;
 }
@@ -190,7 +190,7 @@ int filterbank_data(conf_t conf)
       while(!ipcbuf_eod(conf.db))
 	{
 	  curbuf  = ipcbuf_get_next_read(conf.db, &rsz);
-	  wsz = fwrite(curbuf, sizeof(char), rsz, conf.f_fp);
+	  wsz = fwrite(curbuf, NBYTE_CHAR, rsz, conf.f_fp);
 	  ipcbuf_mark_cleared(conf.db);      
 	}
     }

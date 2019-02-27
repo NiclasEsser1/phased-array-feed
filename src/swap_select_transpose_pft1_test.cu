@@ -105,12 +105,12 @@ int main(int argc, char *argv[])
   fprintf(stdout, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", nsamp_in, nsamp_out, npol_in, npol_out);
 
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&data,     npol_in * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result, npol_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMemset((void *)g_out,  0,      npol_out * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMallocHost((void **)&data,     npol_in * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&h_result, npol_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMemset((void *)g_out,  0,      npol_out * NBYTE_CUFFT_COMPLEX));
   
   /* Prepare the data */
   srand(time(NULL));
@@ -153,11 +153,11 @@ int main(int argc, char *argv[])
     }
   
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(g_in, data, npol_in * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_in, data, npol_in * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
   swap_select_transpose_pft1_kernel<<<grid_size, block_size>>>(g_in, g_out, cufft_nx, NSAMP_DF, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
   CudaSafeKernelLaunch();
 
-  CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < nsamp_out; i++)

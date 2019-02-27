@@ -97,7 +97,7 @@ typedef struct conf_t
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
   dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
-  dim3 gridsize_spectral_saccumulate, blocksize_spectral_saccumulate;
+  dim3 gridsize_saccumulate, blocksize_saccumulate;
 
   //fits_t fits;
 }conf_t; 

@@ -103,15 +103,15 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->bufin_size   = conf->nstream * conf->sbufin_size;
   conf->bufout_size  = conf->nstream * conf->sbufout_size;
   
-  conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
-  conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
+  conf->sbufrt1_size = conf->npol1 * NBYTE_CUFFT_COMPLEX;
+  conf->sbufrt2_size = conf->npol2 * NBYTE_CUFFT_COMPLEX;
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
   conf->hbufin_offset = conf->sbufin_size;
   conf->dbufin_offset = conf->sbufin_size / (NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND);
-  conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
-  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
+  conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_CUFFT_COMPLEX;
+  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_CUFFT_COMPLEX;
   
   conf->dbufout_offset = conf->sbufout_size / NBYTE_SPECTRAL;
 
@@ -151,15 +151,15 @@ int initialize_baseband2spectral(conf_t *conf)
 	  conf->gridsize_spectral_taccumulate.x, conf->gridsize_spectral_taccumulate.y, conf->gridsize_spectral_taccumulate.z,
 	  conf->blocksize_spectral_taccumulate.x, conf->blocksize_spectral_taccumulate.y, conf->blocksize_spectral_taccumulate.z);        
 
-  conf->gridsize_spectral_saccumulate.x = NDATA_PER_SAMP_RT;
-  conf->gridsize_spectral_saccumulate.y = conf->cufft_nx / OVER_SAMP_RATE;
-  conf->gridsize_spectral_saccumulate.z = 1;
-  conf->blocksize_spectral_saccumulate.x = conf->nchan_in;
-  conf->blocksize_spectral_saccumulate.y = 1;
-  conf->blocksize_spectral_saccumulate.z = 1; 
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of spectral_saccumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
-	  conf->gridsize_spectral_saccumulate.x, conf->gridsize_spectral_saccumulate.y, conf->gridsize_spectral_saccumulate.z,
-	  conf->blocksize_spectral_saccumulate.x, conf->blocksize_spectral_saccumulate.y, conf->blocksize_spectral_saccumulate.z);        
+  conf->gridsize_saccumulate.x = NDATA_PER_SAMP_RT;
+  conf->gridsize_saccumulate.y = conf->cufft_nx / OVER_SAMP_RATE;
+  conf->gridsize_saccumulate.z = 1;
+  conf->blocksize_saccumulate.x = conf->nchan_in;
+  conf->blocksize_saccumulate.y = 1;
+  conf->blocksize_saccumulate.z = 1; 
+  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of saccumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
+	  conf->gridsize_saccumulate.x, conf->gridsize_saccumulate.y, conf->gridsize_saccumulate.z,
+	  conf->blocksize_saccumulate.x, conf->blocksize_saccumulate.y, conf->blocksize_saccumulate.z);        
 
   /* attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(NULL);
@@ -296,8 +296,8 @@ int initialize_baseband2spectral(conf_t *conf)
     {
       conf->nchunk_network = conf->nchan_in; // We send spectral of one input channel per udp packet;
       conf->nchan_per_chunk_network = conf->nchan_out/conf->nchunk_network;
-      conf->data_size_network = sizeof(float) * conf->nchan_per_chunk_network;
-      conf->pktsz_network     = conf->data_size_network + 3 * sizeof(float) + 6 * sizeof(int) + FITS_TIME_STAMP_LEN;
+      conf->data_size_network = NBYTE_FLOAT * conf->nchan_per_chunk_network;
+      conf->pktsz_network     = conf->data_size_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
       log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->data_size_network);
@@ -314,10 +314,10 @@ int baseband2spectral(conf_t conf)
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
   dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
-  dim3 gridsize_spectral_saccumulate, blocksize_spectral_saccumulate;
+  dim3 gridsize_saccumulate, blocksize_saccumulate;
   uint64_t cbufsz;
   double time_res_blk, time_offset = 0;
-  float *h_stokes_i = (float *)malloc(conf.nchan_out * sizeof(float));
+  float *h_stokes_i = (float *)malloc(conf.nchan_out * NBYTE_FLOAT);
   uint64_t memcpy_offset;
   double time_stamp_f;
   time_t time_stamp_i;
@@ -335,8 +335,8 @@ int baseband2spectral(conf_t conf)
   blocksize_swap_select_transpose_pft1 = conf.blocksize_swap_select_transpose_pft1;
   gridsize_spectral_taccumulate        = conf.gridsize_spectral_taccumulate; 
   blocksize_spectral_taccumulate       = conf.blocksize_spectral_taccumulate;
-  gridsize_spectral_saccumulate        = conf.gridsize_spectral_saccumulate; 
-  blocksize_spectral_saccumulate       = conf.blocksize_spectral_saccumulate;
+  gridsize_saccumulate        = conf.gridsize_saccumulate; 
+  blocksize_saccumulate       = conf.blocksize_saccumulate;
   
   fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
   fflush(stdout);
@@ -481,7 +481,7 @@ int baseband2spectral(conf_t conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      spectral_saccumulate_kernel<<<conf.gridsize_spectral_saccumulate, conf.blocksize_spectral_saccumulate>>>(conf.dbuf_out, conf.ndata3, conf.nstream);  
+      saccumulate_kernel<<<conf.gridsize_saccumulate, conf.blocksize_saccumulate>>>(conf.dbuf_out, conf.ndata3, conf.nstream);  
       CudaSafeKernelLaunch();
       if(conf.output_network == 0)
 	{

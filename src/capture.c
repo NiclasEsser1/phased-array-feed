@@ -56,7 +56,7 @@ void *do_capture(void *conf)
   register uint64_t rbuf_ndf_per_chunk_tbuf = capture_conf->ndf_per_chunk_rbuf + capture_conf->ndf_per_chunk_tbuf;
   register int thread_index = capture_conf->thread_index;
   
-  dbuf = (char *)malloc(sizeof(char) * DFSZ);
+  dbuf = (char *)malloc(NBYTE_CHAR * DFSZ);
   log_add(capture_conf->log_file, "INFO", 1, log_mutex, "In funtion thread id = %ld, %d, %d", (long)pthread_self(), capture_conf->thread_index, thread_index);
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -328,7 +328,7 @@ int initialize_capture(conf_t *conf)
     }
   conf->tbufsz = (conf->dfsz_keep + 1) * conf->ndf_per_chunk_tbuf * conf->nchunk;
   log_add(conf->log_file, "INFO", 1, log_mutex, "tbufsz is %"PRIu64"", conf->tbufsz);
-  tbuf = (char *)malloc(conf->tbufsz * sizeof(char));// init temp buffer
+  tbuf = (char *)malloc(conf->tbufsz * NBYTE_CHAR);// init temp buffer
   
   /* 
      Get the first ring buffer block ready for capture, 
@@ -336,7 +336,7 @@ int initialize_capture(conf_t *conf)
      write empty buffer blocks if we need to catch up;
      Also check the beam_index and seconds_from_epoch here;
   */
-  dbuf = (char *)malloc(sizeof(char) * DFSZ);  
+  dbuf = (char *)malloc(NBYTE_CHAR * DFSZ);  
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&conf->tout, sizeof(conf->tout));
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));

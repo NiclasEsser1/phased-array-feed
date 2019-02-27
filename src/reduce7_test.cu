@@ -15,8 +15,6 @@
 
 #include "constants.h"
 
-#define NBYTE_RT   8
-
 extern "C" void usage ()
 {
   fprintf (stdout,
@@ -109,11 +107,11 @@ int main(int argc, char *argv[])
   len_in              = len_out*n_accumulate;
 
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&data,     nstream * len_in * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result, len_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result, len_out * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_in,         nstream * len_in * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_out,        len_out * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMallocHost((void **)&data,     nstream * len_in * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&h_result, len_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&g_result, len_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_in,         nstream * len_in * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_out,        len_out * NBYTE_CUFFT_COMPLEX));
 
   /* cauculate on CPU */
   srand(time(NULL));
@@ -136,55 +134,55 @@ int main(int argc, char *argv[])
     }
   
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(g_in, data, nstream * len_in * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_in, data, nstream * len_in * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
   switch (blocksize_reduce7.x)
     {
     case 1024:
-      reduce7_kernel<1024><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<1024><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 512:
-      reduce7_kernel< 512><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel< 512><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 256:
-      reduce7_kernel< 256><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel< 256><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 128:
-      reduce7_kernel< 128><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel< 128><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 64:
-      reduce7_kernel<  64><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<  64><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 32:
-      reduce7_kernel<  32><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<  32><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 16:
-      reduce7_kernel<  16><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<  16><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 8:
-      reduce7_kernel<   8><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<   8><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 4:
-      reduce7_kernel<   4><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<   4><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 2:
-      reduce7_kernel<   2><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<   2><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
       
     case 1:
-      reduce7_kernel<   1><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_RT>>>(g_in, g_out, len_in, n_accumulate, nstream);
+      reduce7_kernel<   1><<<gridsize_reduce7, blocksize_reduce7, blocksize_reduce7.x * NBYTE_CUFFT_COMPLEX>>>(g_in, g_out, len_in, n_accumulate, nstream);
       break;
     }
   CudaSafeKernelLaunch();
-  CudaSafeCall(cudaMemcpy(g_result, g_out, len_out * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result, g_out, len_out * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < len_out; i++)

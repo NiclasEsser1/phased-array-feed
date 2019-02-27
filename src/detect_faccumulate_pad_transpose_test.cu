@@ -89,13 +89,13 @@ int main(int argc, char *argv[])
   npol                                         = NPOL_BASEBAND * nsamp;
    
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&data, npol * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result, nout * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result, nout * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_out, nout * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_in, npol * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMallocHost((void **)&data, npol * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&h_result, nout * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&g_result, nout * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_out, nout * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMalloc((void **)&g_in, npol * NBYTE_CUFFT_COMPLEX));
   
-  CudaSafeCall(cudaMemset((void *)h_result, 0, nout * sizeof(cufftComplex)));
+  CudaSafeCall(cudaMemset((void *)h_result, 0, nout * NBYTE_CUFFT_COMPLEX));
   
   /* cauculate on CPU */
   srand(time(NULL));
@@ -120,11 +120,11 @@ int main(int argc, char *argv[])
     }
     
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(g_in, data, npol * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+  CudaSafeCall(cudaMemcpy(g_in, data, npol * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
   detect_faccumulate_pad_transpose_kernel<<<gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose.x * NBYTE>>>(g_in, g_out, nsamp);
   CudaSafeKernelLaunch();
   
-  CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(cufftComplex), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result, g_out, nout * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
  
   /* Check the result */
   for(i = 0; i < nout; i++)

@@ -17,8 +17,11 @@ extern "C" {
 #define MSTR_LEN       1024
 #define DADA_HDRSZ     4096
 
-#define NBYTE_RT             8    // cudaComplex, for one pol
-
+#define NBYTE_CUFFT_COMPLEX             8    // cudaComplex, for one pol
+#define NBYTE_FLOAT  4
+#define NBYTE_CHAR   1
+#define NBYTE_INT    1
+  
 #define NBIT_BASEBAND        16
 #define NPOL_BASEBAND        2
 #define NDIM_BASEBAND        2
