@@ -52,25 +52,26 @@ typedef struct conf_t
   dada_hdu_t *hdu_in, *hdu_out;
 
   ipcbuf_t *db_in, *db_out;
-  char *cbuf_in, *cbuf_out;
+  char *cbuf_in, *cbuf_out, *buf_out;
   int64_t *dbuf_in;
-  uint8_t *dbuf_out;
-  double tsamp_in, tsamp_out;
+  uint8_t *dbuf_out1;
+  float *dbuf_out2;
+  double tsamp_in, tsamp_out1, tsamp_out2;
   
   uint64_t ndf_per_chunk_rbufin;
-  uint64_t bufin_size, bufout_size; // Device buffer size for all streams
-  uint64_t sbufin_size, sbufout_size; // Buffer size for each stream
+  uint64_t bufin_size, bufout1_size, bufout2_size; // Device buffer size for all streams
+  uint64_t sbufin_size, sbufout1_size, sbufout2_size; // Buffer size for each stream
   uint64_t bufrt1_size, bufrt2_size;
   uint64_t sbufrt1_size, sbufrt2_size;
   cufftComplex *buf_rt1, *buf_rt2;
   uint64_t hbufin_offset, dbufin_offset;
   uint64_t bufrt1_offset, bufrt2_offset;
-  uint64_t dbufout_offset, hbufout_offset;
+  uint64_t dbufout1_offset, dbufout2_offset, hbufout1_offset, hbufout2_offset;
   uint64_t nsamp1, npol1, ndata1;
   uint64_t nsamp2, npol2, ndata2;
   uint64_t nsamp3, npol3, ndata3; // For search part
   
-  uint64_t hdrsz, rbufin_size, rbufout_size; // HDR size for both HDU and ring buffer size of input HDU;
+  uint64_t hdrsz, rbufin_size, rbufout1_size; // HDR size for both HDU and ring buffer size of input HDU;
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   

@@ -121,10 +121,12 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   
   conf->sbufin_size  = conf->ndata1 * NBYTE_BASEBAND;
-  conf->sbufout_size = conf->ndata3 * NBYTE_FILTERBANK;
+  conf->sbufout1_size = conf->ndata3 * NBYTE_FILTERBANK;
+  conf->sbufout2_size = conf->ndata3 * NBYTE_FLOAT * NDATA_PER_SAMP_RT;
   
   conf->bufin_size   = conf->nstream * conf->sbufin_size;
-  conf->bufout_size  = conf->nstream * conf->sbufout_size;
+  conf->bufout1_size  = conf->nstream * conf->sbufout1_size;
+  conf->bufout2_size  = conf->nstream * conf->sbufout2_size;
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_CUFFT_COMPLEX;
   conf->sbufrt2_size = conf->npol2 * NBYTE_CUFFT_COMPLEX;
@@ -136,11 +138,14 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_CUFFT_COMPLEX;
   conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_CUFFT_COMPLEX;
   
-  conf->dbufout_offset = conf->sbufout_size / NBYTE_FILTERBANK;
-  conf->hbufout_offset = conf->sbufout_size;
+  conf->dbufout1_offset = conf->sbufout1_size / NBYTE_FILTERBANK;
+  conf->hbufout1_offset = conf->sbufout1_size;
+  conf->dbufout2_offset = conf->sbufout2_size / NBYTE_FLOAT;
+  conf->hbufout2_offset = conf->sbufout2_size;
 
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out1, conf->bufout1_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out2, conf->bufout2_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
 
@@ -290,10 +295,10 @@ int initialize_baseband2filterbank(conf_t *conf)
       exit(EXIT_FAILURE);    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
-  conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+  conf->rbufout1_size = ipcbuf_get_bufsz(conf->db_out);
   dada_cuda_dbregister(conf->hdu_out);  // To put this into capture does not improve the memcpy!!!
   
-  if(conf->rbufout_size % conf->bufout_size != 0)  
+  if(conf->rbufout1_size % conf->bufout1_size != 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -362,7 +367,7 @@ int baseband2filterbank(conf_t conf)
     4. Add the data in frequency to get NCHAN channels, detect the added data and scale it;
   */
   uint64_t i, j;
-  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset;
+  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout1_offset, dbufout1_offset;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
   dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
@@ -417,8 +422,8 @@ int baseband2filterbank(conf_t conf)
 	      dbufin_offset = j * conf.dbufin_offset; 
 	      bufrt1_offset = j * conf.bufrt1_offset;
 	      bufrt2_offset = j * conf.bufrt2_offset;
-	      dbufout_offset = j * conf.dbufout_offset;
-	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
+	      dbufout1_offset = j * conf.dbufout1_offset;
+	      hbufout1_offset = j * conf.hbufout1_offset + i * conf.bufout1_size;
 	      
 	      /* Copy data into device */
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.cbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
@@ -436,41 +441,41 @@ int baseband2filterbank(conf_t conf)
 	      switch (blocksize_detect_faccumulate_scale.x)
 		{
 		case 1024:
-		  detect_faccumulate_scale2_kernel<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<1024><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 512:
-		  detect_faccumulate_scale2_kernel< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel< 512><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 256:
-		  detect_faccumulate_scale2_kernel< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel< 256><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 128:
-		  detect_faccumulate_scale2_kernel< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel< 128><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 64:
-		  detect_faccumulate_scale2_kernel<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<  64><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 32:
-		  detect_faccumulate_scale2_kernel<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<  32><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 16:
-		  detect_faccumulate_scale2_kernel<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<  16><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 8:
-		  detect_faccumulate_scale2_kernel<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<   8><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 4:
-		  detect_faccumulate_scale2_kernel<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<   4><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 2:
-		  detect_faccumulate_scale2_kernel<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<   2><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		case 1:
-		  detect_faccumulate_scale2_kernel<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
+		  detect_faccumulate_scale2_kernel<   1><<<gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale.x * NBYTE_FLOAT, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nsamp2, conf.naccumulate_scale, conf.offset_scale_d);
 		  break;
 		}
 	      CudaSafeKernelLaunch();	      
-	      CudaSafeCall(cudaMemcpyAsync(&conf.cbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
+	      CudaSafeCall(cudaMemcpyAsync(&conf.cbuf_out[hbufout1_offset], &conf.dbuf_out1[dbufout1_offset], conf.sbufout1_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
@@ -677,8 +682,8 @@ int destroy_baseband2filterbank(conf_t conf)
 
   if(conf.dbuf_in)
     cudaFree(conf.dbuf_in);
-  if(conf.dbuf_out)
-    cudaFree(conf.dbuf_out);
+  if(conf.dbuf_out1)
+    cudaFree(conf.dbuf_out1);
   if(conf.offset_scale_h)
     cudaFreeHost(conf.offset_scale_h);
   if(conf.offset_scale_d)
@@ -819,8 +824,8 @@ int read_register_header(conf_t *conf)
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BW to DADA header is %f", -conf->bandwidth);
   
-  conf->tsamp_out = conf->tsamp_in * conf->cufft_nx;
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out) < 0)  
+  conf->tsamp_out1 = conf->tsamp_in * conf->cufft_nx;
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out1) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -830,7 +835,7 @@ int read_register_header(conf_t *conf)
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out1);
   
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_FILTERBANK) < 0)  
     {
