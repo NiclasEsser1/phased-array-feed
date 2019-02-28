@@ -23,6 +23,9 @@ while (1):
     nchan      = np.fromstring(data[8 + FITS_TIME_STAMP_LEN : 12 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
     nchunk     = np.fromstring(data[28 + FITS_TIME_STAMP_LEN : 32 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
     nchan_per_chunk = nchan/nchunk
-
+    print nchan_per_chunk
+    print nchan
+    print nchunk
+    
     unpack_data = struct.unpack("i28cfiffiiii{}f".format(nchan_per_chunk), data)
     print unpack_data

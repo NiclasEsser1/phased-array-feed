@@ -20,7 +20,7 @@ extern "C" {
 #define NBYTE_CUFFT_COMPLEX             8    // cudaComplex, for one pol
 #define NBYTE_FLOAT  4
 #define NBYTE_CHAR   1
-#define NBYTE_INT    1
+#define NBYTE_INT    4
   
 #define NBIT_BASEBAND        16
 #define NPOL_BASEBAND        2

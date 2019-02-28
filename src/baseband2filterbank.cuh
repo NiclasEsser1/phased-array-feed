@@ -32,8 +32,17 @@ typedef struct fits_t
 
 typedef struct conf_t
 {
+  int pol_type;
+  char ip[MSTR_LEN];
+  int port;
   FILE *log_file;
-
+  uint64_t picoseconds;
+  double center_freq;
+  int beam_index;
+  
+  fits_t *fits;
+  int neth_per_blk;
+  int nseg_per_blk;
   int nrepeat_per_blk;
   int nchunk_in, nchan_in;
   int cufft_nx, cufft_mod;
@@ -52,10 +61,10 @@ typedef struct conf_t
   dada_hdu_t *hdu_in, *hdu_out;
 
   ipcbuf_t *db_in, *db_out;
-  char *cbuf_in, *cbuf_out, *buf_out;
+  char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;
   uint8_t *dbuf_out1;
-  float *dbuf_out2;
+  float *dbuf_out2, *dbuf_out3, *dbuf_out4;
   double tsamp_in, tsamp_out1, tsamp_out2;
   
   uint64_t ndf_per_chunk_rbufin;
@@ -66,7 +75,7 @@ typedef struct conf_t
   cufftComplex *buf_rt1, *buf_rt2;
   uint64_t hbufin_offset, dbufin_offset;
   uint64_t bufrt1_offset, bufrt2_offset;
-  uint64_t dbufout1_offset, dbufout2_offset, hbufout1_offset, hbufout2_offset;
+  uint64_t dbufout1_offset, dbufout2_offset, dbufout4_offset, hbufout1_offset, hbufout2_offset;
   uint64_t nsamp1, npol1, ndata1;
   uint64_t nsamp2, npol2, ndata2;
   uint64_t nsamp3, npol3, ndata3; // For search part
@@ -78,8 +87,9 @@ typedef struct conf_t
   cufftComplex *offset_scale_d, *offset_scale_h;
   cudaStream_t *streams;
   cufftHandle *fft_plans;
-  
+  int n_transpose, m_transpose;
   dim3 gridsize_unpack, blocksize_unpack;
+  dim3 gridsize_transpose, blocksize_transpose;
   dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
   dim3 gridsize_detect_faccumulate_scale, blocksize_detect_faccumulate_scale;
   dim3 gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose;

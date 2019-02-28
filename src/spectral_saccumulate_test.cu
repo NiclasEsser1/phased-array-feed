@@ -17,17 +17,15 @@
 #include "constants.h"
 #include "baseband2spectral.cuh"
 
-#define NBYTE 4
-
-// ./spectral_saccumulate_test -a 48 -b 1024 -c 2
-// ./spectral_saccumulate_test -a 33 -b 1024 -c 2
+// ./saccumulate_test -a 48 -b 1024 -c 2
+// ./saccumulate_test -a 33 -b 1024 -c 2
 
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "spectral_taccumulate_test - Test the spectral_taccumulate kernel \n"
+	   "saccumulate_test - Test the saccumulate kernel \n"
 	   "\n"
-	   "Usage: spectral_taccumulate_test [options]\n"
+	   "Usage: saccumulate_test [options]\n"
 	   " -a  Number of input frequency chunks\n"
 	   " -b  Number of FFT points\n"
 	   " -c  Number of streams\n"
@@ -96,11 +94,12 @@ int main(int argc, char *argv[])
   fprintf(stdout, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", nsamp_in, nsamp_out, npol_in, npol_out);
   
   /* Create buffer */
-  CudaSafeCall(cudaMallocHost((void **)&data,     npol_in * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result, npol_out * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * sizeof(float)));
-  CudaSafeCall(cudaMemset((void *)h_result, 0,    npol_out * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&data,     npol_in * NBYTE_FLOAT));
+  CudaSafeCall(cudaMallocHost((void **)&h_result, npol_out * NBYTE_FLOAT));
+  CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * NBYTE_FLOAT));
+  CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * NBYTE_FLOAT));
+  CudaSafeCall(cudaMemset((void *)g_result, 0,    npol_out * NBYTE_FLOAT));
+  //CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * NBYTE_FLOAT));
   
   /* Prepare the data and calculate on CPU */
   srand(time(NULL));
@@ -123,10 +122,10 @@ int main(int argc, char *argv[])
   //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", idx_out, idx_in);
   
   /* Calculate on GPU */
-  CudaSafeCall(cudaMemcpy(g_in, data, npol_in * sizeof(float), cudaMemcpyHostToDevice));
-  spectral_saccumulate_kernel<<<grid_size, block_size>>>(g_in, npol_out, nstream);  
+  CudaSafeCall(cudaMemcpy(g_in, data, npol_in * NBYTE_FLOAT, cudaMemcpyHostToDevice));
+  saccumulate_kernel<<<grid_size, block_size>>>(g_in, npol_out, nstream);  
   CudaSafeKernelLaunch();
-  CudaSafeCall(cudaMemcpy(g_result, g_in, npol_out * sizeof(float), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result, g_in, npol_out * NBYTE_FLOAT, cudaMemcpyDeviceToHost));
 
   /* Check the result */
   for(i = 0; i < npol_out; i++)

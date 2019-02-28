@@ -79,10 +79,14 @@ SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
 
                          "pad":                     0,
                          "ndf_check_chk":           1024,
-
+                         
+                         "ip":                      '134.104.70.90',
+                         "port":                    17107,
+                         
                          "detect_thresh":           10,
                          "dm":                      [1, 10000],
                          "zap_chans":               [],
+                         "pol_type":                4,
 }
 
 SEARCH_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
@@ -343,6 +347,7 @@ class Search(Pipeline):
         self._nstream = SEARCH_CONFIG_GENERAL["nstream"]
         self._cufft_nx = SEARCH_CONFIG_GENERAL["cufft_nx"]
         self._zap_chans = SEARCH_CONFIG_GENERAL["zap_chans"]
+        self._pol_type = SEARCH_CONFIG_GENERAL["pol_type"]
         self._ndf_stream = SEARCH_CONFIG_GENERAL["ndf_stream"]
         self._detect_thresh = SEARCH_CONFIG_GENERAL["detect_thresh"]
         self._ndf_check_chk = SEARCH_CONFIG_GENERAL["ndf_check_chk"]
@@ -434,10 +439,10 @@ class Search(Pipeline):
             # baseband2filterbank command
             baseband2filterbank_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 1
             command = ("{} -a {} -b {} -c {} -d {} -e {} "
-                       "-f {} -i {} -j {} -k {} -l {} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
-                                                                self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
-                                                                self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
-                                                                self._nchan_filterbank, self._nchan_keep_band)
+                       "-f {} -i {} -j {} -k {} -l {} -m {} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
+                                                                      self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
+                                                                      self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
+                                                                      self._nchan_filterbank, self._nchan_keep_band, self._pol_type)
             if SOD:
                 command += "-g 1"
             else:
@@ -902,6 +907,7 @@ class Spectral2Beams4Pols(Spectral):
         super(Spectral2Beams4Pols, self).configure(ip, 4, SPECTRAL_CONFIG_2BEAMS)
 
 # nvprof -f --profile-child-processes -o profile.nvprof%p ./pipeline.py -a 0 -b 2 -c search -d 10
+# cuda-memcheck ./pipeline.py -a 0 -b 2 -c search -d 10
 if __name__ == "__main__":
     logging.getLogger().addHandler(logging.NullHandler())
     log = logging.getLogger('mpikat')
