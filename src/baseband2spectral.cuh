@@ -46,7 +46,7 @@ typedef struct conf_t
   int cufft_nx, cufft_mod;
   int nchan_keep_chan;
   double bandwidth, scale_dtsz;
-
+  int nblk_accumulate;
   char *hdrbuf_in;
   
   int ndf_per_chunk_stream;

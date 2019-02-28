@@ -40,6 +40,7 @@ int default_arguments(conf_t *conf)
   conf->pol_type = -1;
   conf->ndim_out = -1;
   conf->npol_out = -1;
+  conf->nblk_accumulate = -1;
   
   return EXIT_SUCCESS;
 }
@@ -329,7 +330,7 @@ int initialize_baseband2spectral(conf_t *conf)
 
 int baseband2spectral(conf_t conf)
 {
-  uint64_t i, j;
+  uint64_t i, j, k;
   uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, dbufout_offset;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
@@ -388,7 +389,7 @@ int baseband2spectral(conf_t conf)
       fits.chan_width = conf.bandwidth / (double)conf.nchan_out;
       
       fits.center_freq = conf.center_freq;
-      fits.tsamp = time_res_blk;
+      fits.tsamp = time_res_blk * conf.nblk_accumulate;
       fits.beam_index = conf.beam_index;
       strptime(conf.utc_start, DADA_TIMESTR, &tm_stamp);
       time_stamp_f = mktime(&tm_stamp) + conf.picoseconds / 1.0E12 + 0.5 * fits.tsamp;
@@ -418,233 +419,246 @@ int baseband2spectral(conf_t conf)
     {
       CudaSafeCall(cudaMemset((void *)conf.dbuf_out, 0, conf.bufout_size));// We have to clear the memory for this parameter
       
-      log_add(conf.log_file, "INFO", 1, log_mutex, "before getting new buffer block");
-      conf.cbuf_in  = ipcbuf_get_next_read(conf.db_in, &cbufsz);
-      if(conf.output_network == 0)
+      for(k = 0; k < conf.nblk_accumulate; k++)
 	{
-	  conf.cbuf_out = ipcbuf_get_next_write(conf.db_out);
-	  log_add(conf.log_file, "INFO", 1, log_mutex, "after getting new buffer block");
-	}
-      for(i = 0; i < conf.nrepeat_per_blk; i ++)
-	{
-	  for(j = 0; j < conf.nstream; j++)
+	  log_add(conf.log_file, "INFO", 1, log_mutex, "before getting new buffer block");
+	  conf.cbuf_in  = ipcbuf_get_next_read(conf.db_in, &cbufsz);
+	  if(conf.output_network == 0)
 	    {
-	      hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
-	      dbufin_offset = j * conf.dbufin_offset; 
-	      bufrt1_offset = j * conf.bufrt1_offset;
-	      bufrt2_offset = j * conf.bufrt2_offset;
-	      dbufout_offset = j * conf.dbufout_offset;
-	      	      
-	      /* Copy data into device */
-	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset],
-					   &conf.cbuf_in[hbufin_offset],
-					   conf.sbufin_size,
-					   cudaMemcpyHostToDevice,
-					   conf.streams[j]));
-	      
-	      /* Unpack raw data into cufftComplex array */
-	      unpack_kernel
-		<<<gridsize_unpack,
-		blocksize_unpack,
-		0,
-		conf.streams[j]>>>
-		(&conf.dbuf_in[dbufin_offset],
-		 &conf.buf_rt1[bufrt1_offset],
-		 conf.nsamp1);
-	      CudaSafeKernelLaunch();
-	      
-	      /* Do forward FFT */
-	      CufftSafeCall(cufftExecC2C(conf.fft_plans[j],
-					 &conf.buf_rt1[bufrt1_offset],
-					 &conf.buf_rt1[bufrt1_offset],
-					 CUFFT_FORWARD));
+	      conf.cbuf_out = ipcbuf_get_next_write(conf.db_out);
+	      log_add(conf.log_file, "INFO", 1, log_mutex, "after getting new buffer block");
+	    }
+      	  
+	  for(i = 0; i < conf.nrepeat_per_blk; i ++)
+	    {
+	      for(j = 0; j < conf.nstream; j++)
+		{
+		  hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
+		  dbufin_offset = j * conf.dbufin_offset; 
+		  bufrt1_offset = j * conf.bufrt1_offset;
+		  bufrt2_offset = j * conf.bufrt2_offset;
+		  dbufout_offset = j * conf.dbufout_offset;
+		  
+		  /* Copy data into device */
+		  CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset],
+					       &conf.cbuf_in[hbufin_offset],
+					       conf.sbufin_size,
+					       cudaMemcpyHostToDevice,
+					       conf.streams[j]));
+		  
+		  /* Unpack raw data into cufftComplex array */
+		  unpack_kernel
+		    <<<gridsize_unpack,
+		    blocksize_unpack,
+		    0,
+		    conf.streams[j]>>>
+		    (&conf.dbuf_in[dbufin_offset],
+		     &conf.buf_rt1[bufrt1_offset],
+		     conf.nsamp1);
+		  CudaSafeKernelLaunch();
+		  
+		  /* Do forward FFT */
+		  CufftSafeCall(cufftExecC2C(conf.fft_plans[j],
+					     &conf.buf_rt1[bufrt1_offset],
+					     &conf.buf_rt1[bufrt1_offset],
+					     CUFFT_FORWARD));
+		  
+		  /* from PFTF order to PFT order, also remove channel edge */
+		  swap_select_transpose_pft1_kernel
+		    <<<gridsize_swap_select_transpose_pft1,
+		    blocksize_swap_select_transpose_pft1,
+		    0,
+		    conf.streams[j]>>>
+		    (&conf.buf_rt1[bufrt1_offset],
+		     &conf.buf_rt2[bufrt2_offset],
+		     conf.cufft_nx,
+		     NSAMP_DF,
+		     conf.nsamp1,
+		     conf.nsamp2,
+		     conf.cufft_nx,
+		     conf.cufft_mod,
+		     conf.nchan_keep_chan);
+		  CudaSafeKernelLaunch();
+		  
+		  /* Convert to required pol and accumulate in time */
+		  switch(blocksize_spectral_taccumulate.x)
+		    {
+		    case 1024:
+		      spectral_taccumulate_kernel
+			<1024>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 512:
+		      spectral_taccumulate_kernel
+			< 512>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 256:
+		      spectral_taccumulate_kernel
+			< 256>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 128:
+		      spectral_taccumulate_kernel
+			< 128>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  64:
+		      spectral_taccumulate_kernel
+			<  64>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  32:
+		      spectral_taccumulate_kernel
+			<  32>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		  
+		    case  16:
+		      spectral_taccumulate_kernel
+			<  16>		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  8:
+		      spectral_taccumulate_kernel
+			<   8>		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  4:
+		      spectral_taccumulate_kernel
+			<   4>		    		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  2:
+		      spectral_taccumulate_kernel
+			<   2>		    		    		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  1:
+		      spectral_taccumulate_kernel
+			<   1>		    		    		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt2[conf.bufrt2_offset],
+			 &conf.dbuf_out[dbufout_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		    }
+		  CudaSafeKernelLaunch();
+		}
+	    }
+	  CudaSynchronizeCall(); // Sync here is for multiple streams
 
-	      /* from PFTF order to PFT order, also remove channel edge */
-	      swap_select_transpose_pft1_kernel
-		<<<gridsize_swap_select_transpose_pft1,
-		blocksize_swap_select_transpose_pft1,
-		0,
-		conf.streams[j]>>>
-		(&conf.buf_rt1[bufrt1_offset],
-		 &conf.buf_rt2[bufrt2_offset],
-		 conf.cufft_nx,
-		 NSAMP_DF,
-		 conf.nsamp1,
-		 conf.nsamp2,
-		 conf.cufft_nx,
-		 conf.cufft_mod,
-		 conf.nchan_keep_chan);
-	      CudaSafeKernelLaunch();
-	      
-	      /* Convert to required pol and accumulate in time */
-	      switch(blocksize_spectral_taccumulate.x)
-	      	{
-	      	case 1024:
-	      	  spectral_taccumulate_kernel
-		    <1024>
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case 512:
-	      	  spectral_taccumulate_kernel
-		    < 512>
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case 256:
-	      	  spectral_taccumulate_kernel
-		    < 256>
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case 128:
-	      	  spectral_taccumulate_kernel
-		    < 128>
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  64:
-	      	  spectral_taccumulate_kernel
-		    <  64>
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  32:
-	      	  spectral_taccumulate_kernel
-		    <  32>
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  16:
-	      	  spectral_taccumulate_kernel
-		    <  16>		    
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  8:
-	      	  spectral_taccumulate_kernel
-		    <   8>		    
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  4:
-	      	  spectral_taccumulate_kernel
-		    <   4>		    		    
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  2:
-	      	  spectral_taccumulate_kernel
-		    <   2>		    		    		    
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-		  
-	      	case  1:
-	      	  spectral_taccumulate_kernel
-		    <   1>		    		    		    
-		    <<<gridsize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate,
-		    blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
-		    conf.streams[j]>>>
-		    (&conf.buf_rt2[conf.bufrt2_offset],
-		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
-		     conf.naccumulate);
-		  break;
-	      	}
-	      CudaSafeKernelLaunch();
+	  saccumulate_kernel
+	    <<<conf.gridsize_saccumulate,
+	    conf.blocksize_saccumulate>>>
+	    (conf.dbuf_out,
+	     conf.ndata3,
+	     conf.nstream);  
+	  CudaSafeKernelLaunch();
+
+	  ipcbuf_mark_cleared(conf.db_in);
+	  log_add(conf.log_file, "INFO", 1, log_mutex, "after closing old buffer block");
+	  if(ipcbuf_eod(conf.db_in))
+	    {
+	      log_add(conf.log_file, "INFO", 1, log_mutex, "FINISH the process");
+	      return EXIT_SUCCESS;
 	    }
 	}
-      CudaSynchronizeCall(); // Sync here is for multiple streams
-
-      saccumulate_kernel
-	<<<conf.gridsize_saccumulate,
-	conf.blocksize_saccumulate>>>
-	(conf.dbuf_out,
-	 conf.ndata3,
-	 conf.nstream);  
-      CudaSafeKernelLaunch();
+      
       if(conf.output_network == 0)
 	{
 	  if(conf.pol_type == 2)
@@ -719,10 +733,7 @@ int baseband2spectral(conf_t conf)
 	  log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
 	  ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
 	}
-      ipcbuf_mark_cleared(conf.db_in);
-      log_add(conf.log_file, "INFO", 1, log_mutex, "after closing old buffer block");
-
-      time_offset += time_res_blk;
+      time_offset += (conf.nblk_accumulate * time_res_blk);
       fprintf(stdout, "BASEBAND2SPECTRAL, finished %f seconds data\n", time_offset);
       fflush(stdout);
     }
@@ -941,7 +952,7 @@ int register_dada_header(conf_t *conf)
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
   
-  conf->tsamp_out = conf->tsamp_in * conf->ndf_per_chunk_rbufin * NSAMP_DF;
+  conf->tsamp_out = conf->tsamp_in * conf->ndf_per_chunk_rbufin * NSAMP_DF * conf->nblk_accumulate;
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -1055,6 +1066,17 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
+
+  if(conf.nblk_accumulate == -1)
+    {
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: nblk_accumulate is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nblk_accumulate is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "We will average %d buffer blocks", conf.nblk_accumulate); 
 
   if(conf.nstream <= 0)
     {

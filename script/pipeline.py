@@ -25,11 +25,11 @@ FITSWRITER = True
 SOD = True   # Start filterbank data
 # SOD  = False  # Do not start filterbank data
 
-HEIMDALL = False   # To run heimdall on filterbank file or not
-#HEIMDALL       = True   # To run heimdall on filterbank file or not
+#HEIMDALL = False   # To run heimdall on filterbank file or not
+HEIMDALL       = True   # To run heimdall on filterbank file or not
 
-DBDISK = True   # To run dbdisk on processed data or not
-#DBDISK         = False   # To run dbdisk on processed data or not
+#DBDISK = True   # To run dbdisk on processed data or not
+DBDISK         = False   # To run dbdisk on processed data or not
 
 PAF_ROOT       = "/home/pulsar/xinping/phased-array-feed/"
 DATA_ROOT      = "/beegfs/DENG/"
@@ -111,7 +111,7 @@ SPECTRAL_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                            "rbuf_baseband_nblk":      5,
                            "rbuf_baseband_nread":     1,                 
                            "tbuf_baseband_ndf_chk":   128,
-                           
+                           "nblk_accumulate":         2,
                            "rbuf_spectral_ndf_chk":   16384,
                            "rbuf_spectral_nblk":      2,
                            "rbuf_spectral_nread":     1,
@@ -657,6 +657,7 @@ class Spectral(Pipeline):
         self._ndf_stream = SPECTRAL_CONFIG_GENERAL["ndf_stream"]
         self._ndf_check_chk = SPECTRAL_CONFIG_GENERAL["ndf_check_chk"]
         self._nbyte_spectral = SPECTRAL_CONFIG_GENERAL["nbyte_spectral"]
+        self._nblk_accumulate = SPECTRAL_CONFIG_GENERAL["nblk_accumulate"]
         self._rbuf_baseband_nblk = SPECTRAL_CONFIG_GENERAL["rbuf_baseband_nblk"]
         self._rbuf_baseband_nread = SPECTRAL_CONFIG_GENERAL["rbuf_baseband_nread"]
         self._rbuf_spectral_nblk = SPECTRAL_CONFIG_GENERAL["rbuf_spectral_nblk"]
@@ -747,12 +748,12 @@ class Spectral(Pipeline):
 
             # baseband2spectral command
             baseband2spectral_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 1
-            command = "{} -a {} -c {} -d {} -e {} -f {} -g {} -i {} -j {} ".format(
+            command = "{} -a {} -c {} -d {} -e {} -f {} -g {} -i {} -j {} -k {} ".format(
                 baseband2spectral,
                 self._rbuf_baseband_key[i],self._rbuf_spectral_ndf_chk,
                 self._nstream, self._ndf_stream,
                 self._runtime_directory[i], self._nchk_beam,
-                self._cufft_nx, self._ptype)
+                self._cufft_nx, self._ptype, self._nblk_accumulate)
             if not FITSWRITER:
                 if SOD:
                     command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
@@ -764,12 +765,13 @@ class Spectral(Pipeline):
 
             # Command to create spectral ring buffer
             dadadb_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 2
-            self._spectral_create_buffer_commands.append(("dada_db -l -p -k {:} "
-                                                          "-b {:} -n {:} -r {:}").format(
-                                                              dadadb_cpu, self._rbuf_spectral_key[i],
-                                                              self._rbuf_spectral_blksz,
-                                                              self._rbuf_spectral_nblk,
-                                                              self._rbuf_spectral_nread))
+            if not FITSWRITER:
+                self._spectral_create_buffer_commands.append(("dada_db -l -p -k {:} "
+                                                              "-b {:} -n {:} -r {:}").format(
+                                                                  dadadb_cpu, self._rbuf_spectral_key[i],
+                                                                  self._rbuf_spectral_blksz,
+                                                                  self._rbuf_spectral_nblk,
+                                                                  self._rbuf_spectral_nread))
 
             # command to create baseband ring buffer
             self._baseband_create_buffer_commands.append(("dada_db -l -p -k {:} "
@@ -780,9 +782,10 @@ class Spectral(Pipeline):
                                                               self._rbuf_baseband_nread))
             
             # command to delete spectral ring buffer
-            self._spectral_delete_buffer_commands.append(
-                "dada_db -d -k {:}".format(
-                    self._rbuf_spectral_key[i]))
+            if not FITSWRITER:
+                self._spectral_delete_buffer_commands.append(
+                    "dada_db -d -k {:}".format(
+                        self._rbuf_spectral_key[i]))
 
             # command to delete baseband ring buffer
             self._baseband_delete_buffer_commands.append(
@@ -909,8 +912,8 @@ class Spectral2Beams4Pols(Spectral):
     def configure(self, ip):
         super(Spectral2Beams4Pols, self).configure(ip, 4, SPECTRAL_CONFIG_2BEAMS)
 
-# nvprof -f --profile-child-processes -o profile.nvprof%p ./pipeline.py -a 0 -b 2 -c search -d 10
-# cuda-memcheck ./pipeline.py -a 0 -b 2 -c search -d 10
+# nvprof -f --profile-child-processes -o profile.nvprof%p ./pipeline.py -a 0 -b 2 -c search -d 1
+# cuda-memcheck ./pipeline.py -a 0 -b 2 -c search -d 1
 if __name__ == "__main__":
     logging.getLogger().addHandler(logging.NullHandler())
     log = logging.getLogger('mpikat')

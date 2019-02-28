@@ -35,7 +35,9 @@ void usage ()
 	   " -g  The number of input frequency chunks\n"
 	   " -h  show help\n"
 	   " -i  FFT length\n"
-	   " -j  Pol type, 1 for Stokes I, 2 for AABB and 4 for IQUV\n");
+	   " -j  Pol type, 1 for Stokes I, 2 for AABB and 4 for IQUV\n"
+	   " -k  The number of buffer blocks to accumulate\n"
+	   );
 }
 
 int main(int argc, char *argv[])
@@ -51,7 +53,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
   
   /* Initializeial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:")) != -1)
     {
       switch(arg)
 	{
@@ -140,7 +142,11 @@ int main(int argc, char *argv[])
 	      exit(EXIT_FAILURE);
 	    }
 	  break;
-	}
+	  	  
+	case 'k':
+	  sscanf(optarg, "%d", &conf.nblk_accumulate);
+	  break;
+	}      
     }
   
   /* Setup log interface */
