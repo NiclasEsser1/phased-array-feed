@@ -59,7 +59,7 @@ typedef struct conf_t
   
   key_t key_in, key_out;
   dada_hdu_t *hdu_in, *hdu_out;
-
+  int pktsz_network, dtsz_network;
   ipcbuf_t *db_in, *db_out;
   char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;

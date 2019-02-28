@@ -296,11 +296,11 @@ int initialize_baseband2spectral(conf_t *conf)
     {
       conf->nchunk_network = conf->nchan_in; // We send spectral of one input channel per udp packet;
       conf->nchan_per_chunk_network = conf->nchan_out/conf->nchunk_network;
-      conf->data_size_network = NBYTE_FLOAT * conf->nchan_per_chunk_network;
-      conf->pktsz_network     = conf->data_size_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
+      conf->dtsz_network = NBYTE_FLOAT * conf->nchan_per_chunk_network;
+      conf->pktsz_network     = conf->dtsz_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
       log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->data_size_network);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network);
     }
   
@@ -504,9 +504,9 @@ int baseband2spectral(conf_t conf)
 		  memcpy_offset = i * fits.nchan + j * conf.nchan_per_chunk_network;
 		  fits.chunk_index = j;
 		  if((conf.pol_type == 2) && (i < 2))
-		    CudaSafeCall(cudaMemcpy(fits.data, &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL + memcpy_offset], conf.data_size_network, cudaMemcpyDeviceToHost));
+		    CudaSafeCall(cudaMemcpy(fits.data, &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL + memcpy_offset], conf.dtsz_network, cudaMemcpyDeviceToHost));
 		  if(conf.pol_type != 2)
-		    CudaSafeCall(cudaMemcpy(fits.data, &conf.dbuf_out[memcpy_offset], conf.data_size_network, cudaMemcpyDeviceToHost));
+		    CudaSafeCall(cudaMemcpy(fits.data, &conf.dbuf_out[memcpy_offset], conf.dtsz_network, cudaMemcpyDeviceToHost));
 		  
 		  if(sendto(sock_udp, (void *)&fits, conf.pktsz_network, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
 		    {

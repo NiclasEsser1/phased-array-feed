@@ -59,7 +59,7 @@ typedef struct conf_t
   
   int nchunk_network;
   int nchan_per_chunk_network;
-  int data_size_network;
+  int dtsz_network;
   int pktsz_network;
   
   char dir[MSTR_LEN];

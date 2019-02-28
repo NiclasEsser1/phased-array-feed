@@ -16,16 +16,23 @@ sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 server_address = ('134.104.70.90', 17106)
 sock.bind(server_address)
+data, server = sock.recvfrom(1<<16)
+nchan      = np.fromstring(data[8 + FITS_TIME_STAMP_LEN : 12 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
+nchunk     = np.fromstring(data[28 + FITS_TIME_STAMP_LEN : 32 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
+nchan_per_chunk = nchan/nchunk
+print "The length of the packet is {} bytes.\n".format(len(data))
+print "NCHAN is", nchan
+print "NCHAN_PER_CHUNK is", nchan_per_chunk
+print "NCHUNK is", nchunk
+
 while (1):
     data, server = sock.recvfrom(1<<16)
-    print "The length of the packet is {} bytes.\n".format(len(data))
-    
-    nchan      = np.fromstring(data[8 + FITS_TIME_STAMP_LEN : 12 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
-    nchunk     = np.fromstring(data[28 + FITS_TIME_STAMP_LEN : 32 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
-    nchan_per_chunk = nchan/nchunk
-    print nchan_per_chunk
-    print nchan
-    print nchunk
-    
+    #unpack_data = struct.unpack("i|28c|f|i|f|f|i|i|i|i|{}f".format(nchan_per_chunk), data)
     unpack_data = struct.unpack("i28cfiffiiii{}f".format(nchan_per_chunk), data)
-    print unpack_data
+    print unpack_data[0:36]
+    spectral = unpack_data[37:-1]
+    #plt.figure()
+    #plt.plot(spectral)
+    #plt.show()
+    
+    

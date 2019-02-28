@@ -38,7 +38,9 @@ void usage ()
 	   " -j  FFT length\n"
 	   " -k  The number of output channels\n"
 	   " -l  Number of channels keep for the band\n"
-	   " -m  The type of polarisation\n");
+	   " -m  The type of polarisation\n"
+	   " -n  Network interface ip_port\n"
+	   );
 }
 
 int main(int argc, char *argv[])
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
   
   /* Initializeial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:m:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:m:n:")) != -1)
     {
       switch(arg)
 	{
@@ -116,6 +118,10 @@ int main(int argc, char *argv[])
 	  
 	case 'm':
 	  sscanf(optarg, "%d", &conf.pol_type);
+	  break;
+	  
+	case 'n':
+	  sscanf(optarg, "%[^_]_%d", conf.ip, &conf.port);
 	  break;
 	}
     }

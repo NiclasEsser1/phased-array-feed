@@ -847,7 +847,7 @@ __global__ void detect_faccumulate_scale2_spectral_faccumulate_kernel(cufftCompl
 }
 
 template <unsigned int blockSize>
-__global__ void taccumulate_float_kernel(float *dbuf_in, float *dbuf_out, uint64_t offset_in, int naccumulate)
+__global__ void taccumulate_float_kernel(float *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, int naccumulate)
 {  
   extern volatile __shared__ float float_sdata[];
   int j;
@@ -963,7 +963,7 @@ __global__ void taccumulate_float_kernel(float *dbuf_in, float *dbuf_out, uint64
   if (tid == 0)
     {
       for(j = 0; j < NDATA_PER_SAMP_RT; j++)
-	dbuf_out[blockIdx.x] = float_sdata[j*blockDim.x];
+	dbuf_out[blockIdx.x + j*offset_out] = float_sdata[j*blockDim.x];
     }
 }
 
