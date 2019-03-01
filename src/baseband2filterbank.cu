@@ -64,7 +64,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->nrepeat_per_blk = conf->ndf_per_chunk_rbufin / (conf->ndf_per_chunk_stream * conf->nstream);
   conf->nchan_in        = conf->nchunk_in * NCHAN_PER_CHUNK;
   conf->nchan_keep_chan = (int)(conf->cufft_nx / OVER_SAMP_RATE);
-  conf->cufft_mod       = (int)(0.5 * conf->cufft_nx / OVER_SAMP_RATE);
+  conf->nchan_keep_band = conf->nchan_keep_chan * conf->nchan_in - (conf->nchan_keep_chan * conf->nchan_in) % conf->nchan_out;
+  conf->cufft_mod       = (int)(0.5 * conf->nchan_keep_chan);
   conf->nchan_edge      = (int)(0.5 * conf->nchan_in * conf->nchan_keep_chan - 0.5 * conf->nchan_keep_band);
   conf->inverse_nchan_rate = conf->nchan_in * conf->nchan_keep_chan/(double)conf->nchan_keep_band;
   conf->scale_dtsz         = NBYTE_FILTERBANK / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->inverse_nchan_rate * conf->nchan_keep_band * NPOL_BASEBAND * NDIM_BASEBAND * NBYTE_BASEBAND);
@@ -75,6 +76,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf->nchan_keep_band); 
   if(conf->nchan_edge<0) // Check the nchan_keep_band further
     {
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_edge can not be a negative number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf->nchan_edge, __FILE__, __LINE__);
@@ -96,7 +98,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->npol1        = conf->nsamp1 * NPOL_BASEBAND;
   conf->ndata1       = conf->npol1  * NDIM_BASEBAND;
   
-  conf->nsamp2       = conf->nsamp1 / OVER_SAMP_RATE / conf->inverse_nchan_rate;
+  //conf->nsamp2       = conf->nsamp1 / OVER_SAMP_RATE / conf->inverse_nchan_rate;
+  conf->nsamp2       = conf->nsamp1 * conf->nchan_keep_band / (OVER_SAMP_RATE * conf->nchan_in * conf->nchan_keep_chan);
   conf->npol2        = conf->nsamp2 * NPOL_BASEBAND;
   conf->ndata2       = conf->npol2  * NDIM_BASEBAND;
 
@@ -162,8 +165,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out3, conf->bufout2_size));
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out4, conf->nchan_out * NDATA_PER_SAMP_RT * conf->nstream * NBYTE_FLOAT));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
-
+  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size))
+;
   CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));// We have to clear the memory for this parameter
@@ -1490,8 +1493,8 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.nchan_out <= 0)
     {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_out, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be positive, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_out, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       CudaSafeCall(cudaProfilerStop());
@@ -1500,25 +1503,14 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 
   if((log2((double)conf.nchan_out) - floor(log2((double)conf.nchan_out))) != 0)
     {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_out, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_out should be power of 2, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_out, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
-  
-  if(conf.nchan_keep_band<=0)    
-    {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nchan_keep_band, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nchan_keep_band shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nchan_keep_band, __FILE__, __LINE__);
-      
-      log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf.nchan_keep_band); 
   
   return EXIT_SUCCESS;
 }

@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
 {
   int i, arg, nchan;
   float *g_offs = NULL, *g_mean = NULL, *g_result_scl = NULL, *g_out_scl = NULL, *h_offs = NULL, *h_mean = NULL, *h_scl = NULL;
+  float temp;
   dim3 gridsize_scale, blocksize_scale;
   
   /* Read in parameters, the arguments here have the same name  */
@@ -80,10 +81,14 @@ int main(int argc, char *argv[])
   srand(time(NULL));
   for(i = 0; i < nchan; i++)
     {
-      h_offs[i] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-      h_mean[i] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+      h_offs[i] = rand()*RAND_STD/RAND_MAX;
+      temp = rand()*RAND_STD/RAND_MAX;
+      h_mean[i] = temp * temp;
       while (h_mean[i] < h_offs[i] * h_offs[i])
-	h_mean[i] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	{
+	  temp = rand()*RAND_STD/RAND_MAX;
+	  h_mean[i] = temp * temp;
+	}
       h_scl[i]  = SCL_NSIG * sqrt(h_mean[i] - h_offs[i] * h_offs[i])/SCL_UINT8;
     }
 

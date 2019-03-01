@@ -22,19 +22,24 @@ int init_baseband2baseband(conf_t *conf)
   int iembed1, istride1, idist1, oembed1, ostride1, odist1, batch1, nx1;
   int iembed2, istride2, idist2, oembed2, ostride2, odist2, batch2, nx2;
   uint64_t hdrsz;
+
+  conf->nchan = conf->nchunk * NCHAN_PER_CHUNK;
+  cufft->nchan_keep_chan = conf->cufft_nx / OVER_SAMP_RATE;
+  conf->cufft_mod = (int)(0.5 * conf->nchan_keep_chan);
+  
   
   /* Prepare buffer, stream and fft plan for process */
-  conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
-  conf->nsamp1  = conf->stream_ndf_chk * NCHAN_IN * NSAMP_DF;  // For each stream
-  conf->npol1   = conf->nsamp1 * NPOL_SAMP;
-  conf->ndata1  = conf->npol1  * NDIM_POL;
+  conf->sclndim = conf->rbufin_ndf_chk * NSAMP_DF * NPOL_BASEBAND * NDIM_BASEBAND; // Only works when two polarisations has similar power level
+  conf->nsamp1  = conf->stream_ndf_chk * conf->nchan * NSAMP_DF;  // For each stream
+  conf->npol1   = conf->nsamp1 * NPOL_BASEBAND;
+  conf->ndata1  = conf->npol1  * NDIM_BASEBAND;
 		
-  conf->nsamp2  = conf->nsamp1 * OSAMP_RATEI / NCHAN_RATEI;
-  conf->npol2   = conf->nsamp2 * NPOL_SAMP;
-  conf->ndata2  = conf->npol2  * NDIM_POL;
+  conf->nsamp2  = conf->nsamp1 / (OSAMP_RATE * NCHAN_RATEI);
+  conf->npol2   = conf->nsamp2 * NPOL_BASEBAND;
+  conf->ndata2  = conf->npol2  * NDIM_BASEBAND;
 
-  nx1        = CUFFT_NX1;
-  batch1     = conf->npol1 / CUFFT_NX1;
+  nx1        = conf->cufft_nx;
+  batch1     = conf->npol1 / conf->cufft_nx;
   
   iembed1    = nx1;
   istride1   = 1;
@@ -44,8 +49,8 @@ int init_baseband2baseband(conf_t *conf)
   ostride1   = 1;
   odist1     = nx1;
   
-  nx2        = CUFFT_NX2;
-  batch2     = conf->npol2 / CUFFT_NX2;
+  nx2        = conf->nchan_keep_chan;
+  batch2     = conf->npol2 / conf->nchan_keep_chan;
   
   iembed2    = nx2;
   istride2   = 1;
@@ -61,114 +66,69 @@ int init_baseband2baseband(conf_t *conf)
   for(i = 0; i < conf->nstream; i ++)
     {
       CudaSafeCall(cudaStreamCreate(&conf->streams[i]));
-      CufftSafeCall(cufftPlanMany(&conf->fft_plans1[i], CUFFT_RANK1, &nx1, &iembed1, istride1, idist1, &oembed1, ostride1, odist1, CUFFT_C2C, batch1));
-      CufftSafeCall(cufftPlanMany(&conf->fft_plans2[i], CUFFT_RANK2, &nx2, &iembed2, istride2, idist2, &oembed2, ostride2, odist2, CUFFT_C2C, batch2));
+      CufftSafeCall(cufftPlanMany(&conf->fft_plans1[i], CUFFT_RANK, &nx1, &iembed1, istride1, idist1, &oembed1, ostride1, odist1, CUFFT_C2C, batch1));
+      CufftSafeCall(cufftPlanMany(&conf->fft_plans2[i], CUFFT_RANK, &nx2, &iembed2, istride2, idist2, &oembed2, ostride2, odist2, CUFFT_C2C, batch2));
       
       CufftSafeCall(cufftSetStream(conf->fft_plans1[i], conf->streams[i]));
       CufftSafeCall(cufftSetStream(conf->fft_plans2[i], conf->streams[i]));
     }
   
-  conf->sbufin_size    = conf->ndata1 * NBYTE_IN;
-  conf->sbufout_size   = conf->ndata2 * NBYTE_OUT;
+  conf->sbufin_size    = conf->ndata1 * NBYTE_BASEBAND;
+  conf->sbufout_size   = conf->ndata2 * NBYTE_FOLD;
   
   conf->bufin_size     = conf->nstream * conf->sbufin_size;
   conf->bufout_size    = conf->nstream * conf->sbufout_size;
   
-  conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
-  conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
+  conf->sbufrt1_size = conf->npol1 * NBYTE_CUDA_COMPLEX;
+  conf->sbufrt2_size = conf->npol2 * NBYTE_CUDA_COMPLEX;
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
   //conf->hbufin_offset = conf->sbufin_size / sizeof(char);
   conf->hbufin_offset = conf->sbufin_size;
-  conf->dbufin_offset = conf->sbufin_size / (NBYTE_IN * NPOL_SAMP * NDIM_POL);
-  conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_RT;
-  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_RT;
+  conf->dbufin_offset = conf->sbufin_size / (NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND);
+  conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_CUDA_COMPLEX;
+  conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_CUDA_COMPLEX;
   
-  conf->dbufout_offset   = conf->sbufout_size / NBYTE_OUT;
+  conf->dbufout_offset   = conf->sbufout_size / NBYTE_FOLD;
   conf->hbufout_offset   = conf->sbufout_size;
 
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));
-  
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));       
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, NCHAN_OUT * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, NCHAN_OUT * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, NCHAN_OUT * sizeof(float)));
-      
-  CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, NCHAN_OUT * sizeof(float)));   // We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, NCHAN_OUT * sizeof(float)));// We have to clear the memory for this parameter
-  
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, NCHAN_OUT * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, NCHAN_OUT * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, NCHAN_OUT * sizeof(float)));   // Malloc host memory to receive data from device
-  
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
 
+  CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));// We have to clear the memory for this parameter
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->stream_ndf_chk;
-  conf->gridsize_unpack.y = NCHK_BEAM;
+  conf->gridsize_unpack.y = conf->nchunk;
   conf->gridsize_unpack.z = 1;
   conf->blocksize_unpack.x = NSAMP_DF; 
-  conf->blocksize_unpack.y = NCHAN_CHK;
+  conf->blocksize_unpack.y = NCHAN_PER_CHUNK;
   conf->blocksize_unpack.z = 1;
   
-  conf->gridsize_swap_select_transpose_swap.x = NCHAN_IN;
-  conf->gridsize_swap_select_transpose_swap.y = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX1;
+  conf->gridsize_swap_select_transpose_swap.x = conf->nchan;
+  conf->gridsize_swap_select_transpose_swap.y = conf->stream_ndf_chk * NSAMP_DF / conf->cufft_nx;
   conf->gridsize_swap_select_transpose_swap.z = 1;  
-  conf->blocksize_swap_select_transpose_swap.x = CUFFT_NX1;
+  conf->blocksize_swap_select_transpose_swap.x = conf->cufft_nx;
   conf->blocksize_swap_select_transpose_swap.y = 1;
   conf->blocksize_swap_select_transpose_swap.z = 1;
   
-  conf->gridsize_mean.x = 1; 
-  conf->gridsize_mean.y = 1; 
-  conf->gridsize_mean.z = 1;
-  conf->blocksize_mean.x = NCHAN_OUT; 
-  conf->blocksize_mean.y = 1;
-  conf->blocksize_mean.z = 1;
-  
-  conf->gridsize_scale.x = 1;
-  conf->gridsize_scale.y = 1;
-  conf->gridsize_scale.z = 1;
-  conf->blocksize_scale.x = NCHAN_OUT;
-  //conf->blocksize_scale.x = 1;
-  conf->blocksize_scale.y = 1;
-  conf->blocksize_scale.z = 1;
-  
-  conf->gridsize_transpose_pad.x = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_pad.y = NCHAN_OUT;
+  conf->gridsize_transpose_pad.x = conf->stream_ndf_chk * NSAMP_DF / conf->cufft_nx; 
+  conf->gridsize_transpose_pad.y = conf->nchan;
   conf->gridsize_transpose_pad.z = 1;
-  conf->blocksize_transpose_pad.x = CUFFT_NX2;
+  conf->blocksize_transpose_pad.x = conf->nchan_keep_chan;
   conf->blocksize_transpose_pad.y = 1;
   conf->blocksize_transpose_pad.z = 1;
 
-  conf->gridsize_sum1.x = NCHAN_OUT;
-  conf->gridsize_sum1.y = conf->stream_ndf_chk * NPOL_SAMP;
-  conf->gridsize_sum1.z = 1;
-  conf->blocksize_sum1.x = NSAMP_DF * CUFFT_NX2 / (2 * CUFFT_NX1);  // This is the right setup if CUFFT_NX2 is not equal to CUFFT_NX1
-  conf->blocksize_sum1.y = 1;
-  conf->blocksize_sum1.z = 1;
-  
-  conf->gridsize_sum2.x = NCHAN_OUT;
-  conf->gridsize_sum2.y = 1;
-  conf->gridsize_sum2.z = 1;
-  conf->blocksize_sum2.x = conf->stream_ndf_chk * NPOL_SAMP / 2;
-  conf->blocksize_sum2.y = 1;
-  conf->blocksize_sum2.z = 1;
-  
-  conf->gridsize_transpose_scale.x = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_scale.y = NCHAN_OUT / TILE_DIM;
+  conf->gridsize_transpose_scale.x = conf->stream_ndf_chk * NSAMP_DF / conf->cufft_nx; 
+  conf->gridsize_transpose_scale.y = conf->nchan / TILE_DIM;
   conf->gridsize_transpose_scale.z = 1;
   conf->blocksize_transpose_scale.x = TILE_DIM;
   conf->blocksize_transpose_scale.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose_scale.z = 1;
-  
-  conf->gridsize_transpose_float.x = conf->stream_ndf_chk * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_float.y = NCHAN_OUT / TILE_DIM;
-  conf->gridsize_transpose_float.z = 1;
-  conf->blocksize_transpose_float.x = TILE_DIM;
-  conf->blocksize_transpose_float.y = NROWBLOCK_TRANS;
-  conf->blocksize_transpose_float.z = 1;
   
   /* attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(runtime_log);
@@ -406,17 +366,17 @@ int register_header(conf_t *conf)
       return EXIT_FAILURE;
     }
   memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header 
-  //scale =  OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * (double)NBYTE_IN);
+  //scale =  OSAMP_RATEI * (double)NBYTE_FOLD/ (NCHAN_RATEI * (double)NBYTE_BASEBAND);
   file_size = (uint64_t)(file_size * SCL_DTSZ);
   bytes_per_seconds = (uint64_t)(bytes_per_seconds * SCL_DTSZ);
   
-  if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", NCHAN_OUT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf.nchan) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set NCHAN\n");
       fprintf(stderr, "Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "BW", "%d", NCHAN_OUT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "BW", "%d", conf.nchan) < 0)  
     {
       multilog(runtime_log, LOG_ERR, "failed ascii_header_set BW\n");
       fprintf(stderr, "Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -428,15 +388,15 @@ int register_header(conf_t *conf)
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT) < 0)  
+  if (ascii_header_set(hdrbuf_out, "NBIT_FOLD", "%d", NBIT_FOLD) < 0)  
     {
-      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT_FOLD\n");
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
-      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT\n");
+      multilog(runtime_log, LOG_ERR, "failed ascii_header_set NBIT_FOLD\n");
       fprintf(stderr, "Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
@@ -483,10 +443,7 @@ int dat_offs_scl(conf_t conf)
   size_t i, j;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
-  dim3 gridsize_scale, blocksize_scale;  
-  dim3 gridsize_mean, blocksize_mean;
-  dim3 gridsize_sum1, blocksize_sum1;
-  dim3 gridsize_sum2, blocksize_sum2;
+  dim3 gridsize_scale, blocksize_scale; 
   dim3 gridsize_transpose_pad, blocksize_transpose_pad;
 
   size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset;
@@ -497,15 +454,9 @@ int dat_offs_scl(conf_t conf)
   blocksize_swap_select_transpose_swap = conf.blocksize_swap_select_transpose_swap; 
   gridsize_transpose_pad               = conf.gridsize_transpose_pad;
   blocksize_transpose_pad              = conf.blocksize_transpose_pad;
-  	         	               						       
-  gridsize_sum1              = conf.gridsize_sum1;	       
-  blocksize_sum1             = conf.blocksize_sum1;
-  gridsize_sum2              = conf.gridsize_sum2;	       
-  blocksize_sum2             = conf.blocksize_sum2;
+  	         	               	
   gridsize_scale             = conf.gridsize_scale;	       
-  blocksize_scale            = conf.blocksize_scale;	         					    
-  gridsize_mean              = conf.gridsize_mean;	       
-  blocksize_mean             = conf.blocksize_mean;
+  blocksize_scale            = conf.blocksize_scale;
 
   for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
     {
@@ -533,10 +484,6 @@ int dat_offs_scl(conf_t conf)
 	  
 	  /* Transpose the data from PTFT to FTP for later calculation */
 	  transpose_pad_kernel<<<gridsize_transpose_pad, blocksize_transpose_pad, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
-	  
-	  /* Get the sum of samples and square of samples */
-	  sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
-	  sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset]);
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
@@ -546,11 +493,11 @@ int dat_offs_scl(conf_t conf)
   scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
   CudaSynchronizeCall();
   
-  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN_OUT, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * conf.nchan, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * conf.nchan, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * conf.nchan, cudaMemcpyDeviceToHost));
 
-  for (i = 0; i< NCHAN_OUT; i++)
+  for (i = 0; i< conf.nchan; i++)
     //fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[0], conf.hdat_scl[0]);
     fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 
@@ -566,7 +513,7 @@ int dat_offs_scl(conf_t conf)
       return EXIT_FAILURE;
     }
 
-  for (i = 0; i< NCHAN_OUT; i++)
+  for (i = 0; i< conf.nchan; i++)
     fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 
   fclose(fp);

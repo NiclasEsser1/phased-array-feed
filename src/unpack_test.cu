@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
   /* Prepare data */
   srand(time(NULL));
   for(i = 0; i < ndata; i++)
-    data_int16[i] = (int16_t)(rand()/(float)(RAND_MAX/(float)MAX_RAND));
+    data_int16[i] = (int16_t)(rand() * RAND_STD/RAND_MAX);
   data_int64 = (int64_t *)data_int16;
   
   /* calculate on CPU*/

@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
 {
   int i, arg, nchan;
   float *h_result = NULL;
+  float temp;
   dim3 gridsize_scale2, blocksize_scale2;
   cufftComplex *g = NULL, *data = NULL, *g_result = NULL;
   
@@ -72,10 +73,14 @@ int main(int argc, char *argv[])
   srand(time(NULL));
   for(i = 0; i < nchan; i++)
     {
-      data[i].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-      data[i].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+      data[i].x = rand()*RAND_STD/RAND_MAX;
+      temp = rand()*RAND_STD/RAND_MAX;
+      data[i].y =  temp * temp;
       while (data[i].y < data[i].x * data[i].x)
-	data[i].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	{
+	  temp = rand()*RAND_STD/RAND_MAX;
+	  data[i].y =  temp * temp;
+	}
       h_result[i]  = SCL_NSIG * sqrt(data[i].y - data[i].x * data[i].x)/SCL_UINT8;
     }
 

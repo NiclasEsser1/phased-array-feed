@@ -112,8 +112,8 @@ int main(int argc, char *argv[])
   srand(time(NULL));
   for(i = 0; i < nchan; i ++) // Prepare the scale
     {
-      mean_scale_h[i].x = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND)) + 1 ;
-      mean_scale_h[i].y = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND)) * 50000.0;
+      mean_scale_h[i].x = fabs(rand()*RAND_STD/RAND_MAX) + 1 ;
+      mean_scale_h[i].y = fabs(rand()*RAND_STD/RAND_MAX) * 50000.0;
     }
   for(i = 0; i < grid_x; i ++) // Prepare the input data
     {
@@ -126,8 +126,8 @@ int main(int argc, char *argv[])
 	      idx = (i*grid_y + j) * n_accumulate + k;
 	      for(l = 0; l < NPOL_BASEBAND; l++)
 		{
-		  data[idx+l*nsamp].x = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND));
-		  data[idx+l*nsamp].y = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND));
+		  data[idx+l*nsamp].x = fabs(rand()*RAND_STD/RAND_MAX);
+		  data[idx+l*nsamp].y = fabs(rand()*RAND_STD/RAND_MAX);
 		  
 		  power += (data[idx+l*nsamp].x*data[idx+l*nsamp].x + data[idx+l*nsamp].y*data[idx+l*nsamp].y);
 		}
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
       break;
     }
   CudaSafeKernelLaunch();
-
+  
   CudaSafeCall(cudaMemcpy(g_result, g_out, nout * sizeof(uint8_t), cudaMemcpyDeviceToHost));
  
   /* Check the result */

@@ -57,7 +57,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->nchan_in        = conf->nchunk_in * NCHAN_PER_CHUNK;
   conf->nchan_keep_chan = (int)(conf->cufft_nx / OVER_SAMP_RATE);
   conf->nchan_out       = conf->nchan_in * conf->nchan_keep_chan;
-  conf->cufft_mod       = (int)(0.5 * conf->cufft_nx / OVER_SAMP_RATE);
+  conf->cufft_mod       = (int)(0.5 * conf->nchan_keep_chan);
   conf->scale_dtsz      = NBYTE_SPECTRAL * NDATA_PER_SAMP_FULL * conf->nchan_in * conf->nchan_keep_chan / (double)(NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND * conf->ndf_per_chunk_rbufin * conf->nchan_in * NSAMP_DF); // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
 
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
@@ -152,7 +152,7 @@ int initialize_baseband2spectral(conf_t *conf)
   
   naccumulate_pow2 = (int)pow(2.0, floor(log2((double)conf->naccumulate)));
   conf->gridsize_spectral_taccumulate.x = conf->nchan_in;
-  conf->gridsize_spectral_taccumulate.y = conf->cufft_nx / OVER_SAMP_RATE;
+  conf->gridsize_spectral_taccumulate.y = conf->nchan_keep_chan;
   conf->gridsize_spectral_taccumulate.z = 1;
   conf->blocksize_spectral_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_spectral_taccumulate.y = 1;
@@ -167,7 +167,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  conf->blocksize_spectral_taccumulate.z);        
 
   conf->gridsize_saccumulate.x = NDATA_PER_SAMP_RT;
-  conf->gridsize_saccumulate.y = conf->cufft_nx / OVER_SAMP_RATE;
+  conf->gridsize_saccumulate.y = conf->nchan_keep_chan;
   conf->gridsize_saccumulate.z = 1;
   conf->blocksize_saccumulate.x = conf->nchan_in;
   conf->blocksize_saccumulate.y = 1;

@@ -652,7 +652,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, 
 {
   __shared__ int8_t tile[NPOL_BASEBAND * NDIM_BASEBAND][TILE_DIM][TILE_DIM + 1];
 
-  int i;
+  int i;//, loc_freq;
   uint64_t loc_in, loc_out;
   cufftComplex p1, p2;
   
@@ -660,6 +660,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, 
   // Every Thread loads in this case 4 elements into tile.  
   int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
   int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // <- threadIdx.y only between 0 and 7
+  
   for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
     {
       if(i_n < n  && (i_m+i) < m)
@@ -668,7 +669,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, 
 	  p1 = dbuf_in[loc_in];
 	  p2 = dbuf_in[loc_in + offset];
 
-	  if(offset_scale[i_m].y == 0)
+	  if(offset_scale[i_m+i].y == 0)
 	    {
 	      tile[0][threadIdx.y+i][threadIdx.x] = __float2int_rz(p1.x);
 	      tile[1][threadIdx.y+i][threadIdx.x] = __float2int_rz(p1.y);
@@ -677,10 +678,10 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, 
 	    }
 	  else
 	    {	  
-	      tile[0][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.x - offset_scale[i_m].x) / offset_scale[i_m].y);
-	      tile[1][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.y - offset_scale[i_m].x) / offset_scale[i_m].y);
-	      tile[2][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.x - offset_scale[i_m].x) / offset_scale[i_m].y);	  
-	      tile[3][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.y - offset_scale[i_m].x) / offset_scale[i_m].y);	  
+	      tile[0][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.x - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);
+	      tile[1][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.y - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);
+	      tile[2][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.x - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);	  
+	      tile[3][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.y - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);	  
 	    }
         }
     }
@@ -692,7 +693,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, 
     {
       if(i_n < m  && (i_m+i) < n)
   	{
-	  loc_out = blockIdx.z * n * m + (i_m+i)*m + i_n;
+	  loc_out = NPOL_BASEBAND * NDIM_BASEBAND * (blockIdx.z * n * m + (i_m+i)*m + i_n);
   	  dbuf_out[loc_out]     = tile[0][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
   	  dbuf_out[loc_out + 1] = tile[1][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
   	  dbuf_out[loc_out + 2] = tile[2][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!

@@ -444,11 +444,16 @@ class Search(Pipeline):
             # baseband2filterbank command
             baseband2filterbank_cpu = self._numa * self._ncpu_numa + i * self._ncpu_pipeline + 1
             command = ("{} -a {} -b {} -c {} -d {} -e {} "
-                       "-f {} -i {} -j {} -k {} -l {} "
-                       "-m {} -n {}_{} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
-                                                 self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
-                                                 self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
-                                                 self._nchan_filterbank, self._nchan_keep_band, self._ptype, self._ip_udp, self._port_udp)
+                       "-f {} -i {} -j {} -k {} -l {} -m {}_{} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
+                                                                         self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
+                                                                         self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
+                                                                         self._nchan_filterbank, self._ptype, self._ip_udp, self._port_udp)
+            #command = ("{} -a {} -b {} -c {} -d {} -e {} "
+            #           "-f {} -i {} -j {} -k {} -l {} "
+            #           "-m {} -n {}_{} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
+            #                                     self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
+            #                                     self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
+            #                                     self._nchan_filterbank, self._nchan_keep_band, self._ptype, self._ip_udp, self._port_udp)
             if SOD:
                 command += "-g 1"
             else:

@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 	  for (k = 0; k< NDATA_PER_SAMP_RT; k++)
 	    {
 	      idx_in = i * naccumulate + j + k * nsamp_in;
-	      data[idx_in] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	      data[idx_in] = rand()*RAND_STD/RAND_MAX;
 
 	      idx_out = i + k * nsamp_out;
 	      h_result[idx_out] += data[idx_in];

@@ -118,10 +118,10 @@ int main(int argc, char *argv[])
 	  for(k = 0; k < cufft_nx; k++)
 	    {
 	      idx_in      = i * stream_ndf_chk * NSAMP_DF + j * cufft_nx + k;
-	      data[idx_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+  	      data[idx_in].x = rand()*RAND_STD/RAND_MAX;
+  	      data[idx_in].y = rand()*RAND_STD/RAND_MAX;
+  	      data[idx_in+nsamp_in].x = rand()*RAND_STD/RAND_MAX;
+  	      data[idx_in+nsamp_in].y = rand()*RAND_STD/RAND_MAX;	      
 	    }
 	}
     }

@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 {
   int i, j, arg, nchan, nstream;
   float *h_result = NULL;
-  float x, y;
+  float x, y, temp;
   dim3 gridsize_scale3, blocksize_scale3;
   cufftComplex *g = NULL, *data = NULL, *g_result = NULL;
   
@@ -88,9 +88,9 @@ int main(int argc, char *argv[])
 	{
 	  for(j = 0; j < nstream; j++)
 	    {
-	      data[j*nchan+i].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[j*nchan+i].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[j*nchan+i].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND) * (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	      data[j*nchan+i].x = rand()*RAND_STD/RAND_MAX;
+	      temp = rand()*RAND_STD/RAND_MAX;
+	      data[j*nchan+i].y = temp * temp;
 	      x += data[j*nchan+i].x;
 	      y += data[j*nchan+i].y;
 	    }

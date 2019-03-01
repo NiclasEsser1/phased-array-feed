@@ -121,10 +121,10 @@ int main(int argc, char *argv[])
 	  for(k = 0; k < cufft_nx; k++)
 	    {
 	      idx_in      = i * stream_ndf_chk * NSAMP_DF + j * cufft_nx + k;
-	      data[idx_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	      data[idx_in].x = rand()*RAND_STD/RAND_MAX; 
+	      data[idx_in].y = rand()*RAND_STD/RAND_MAX; 
+	      data[idx_in+nsamp_in].x = rand()*RAND_STD/RAND_MAX; 
+	      data[idx_in+nsamp_in].y = rand()*RAND_STD/RAND_MAX; 
 	    }
 	}
     }
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
   
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, npol_in * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
-  swap_select_transpose_pft1_kernel<<<grid_size, block_size>>>(g_in, g_out, cufft_nx, NSAMP_DF, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
+  swap_select_transpose_pft1_kernel<<<grid_size, block_size>>>(g_in, g_out, cufft_nx, stream_ndf_chk * NSAMP_DF / cufft_nx, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
   CudaSafeKernelLaunch();
 
   CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));

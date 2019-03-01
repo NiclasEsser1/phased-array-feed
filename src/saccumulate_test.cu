@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 	      for (l = 0; l < nstream; l++)
 		{
 		  idx_in = idx_out + l * npol_out;	      
-		  data[idx_in] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+		  data[idx_in] = rand()*RAND_STD/RAND_MAX;
 		  h_result[idx_out] += data[idx_in];
 		}
 	    }

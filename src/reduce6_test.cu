@@ -111,8 +111,8 @@ int main(int argc, char *argv[])
       for(j = 0; j < n_accumulate; j++)
 	{
 	  idx = i * n_accumulate + j;
-	  data[idx].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	  data[idx].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	  data[idx].x = rand()*RAND_STD/RAND_MAX;
+	  data[idx].y = rand()*RAND_STD/RAND_MAX;
 
 	  h_result[i].x += data[idx].x;
 	  h_result[i].y += data[idx].y;

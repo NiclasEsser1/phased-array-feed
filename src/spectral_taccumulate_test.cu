@@ -116,12 +116,11 @@ int main(int argc, char *argv[])
 	    {
 	      idx_in      = i * stream_ndf_chk * NSAMP_DF/OVER_SAMP_RATE + j * stream_ndf_chk * NSAMP_DF / cufft_nx + k;
 	      
-	      data[idx_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+  	      data[idx_in].x = rand()*RAND_STD/RAND_MAX;
+  	      data[idx_in].y = rand()*RAND_STD/RAND_MAX;
+  	      data[idx_in+nsamp_in].x = rand()*RAND_STD/RAND_MAX;
+  	      data[idx_in+nsamp_in].y = rand()*RAND_STD/RAND_MAX;
 	      
-	      data[idx_in+nsamp_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-
 	      aa = data[idx_in].x * data[idx_in].x + data[idx_in].y * data[idx_in].y;
 	      bb = data[idx_in+nsamp_in].x * data[idx_in+nsamp_in].x + data[idx_in+nsamp_in].y * data[idx_in+nsamp_in].y;
 	      u = 2 * (data[idx_in].x * data[idx_in+nsamp_in].x + data[idx_in].y * data[idx_in+nsamp_in].y);

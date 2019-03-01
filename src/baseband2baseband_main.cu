@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
   char log_fname[MSTR_LEN];
   
   /* Initial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:")) != -1)
     {
       switch(arg)
 	{
@@ -84,6 +84,14 @@ int main(int argc, char *argv[])
 	  	
 	case 'g':
 	  sscanf(optarg, "%s", conf.dir);
+	  break;
+	  
+	case 'i':
+	  sscanf(optarg, "%d", &conf.nchunk_in);
+	  break;
+	  
+	case 'j':
+	  sscanf(optarg, "%d", &conf.cufft_nx);
 	  break;
 	}
     }

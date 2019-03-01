@@ -145,8 +145,8 @@ int main(int argc, char *argv[])
 	  idx = i * n_accumulate + j;
 	  for(k = 0; k < nstream; k++)
 	    {
-	      data[idx+k*len_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx+k*len_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	      data[idx+k*len_in].x = rand()*RAND_STD/RAND_MAX;
+	      data[idx+k*len_in].y = rand()*RAND_STD/RAND_MAX;
 	  
 	      h_result_offs[i] += (data[idx+k*len_in].x/scl_ndim);
 	      h_result_mean[i] += (data[idx+k*len_in].y/scl_ndim);

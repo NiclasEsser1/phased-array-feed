@@ -34,6 +34,9 @@ extern "C" {
 #define NPOL_FILTERBANK      1
 #define NBYTE_FILTERBANK     1    // uint8_t
   
+#define NBYTE_FOLD           1    // int8_t
+#define NBIT_FOLD            8
+  
 #define NDATA_PER_SAMP_RT  6
 #define NDATA_PER_SAMP_FULL  4
 #define NBIT_SPECTRAL        32
@@ -56,11 +59,12 @@ extern "C" {
 #define MJD1970        40587.0
 #define NPROCESS_PER_NODE_MAX    2
 #define CUFFT_RANK     1
-#define MAX_RAND       1024
+#define RAND_STD       64.0f
 
 #define SCL_UINT8      64.0f          // uint8_t, detected samples should vary in 0.5 * range(uint8_t) = 127, to be safe, use 0.25
 #define OFFS_UINT8     64.0f          // uint8_t, detected samples should center at 0.5 * range(uint8_t) = 127, to be safe, use 0.25
 #define SCL_NSIG       3.0f
+#define SCL_INT8              64.0f          // int8_t, baseband samples should vary in 0.5 * range(int8_t) = 127, to be safe, 0.25;
   
 #endif
 #ifdef __cplusplus

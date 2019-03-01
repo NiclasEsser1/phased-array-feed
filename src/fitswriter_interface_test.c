@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
     {
       for(j = 0; j < fits.nchan; j++)
 	{
-	  spectral_buffer[i * fits.nchan + j] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	  spectral_buffer[i * fits.nchan + j] = rand()*RAND_STD/RAND_MAX;
 	  fprintf(fp, "%f\n", spectral_buffer[i * fits.nchan + j]);
 	}
     }

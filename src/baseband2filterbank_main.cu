@@ -37,9 +37,9 @@ void usage ()
 	   " -i  Number of chunks of input\n"
 	   " -j  FFT length\n"
 	   " -k  The number of output channels\n"
-	   " -l  Number of channels keep for the band\n"
-	   " -m  The type of polarisation\n"
-	   " -n  Network interface ip_port\n"
+	   //" -l  Number of channels keep for the band\n"
+	   " -l  The type of polarisation\n"
+	   " -m  Network interface ip_port\n"
 	   );
 }
 
@@ -112,15 +112,15 @@ int main(int argc, char *argv[])
 	  sscanf(optarg, "%d", &conf.nchan_out);
 	  break;
 	  
-	case 'l':
-	  sscanf(optarg, "%d", &conf.nchan_keep_band);
-	  break;
+	//case 'l':
+	//  sscanf(optarg, "%d", &conf.nchan_keep_band);
+	//  break;
 	  
-	case 'm':
+	case 'l':
 	  sscanf(optarg, "%d", &conf.pol_type);
 	  break;
 	  
-	case 'n':
+	case 'm':
 	  sscanf(optarg, "%[^_]_%d", conf.ip, &conf.port);
 	  break;
 	}

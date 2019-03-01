@@ -116,10 +116,10 @@ int main(int argc, char *argv[])
 	  for(k = 0; k < block_size.x; k++)
 	    {
 	      idx_in = i * grid_size.y * block_size.x + j * block_size.x + k;
-	      data[idx_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].x = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
-	      data[idx_in+nsamp_in].y = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+	      data[idx_in].x = rand() * RAND_STD/RAND_MAX;
+	      data[idx_in].y = rand() * RAND_STD/RAND_MAX;
+	      data[idx_in+nsamp_in].x = rand() * RAND_STD/RAND_MAX;
+	      data[idx_in+nsamp_in].y = rand() * RAND_STD/RAND_MAX;
 
 	      idx_out = j * grid_size.x * block_size.x + i * block_size.x + k;
 	      

@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
   /* Create data on host */
   srand(time(NULL));
   for(i = 0; i < ndata; i ++)
-    data[i] = (float)rand()/(float)(RAND_MAX/(float)MAX_RAND);
+    data[i] = rand()*RAND_STD/RAND_MAX;
 
   /* Transpose with CPU */
   for(i = 0; i < m; i ++)

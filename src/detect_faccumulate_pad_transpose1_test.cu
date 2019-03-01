@@ -119,8 +119,8 @@ int main(int argc, char *argv[])
 	      idx = (i*grid_y + j) * n_accumulate + k;
 	      for(l = 0; l < NPOL_BASEBAND; l++)
 		{
-		  data[idx+l*nsamp].x = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND))/100.;
-		  data[idx+l*nsamp].y = fabs((float)rand()/(float)(RAND_MAX/(float)MAX_RAND))/100.;
+		  data[idx+l*nsamp].x = fabs(rand()*RAND_STD/RAND_MAX)/100.;
+		  data[idx+l*nsamp].y = fabs(rand()*RAND_STD/RAND_MAX)/100.;
 		  accumulate += (data[idx+l*nsamp].x*data[idx+l*nsamp].x + data[idx+l*nsamp].y*data[idx+l*nsamp].y);
 		}
  	    }
