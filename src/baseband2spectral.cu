@@ -472,7 +472,7 @@ int baseband2spectral(conf_t conf)
 		    (&conf.buf_rt1[bufrt1_offset],
 		     &conf.buf_rt2[bufrt2_offset],
 		     conf.cufft_nx,
-		     NSAMP_DF,
+		     conf.ndf_per_chunk_stream * NSAMP_DF / conf.cufft_nx,
 		     conf.nsamp1,
 		     conf.nsamp2,
 		     conf.cufft_nx,

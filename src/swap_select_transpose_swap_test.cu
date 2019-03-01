@@ -16,23 +16,18 @@
 #include "kernel.cuh"
 #include "constants.h"
 
-// ./swap_select_transpose_ptf_test -a 48 -b 1024 -c 128 -d 32768
-// ./swap_select_transpose_ptf_test -a 33 -b 1024 -c 128 -d 24576
-
-// ./swap_select_transpose_ptf_test -a 48 -b 1024 -c 128 -d 35840
-// ./swap_select_transpose_ptf_test -a 48 -b 1024 -c 256 -d 72192
-// ./swap_select_transpose_ptf_test -a 33 -b 1024 -c 256 -d 49664
+// ./swap_select_transpose_swap_test -a 48 -b 1024 -c 64
+// ./swap_select_transpose_swap_test -a 33 -b 1024 -c 64
 
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "swap_select_transpose_ptf_test - Test the swap_select_transpose_ptf kernel \n"
+	   "swap_select_transpose_swap_test - Test the swap_select_transpose_swap kernel \n"
 	   "\n"
-	   "Usage: swap_select_transpose_ptf_test [options]\n"
+	   "Usage: swap_select_transpose_swap_test [options]\n"
 	   " -a  Number of input frequency chunks\n"
 	   " -b  Number of packets of each stream per frequency chunk\n"
 	   " -c  Number of FFT points\n"
-	   " -d  Number of fine frequency channels keep for the band\n"
 	   " -h  show help\n");
 }
 
@@ -43,14 +38,14 @@ int main(int argc, char *argv[])
   int remainder;
   int nchk_in, nchan_in;
   int stream_ndf_chk, cufft_nx, cufft_mod;
-  int nchan_keep_band, nchan_keep_chan, nchan_edge;
+  int nchan_keep_chan;
   dim3 grid_size, block_size;
   uint64_t nsamp_in, nsamp_out, npol_in, npol_out, idx_in, idx_out;
   int64_t loc;
   cufftComplex *data = NULL, *h_result = NULL, *g_result = NULL, *g_in = NULL, *g_out = NULL;
   
   /* Read in parameters */
-  while((arg=getopt(argc,argv,"a:b:c:hd:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:hc:")) != -1)
     {
       switch(arg)
 	{
@@ -82,23 +77,15 @@ int main(int argc, char *argv[])
 	    }
 	  break;
 	  
-	case 'd':	  
-	  if (sscanf (optarg, "%d", &nchan_keep_band) != 1)
-	    {
-	      fprintf (stderr, "Could not get nchan_keep_band, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      exit(EXIT_FAILURE);
-	    }
-	  break;
 	}
     }
-  fprintf(stdout, "nchk_in is %d, stream_ndf_chk is %d, cufft_nx is %d and nchan_keep_band is %d\n", nchk_in, stream_ndf_chk, cufft_nx, nchan_keep_band);
+  fprintf(stdout, "nchk_in is %d, stream_ndf_chk is %d and cufft_nx is %d\n", nchk_in, stream_ndf_chk, cufft_nx);
 
   /* Setup size */
   nchan_in        = nchk_in * NCHAN_PER_CHUNK;
   nchan_keep_chan = cufft_nx / OVER_SAMP_RATE;
-  nchan_edge      = 0.5 * (nchan_in * nchan_keep_chan - nchan_keep_band);
   cufft_mod       = 0.5 * nchan_keep_chan;
-  fprintf(stdout, "nchan_in is %d, nchan_keep_chan is %d, cufft_mod is %d and nchan_edge is %d\n", nchan_in, nchan_keep_chan, cufft_mod, nchan_edge);
+  fprintf(stdout, "nchan_in is %d, nchan_keep_chan is %d and cufft_mod is %d\n", nchan_in, nchan_keep_chan, cufft_mod);
     
   grid_size.x = nchan_in;
   grid_size.y = stream_ndf_chk * NSAMP_DF / cufft_nx;
@@ -109,7 +96,7 @@ int main(int argc, char *argv[])
   fprintf(stdout, "kernel configuration is (%d, %d, %d) and (%d, %d, %d)\n", grid_size.x, grid_size.y, grid_size.z, block_size.x, block_size.y, block_size.z);
 
   nsamp_in  = stream_ndf_chk * nchan_in * NSAMP_DF;
-  nsamp_out = stream_ndf_chk * NSAMP_DF / cufft_nx * nchan_keep_band;
+  nsamp_out = nsamp_in / OVER_SAMP_RATE;
   npol_in   = nsamp_in * NPOL_BASEBAND;
   npol_out  = nsamp_out * NPOL_BASEBAND;
   
@@ -149,18 +136,15 @@ int main(int argc, char *argv[])
 	      remainder = (k + cufft_mod)%cufft_nx;
 	      if (remainder<nchan_keep_chan)
 		{
-		  loc = i * nchan_keep_chan + remainder - nchan_edge;
+		  loc = i * nchan_keep_chan + (remainder + nchan_keep_chan/2)%nchan_keep_chan;
+		  idx_in      = i * stream_ndf_chk * NSAMP_DF + j * cufft_nx + k;
 		  
-		  if((loc >= 0) && (loc < nchan_keep_band))
-		    {
-		      idx_in      = i * stream_ndf_chk * NSAMP_DF + j * cufft_nx + k;
-		      idx_out     = j * nchan_keep_band + loc;
-		      		      
-		      h_result[idx_out].x           = data[idx_in].x;
-		      h_result[idx_out].y           = data[idx_in].y;
-		      h_result[idx_out+nsamp_out].x = data[idx_in+nsamp_in].x;
-		      h_result[idx_out+nsamp_out].y = data[idx_in+nsamp_in].y;
-		    }
+		  idx_out     = j * nchan_in * nchan_keep_chan + loc;
+		  
+		  h_result[idx_out].x           = data[idx_in].x;
+		  h_result[idx_out].y           = data[idx_in].y;
+		  h_result[idx_out+nsamp_out].x = data[idx_in+nsamp_in].x;
+		  h_result[idx_out+nsamp_out].y = data[idx_in+nsamp_in].y;
 		}
 	    }
 	}
@@ -168,9 +152,8 @@ int main(int argc, char *argv[])
   
   /* Calculate on GPU */
   CudaSafeCall(cudaMemcpy(g_in, data, npol_in * NBYTE_CUFFT_COMPLEX, cudaMemcpyHostToDevice));
-  swap_select_transpose_ptf_kernel<<<grid_size, block_size>>>(g_in, g_out, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan, nchan_keep_band, nchan_edge);
+  swap_select_transpose_swap_kernel<<<grid_size, block_size>>>(g_in, g_out, nsamp_in, nsamp_out, cufft_nx, cufft_mod, nchan_keep_chan);
   CudaSafeKernelLaunch();
-
   CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */
@@ -178,8 +161,6 @@ int main(int argc, char *argv[])
     {      
       if((h_result[i].x - g_result[i].x) !=0 || (h_result[i].y - g_result[i].y) != 0)
 	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i].x, g_result[i].x, h_result[i].x - g_result[i].x, h_result[i].y, g_result[i].y, h_result[i].y - g_result[i].y);
-      if((h_result[i+nsamp_out].x - g_result[i+nsamp_out].x) !=0 || (h_result[i+nsamp_out].y - g_result[i+nsamp_out].y) !=0)
-	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i+nsamp_out].x, g_result[i+nsamp_out].x, h_result[i+nsamp_out].x - g_result[i+nsamp_out].x, h_result[i+nsamp_out].y, g_result[i+nsamp_out].y, h_result[i+nsamp_out].y - g_result[i+nsamp_out].y);
     }
 
   /* Free buffer */

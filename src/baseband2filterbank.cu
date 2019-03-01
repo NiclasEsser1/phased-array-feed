@@ -84,7 +84,6 @@ int initialize_baseband2filterbank(conf_t *conf)
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "We keep %d fine channels for the whole band after FFT", conf->nchan_keep_band); 
   
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will drop %d fine channels at the band edge for frequency accumulation", conf->nchan_edge);
   log_add(conf->log_file, "INFO", 1, log_mutex, "%f percent fine channels (after down sampling) are kept for frequency accumulation", 1.0/conf->inverse_nchan_rate * 100.);

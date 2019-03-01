@@ -25,11 +25,11 @@ FITSWRITER = True
 SOD = True   # Start filterbank data
 # SOD  = False  # Do not start filterbank data
 
-#HEIMDALL = False   # To run heimdall on filterbank file or not
-HEIMDALL       = True   # To run heimdall on filterbank file or not
+HEIMDALL = False   # To run heimdall on filterbank file or not
+#HEIMDALL       = True   # To run heimdall on filterbank file or not
 
-#DBDISK = True   # To run dbdisk on processed data or not
-DBDISK         = False   # To run dbdisk on processed data or not
+DBDISK = True   # To run dbdisk on processed data or not
+#DBDISK         = False   # To run dbdisk on processed data or not
 
 PAF_ROOT       = "/home/pulsar/xinping/phased-array-feed/"
 DATA_ROOT      = "/beegfs/DENG/"
@@ -66,7 +66,8 @@ SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                          "rbuf_filterbank_nread":   (HEIMDALL + DBDISK) if (HEIMDALL + DBDISK) else 1,
 
                          "nchan_filterbank":        512,
-                         "cufft_nx":                128,
+                         #"cufft_nx":                128,
+                         "cufft_nx":                256,
 
                          "nbyte_filterbank":        1,
                          "npol_samp_filterbank":    1,
@@ -92,7 +93,8 @@ SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
 SEARCH_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                        "rbuf_baseband_key":      ["dada"],
                        "rbuf_filterbank_key":    ["dade"],
-                       "nchan_keep_band":        32768,
+                       #"nchan_keep_band":        32768,
+                       "nchan_keep_band":        72192,
                        "nbeam":                  1,
                        "nport_beam":             3,
                        "nchk_port":              16,
@@ -101,7 +103,8 @@ SEARCH_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format
 SEARCH_CONFIG_2BEAMS = {"dada_fname":              "{}/{}/{}_33chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                         "rbuf_baseband_key":       ["dada", "dadc"],
                         "rbuf_filterbank_key":     ["dade", "dadg"],
-                        "nchan_keep_band":         24576,
+                        #"nchan_keep_band":         24576,
+                        "nchan_keep_band":         49664,
                         "nbeam":                   2,
                         "nport_beam":              3,
                         "nchk_port":               11,
@@ -666,6 +669,10 @@ class Spectral(Pipeline):
         self._tbuf_baseband_ndf_chk = SPECTRAL_CONFIG_GENERAL["tbuf_baseband_ndf_chk"]
         self._rbuf_spectral_ndf_chk = SPECTRAL_CONFIG_GENERAL["rbuf_spectral_ndf_chk"]
 
+        if not (self._ndf_stream % self._cufft_nx == 0):
+            log.error("ndf_stream should be multiple times of cufft_nx")
+            raise PipelineError("ndf_stream should be multiple times of cufft_nx")
+        
         self._cleanup_commands = ["pkill -9 -f dada_diskdb",
                                   "pkill -9 -f baseband2spectr", # process name, maximum 16 bytes (15 bytes visiable)
                                   "pkill -9 -f dada_dbdisk",

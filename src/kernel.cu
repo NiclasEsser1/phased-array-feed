@@ -372,34 +372,34 @@ __global__ void mean_kernel(cufftComplex *buf_in, uint64_t offset_in, float *dda
 /*
   This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
 */
-__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_uint8)
+__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_format)
 {
   uint64_t loc_freq  = threadIdx.x;
-  ddat_scl[loc_freq] = scl_nsig * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / scl_uint8;
+  ddat_scl[loc_freq] = scl_nsig * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / scl_format;
 }
 
 /*
   This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
 */
-__global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_uint8)
+__global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_format)
 {
   uint64_t loc_freq  = threadIdx.x;
-  ddat_scl[loc_freq] = scl_nsig * sqrtf(mean[loc_freq].y - mean[loc_freq].x * mean[loc_freq].x) / scl_uint8;
+  ddat_scl[loc_freq] = scl_nsig * sqrtf(mean[loc_freq].y - mean[loc_freq].x * mean[loc_freq].x) / scl_format;
 }
 
 /*
   This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
 */
-__global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_uint8)
+__global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_format)
 {
   uint64_t loc_freq  = threadIdx.x;
-  offset_scale[loc_freq].y = scl_nsig * sqrtf(offset_scale[loc_freq].y - offset_scale[loc_freq].x * offset_scale[loc_freq].x) / scl_uint8;
+  offset_scale[loc_freq].y = scl_nsig * sqrtf(offset_scale[loc_freq].y - offset_scale[loc_freq].x * offset_scale[loc_freq].x) / scl_format;
 }
 
 /*
   This kernel is used to calculate the scale of data based on the mean calculated by mean_kernel
 */
-__global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, int nstream, float scl_nsig, float scl_uint8)
+__global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, int nstream, float scl_nsig, float scl_format)
 {
   int i;
   uint64_t loc_freq  = threadIdx.x;
@@ -409,7 +409,7 @@ __global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, in
       offset_scale[loc_freq].y += offset_scale[loc_freq + i * offset_in].y;
     }
   
-  offset_scale[loc_freq].y = scl_nsig * sqrtf(offset_scale[loc_freq].y - offset_scale[loc_freq].x * offset_scale[loc_freq].x) / scl_uint8;
+  offset_scale[loc_freq].y = scl_nsig * sqrtf(offset_scale[loc_freq].y - offset_scale[loc_freq].x * offset_scale[loc_freq].x) / scl_format;
 }
 
 /*
@@ -591,4 +591,112 @@ __global__ void saccumulate_kernel(float *dbuf, uint64_t offset, int nstream)
 
   for(i = 1; i < nstream; i++)
     dbuf[loc] += dbuf[loc+i*offset];  
+}
+
+__global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan)
+{
+  int remainder1, remainder2, loc;
+  uint64_t loc_in, loc_out;
+  cufftComplex p1, p2;
+  
+  remainder1 = (threadIdx.x + cufft_mod)%cufft_nx;
+  if(remainder1 < nchan_keep_chan)
+    {
+      loc_in = blockIdx.x * gridDim.y * blockDim.x +
+	blockIdx.y * blockDim.x +
+	threadIdx.x;
+
+      remainder2 = (remainder1 + nchan_keep_chan/2)%nchan_keep_chan; // The reverse FFT has to be done inside the original croase channel
+      loc = remainder2 + blockIdx.x * nchan_keep_chan;
+      
+      loc_out = blockIdx.y * gridDim.x * nchan_keep_chan + loc;  
+	  
+      p1 = dbuf_in[loc_in];
+      dbuf_out[loc_out].x = p1.x;
+      dbuf_out[loc_out].y = p1.y;
+
+      loc_out = loc_out + offset_out;
+      
+      p2 = dbuf_in[loc_in + offset_in];
+      dbuf_out[loc_out].x = p2.x;
+      dbuf_out[loc_out].y = p2.y;
+    }
+}
+
+__global__ void transpose_pad_kernel(cufftComplex *dbuf_in, uint64_t offset_in, cufftComplex *dbuf_out)
+{
+  uint64_t loc_in, loc_out;
+  cufftComplex p;
+  
+  loc_in = blockIdx.x * gridDim.y * blockDim.x +
+    blockIdx.y * blockDim.x +
+    threadIdx.x;
+  
+  loc_out = NPOL_BASEBAND * (blockIdx.y * gridDim.x * blockDim.x +
+			    blockIdx.x * blockDim.x +
+			    threadIdx.x);
+  
+  p = dbuf_in[loc_in];
+  dbuf_out[loc_out].x         = p.x + p.y;
+  dbuf_out[loc_out].y         = p.x * p.x + p.y * p.y;
+
+  p = dbuf_in[loc_in + offset_in];
+  dbuf_out[loc_out + 1].x     = p.x + p.y;
+  dbuf_out[loc_out + 1].y     = p.x * p.x + p.y * p.y;
+}
+
+/* 
+   This is the speedup version with dat_scl and dat_offs calculated from data
+*/
+__global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, int n, int m, uint64_t offset, cufftComplex *offset_scale)
+{
+  __shared__ int8_t tile[NPOL_BASEBAND * NDIM_BASEBAND][TILE_DIM][TILE_DIM + 1];
+
+  int i;
+  uint64_t loc_in, loc_out;
+  cufftComplex p1, p2;
+  
+  // Load matrix into tile
+  // Every Thread loads in this case 4 elements into tile.  
+  int i_n = blockIdx.x * TILE_DIM + threadIdx.x;
+  int i_m = blockIdx.y * TILE_DIM + threadIdx.y; // <- threadIdx.y only between 0 and 7
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      if(i_n < n  && (i_m+i) < m)
+  	{
+	  loc_in = blockIdx.z * m * n + (i_m+i)*n + i_n;
+	  p1 = dbuf_in[loc_in];
+	  p2 = dbuf_in[loc_in + offset];
+
+	  if(offset_scale[i_m].y == 0)
+	    {
+	      tile[0][threadIdx.y+i][threadIdx.x] = __float2int_rz(p1.x);
+	      tile[1][threadIdx.y+i][threadIdx.x] = __float2int_rz(p1.y);
+	      tile[2][threadIdx.y+i][threadIdx.x] = __float2int_rz(p2.x);
+	      tile[3][threadIdx.y+i][threadIdx.x] = __float2int_rz(p2.y);
+	    }
+	  else
+	    {	  
+	      tile[0][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.x - offset_scale[i_m].x) / offset_scale[i_m].y);
+	      tile[1][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.y - offset_scale[i_m].x) / offset_scale[i_m].y);
+	      tile[2][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.x - offset_scale[i_m].x) / offset_scale[i_m].y);	  
+	      tile[3][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.y - offset_scale[i_m].x) / offset_scale[i_m].y);	  
+	    }
+        }
+    }
+  __syncthreads();
+  
+  i_n = blockIdx.y * TILE_DIM + threadIdx.x; 
+  i_m = blockIdx.x * TILE_DIM + threadIdx.y;
+  for (i = 0; i < TILE_DIM; i += NROWBLOCK_TRANS)
+    {
+      if(i_n < m  && (i_m+i) < n)
+  	{
+	  loc_out = blockIdx.z * n * m + (i_m+i)*m + i_n;
+  	  dbuf_out[loc_out]     = tile[0][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
+  	  dbuf_out[loc_out + 1] = tile[1][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
+  	  dbuf_out[loc_out + 2] = tile[2][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
+  	  dbuf_out[loc_out + 3] = tile[3][threadIdx.x][threadIdx.y + i]; // <- multiply by m, non-squared!
+  	}
+    }
 }

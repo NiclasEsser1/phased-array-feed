@@ -22,10 +22,10 @@ __global__ void swap_select_transpose_pft1_kernel(cufftComplex* dbuf_in, cufftCo
 __global__ void taccumulate_complex_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out);  // Share between fold and search mode
 __global__ void mean_kernel(cufftComplex *buf_in, uint64_t offset_in, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim); // Share between fold and search mode
 //__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl); // Share between fold and search mode
-__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_uint8);
-__global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_uint8);
-__global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_uint8);
-__global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, int nstream, float scl_nsig, float scl_uint8);
+__global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl, float scl_nsig, float scl_format);
+__global__ void scale1_kernel(cufftComplex *mean, float *ddat_scl, float scl_nsig, float scl_format);
+__global__ void scale2_kernel(cufftComplex *offset_scale, float scl_nsig, float scl_format);
+__global__ void scale3_kernel(cufftComplex *offset_scale, uint64_t offset_in, int nstream, float scl_nsig, float scl_format);
 
 /* The following are only for search mode */
 __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *dbuf_out, uint64_t offset_in, float *ddat_offs, float *ddat_scl);
@@ -33,6 +33,8 @@ __global__ void detect_faccumulate_scale1_kernel(cufftComplex *dbuf_in, uint8_t 
 __global__ void detect_faccumulate_pad_transpose_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in);
 __global__ void transpose_kernel(float* dbuf_in, float *dbuf_out, uint64_t offset, int n, int m);
 __global__ void saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
+__global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan);
+__global__ void transpose_pad_kernel(cufftComplex *dbuf_out, uint64_t offset_out, cufftComplex *dbuf_in);
 
 // Modified from the example here, https://devtalk.nvidia.com/default/topic/1038617/cuda-programming-and-performance/understanding-and-adjusting-mark-harriss-array-reduction/
 // The original code is given by Mark Harris 
