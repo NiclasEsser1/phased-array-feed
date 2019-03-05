@@ -14,29 +14,20 @@
 #include "ipcbuf.h"
 #include "daemon.h"
 #include "futils.h"
-
-#define NCHAN_KEEP_CHAN       (int)(CUFFT_NX1 * OSAMP_RATEI)
-#define CUFFT_NX2             (int)(CUFFT_NX1 * OSAMP_RATEI)              // We work in seperate raw channels
-#define CUFFT_MOD2            (int)(CUFFT_NX2/2)         
-
-#define NCHAN_OUT             324             // Final number of channels, multiple times of CUFFT2_NX2
-#define NCHAN_KEEP_BAND       (int)(CUFFT_NX2 * NCHAN_OUT)
-#define NCHAN_RATEI           (NCHAN_IN * NCHAN_KEEP_CHAN / (double)NCHAN_KEEP_BAND)
-
-#define NCHAN_EDGE            (int)((NCHAN_IN * NCHAN_KEEP_CHAN - NCHAN_KEEP_BAND)/2)
-
-#define SCL_DTSZ              (OSAMP_RATEI * (double)NBYTE_OUT/ (NCHAN_RATEI * (double)NBYTE_IN))
-#define TSAMP                 (NCHAN_KEEP_CHAN/(double)CUFFT_NX2)
+#include "constants.h"
 
 typedef struct conf_t
 {
+  FILE *log_file;
   int nchunk, nchan;
   int cufft_nx, cufft_mod, nchan_keep_chan;
-  int stream_ndf_chk;
+  int ndf_per_chunk_stream;
+  int naccumulate;
   int nstream;
-  float sclndim;
-
-  int nrun_blk;
+  float ndim_scale;
+  double scale_dtsz;
+  
+  int nrepeat_per_blk;
   char dir[MSTR_LEN];
   char utc_start[MSTR_LEN];
   
@@ -47,7 +38,7 @@ typedef struct conf_t
   int8_t *dbuf_out;
 
   cufftComplex *buf_rt1, *buf_rt2;
-  uint64_t rbufin_ndf_chk;
+  uint64_t ndf_per_chunk_rbufin;
   uint64_t bufin_size, bufout_size;
   uint64_t sbufin_size, sbufout_size;
   uint64_t bufrt1_size, bufrt2_size;
@@ -73,14 +64,21 @@ typedef struct conf_t
 
   dim3 gridsize_transpose_pad, blocksize_transpose_pad;
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
+
+  double tsamp;
+  char *hdrbuf_in;
+  uint64_t file_size_in, bytes_per_second_in;
+  int sod;
 }conf_t; 
 
-int init_baseband2baseband(conf_t *conf);
+int default_arguments(conf_t *conf);
+int initialize_baseband2baseband(conf_t *conf);
 int baseband2baseband(conf_t conf);
-int dat_offs_scl(conf_t conf);
-int register_header(conf_t *conf);
-int dat_offs_scl(conf_t conf);
+int read_dada_header(conf_t *conf);
+int register_dada_header(conf_t *conf);
 
+int offset_scale(conf_t conf);
 int destroy_baseband2baseband(conf_t conf);
+int examine_record_arguments(conf_t conf, char **argv, int argc);
 
 #endif

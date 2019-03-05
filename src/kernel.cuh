@@ -35,6 +35,7 @@ __global__ void saccumulate_kernel(float *dbuf, uint64_t offset, int nstream);
 __global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan);
 __global__ void transpose_pad_kernel(cufftComplex *dbuf_out, uint64_t offset_out, cufftComplex *dbuf_in);
 __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, int n, int m, uint64_t offset, cufftComplex *offset_scale);
+__global__ void transpose_complex_kernel(cufftComplex* dbuf_in, uint64_t offset, cufftComplex *dbuf_out);
 
 // Modified from the example here, https://devtalk.nvidia.com/default/topic/1038617/cuda-programming-and-performance/understanding-and-adjusting-mark-harriss-array-reduction/
 // The original code is given by Mark Harris 

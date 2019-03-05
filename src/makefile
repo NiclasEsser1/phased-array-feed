@@ -26,13 +26,16 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include -L/usr/local/cuda/include
 
-all: capture_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test accumulate_test taccumulate_complex_test taccumulate_float_test unpack_test transpose_test transpose_scale_test transpose_pad_test swap_select_transpose_ptf_test swap_select_transpose_swap_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale2_spectral_faccumulate_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
+all: capture_main baseband2baseband_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test taccumulate_complex_test taccumulate_float_test unpack_test transpose_test transpose_complex_test transpose_scale_test transpose_pad_test swap_select_transpose_ptf_test swap_select_transpose_swap_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale2_spectral_faccumulate_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test clean
 
 capture_main:capture_main.o capture.o log.o
 	$(NVCC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
 
 dada2filterbank_main:dada2filterbank_main.o dada2filterbank.o log.o
 	$(NVCC) -o dada2filterbank_main dada2filterbank_main.o dada2filterbank.o log.o $(LIB_DIRS) $(LIBS)
+
+baseband2baseband_main:baseband2baseband_main.o baseband2baseband.o kernel.o log.o
+	$(NVCC) -o baseband2baseband_main baseband2baseband_main.o baseband2baseband.o kernel.o log.o $(LIB_DIRS) $(LIBS)
 
 baseband2filterbank_main:baseband2filterbank_main.o baseband2filterbank.o kernel.o log.o
 	$(NVCC) -o baseband2filterbank_main baseband2filterbank_main.o baseband2filterbank.o kernel.o log.o $(LIB_DIRS) $(LIBS)
@@ -78,6 +81,9 @@ unpack_test:unpack_test.o kernel.o
 
 transpose_test:transpose_test.o kernel.o 
 	$(NVCC) -o transpose_test transpose_test.o kernel.o $(LIB_DIRS) $(LIBS)
+
+transpose_complex_test:transpose_complex_test.o kernel.o 
+	$(NVCC) -o transpose_complex_test transpose_complex_test.o kernel.o $(LIB_DIRS) $(LIBS)
 
 transpose_scale_test:transpose_scale_test.o kernel.o 
 	$(NVCC) -o transpose_scale_test transpose_scale_test.o kernel.o $(LIB_DIRS) $(LIBS)
@@ -127,6 +133,12 @@ capture_main.o:capture_main.c
 
 capture.o:capture.c
 	$(NVCC) -c capture.c $(INCLUDE_DIRS) ${C_FLAGS} 
+
+baseband2baseband_main.o:baseband2baseband_main.cu
+	$(NVCC) -c baseband2baseband_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+baseband2baseband.o:baseband2baseband.cu
+	$(NVCC) -c baseband2baseband.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 baseband2filterbank_main.o:baseband2filterbank_main.cu
 	$(NVCC) -c baseband2filterbank_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
@@ -214,6 +226,9 @@ unpack_test.o:unpack_test.cu
 
 transpose_test.o:transpose_test.cu
 	$(NVCC) -c transpose_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
+
+transpose_complex_test.o:transpose_complex_test.cu
+	$(NVCC) -c transpose_complex_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}
 
 transpose_scale_test.o:transpose_scale_test.cu
 	$(NVCC) -c transpose_scale_test.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}

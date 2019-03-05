@@ -247,6 +247,22 @@ __global__ void transpose_kernel(float* dbuf_in, float *dbuf_out, uint64_t offse
     }
 }
 
+/*
+  This kernel is purely for the transpose of PTFT data into PFT 
+ */
+__global__ void transpose_complex_kernel(cufftComplex* dbuf_in, uint64_t offset, cufftComplex *dbuf_out)
+{
+  int64_t loc_in, loc_out;
+
+  loc_in  = blockIdx.x * gridDim.y * blockDim.x + blockIdx.y * blockDim.x + threadIdx.x;
+  loc_out = blockIdx.y * gridDim.x * blockDim.x + blockIdx.x * blockDim.x + threadIdx.x;
+
+  dbuf_out[loc_out].x        = dbuf_in[loc_in].x;
+  dbuf_out[loc_out].y        = dbuf_in[loc_in].y;
+  dbuf_out[loc_out+offset].x = dbuf_in[loc_in+offset].x;
+  dbuf_out[loc_out+offset].y = dbuf_in[loc_in+offset].y;
+}
+
 ///* A example of accumulate */
 //template <unsigned int blockSize>
 //__global__ void reduce6(int *g_idata, int *g_odata, unsigned int n)

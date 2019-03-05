@@ -51,7 +51,7 @@ extern "C" {
 #define PERIOD          27
 #define NDF_PER_CHUNK_PER_PERIOD 250000
 #define NBEAM_MAX      36
-#define NCHUNK_MAX     48
+#define NCHUNK_FULL_BEAM     48
 #define BAND_LIMIT_UP   1920.0
 #define BAND_LIMIT_DOWN 640.0
   

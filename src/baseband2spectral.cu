@@ -211,13 +211,12 @@ int initialize_baseband2spectral(conf_t *conf)
   struct timespec start, stop;
   double elapsed_time;
 
-  clock_gettime(CLOCK_REALTIME, &start);
   /* registers the existing host memory range for use by CUDA */
+  clock_gettime(CLOCK_REALTIME, &start);
   dada_cuda_dbregister(conf->hdu_in); // To put this into capture does not improve the memcpy!!!
-  
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "elapse_time for spectral for dbregister is %f\n", elapsed_time);
+  fprintf(stdout, "elapse_time for dbregister of input ring buffer is %f\n", elapsed_time);
   fflush(stdout);
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
@@ -261,7 +260,14 @@ int initialize_baseband2spectral(conf_t *conf)
 	}
       conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
       conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+      
+      clock_gettime(CLOCK_REALTIME, &start);
       dada_cuda_dbregister(conf->hdu_out); // To put this into capture does not improve the memcpy!!!
+      clock_gettime(CLOCK_REALTIME, &stop);
+      elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+      fprintf(stdout, "elapse_time for dbregister of output ring buffer is %f\n", elapsed_time);
+      fflush(stdout);
+
       
       if(conf->rbufout_size != conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL)
 	{
@@ -299,7 +305,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  exit(EXIT_FAILURE);
 	}
       
-      if(!(conf->sod == 1))
+      if(conf->sod == 0)
 	{
 	  if(ipcbuf_disable_sod(conf->db_out) < 0)
 	    {
@@ -763,6 +769,10 @@ int destroy_baseband2spectral(conf_t conf)
     cudaFree(conf.dbuf_in);
   if(conf.dbuf_out)
     cudaFree(conf.dbuf_out);
+  if(conf.buf_rt1)
+    cudaFree(conf.buf_rt1);
+  if(conf.buf_rt2)
+    cudaFree(conf.buf_rt2);
   log_add(conf.log_file, "INFO", 1, log_mutex, "Free cuda memory done");
 
   if(conf.db_in)
@@ -887,6 +897,13 @@ int read_dada_header(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
 
+      destroy_baseband2spectral(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
+
   if (ascii_header_get(conf->hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -898,14 +915,7 @@ int read_dada_header(conf_t *conf)
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
-  
-      destroy_baseband2spectral(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
-    
+      
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -1107,9 +1117,9 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "INFO", 1, log_mutex, "We will send spectral data with ring buffer");
       if(conf.sod == 1)
 	log_add(conf.log_file, "INFO", 1, log_mutex, "The spectral data is enabled at the beginning");
-      if(conf.sod == 0)
+      else if(conf.sod == 0)
 	log_add(conf.log_file, "INFO", 1, log_mutex, "The spectral data is NOT enabled at the beginning");
-      if(conf.sod == -1)
+      else
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: The sod should be 0 or 1 when we use ring buffer to send spectral data, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "The sod should be 0 or 1 when we use ring buffer to send spectral data, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -1118,8 +1128,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
-      else
-	log_add(conf.log_file, "INFO", 1, log_mutex, "The key for the spectral ring buffer is %x", conf.key_out);  
+      log_add(conf.log_file, "INFO", 1, log_mutex, "The key for the spectral ring buffer is %x", conf.key_out);  
     }
   if(conf.output_network == 1)
     {
@@ -1155,10 +1164,10 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       exit(EXIT_FAILURE);
     }
   
-  if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_MAX)    
+  if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_FULL_BEAM)    
     {
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       CudaSafeCall(cudaProfilerStop());

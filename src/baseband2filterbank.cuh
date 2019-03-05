@@ -32,6 +32,7 @@ typedef struct fits_t
 
 typedef struct conf_t
 {
+  char *hdrbuf_in;
   int pol_type;
   char ip[MSTR_LEN];
   int port;
@@ -96,12 +97,15 @@ typedef struct conf_t
   dim3 gridsize_taccumulate, blocksize_taccumulate;
   dim3 gridsize_scale, blocksize_scale;
   int naccumulate_pad, naccumulate_scale, naccumulate;
+
+  uint64_t file_size_in, bytes_per_second_in;
 }conf_t; 
 
 int initialize_baseband2filterbank(conf_t *conf);
 int baseband2filterbank(conf_t conf);
 int offset_scale(conf_t conf);
-int read_register_header(conf_t *conf);
+int read_dada_header(conf_t *conf);
+int register_dada_header(conf_t *conf);
 
 int destroy_baseband2filterbank(conf_t conf);
 int default_arguments(conf_t *conf);

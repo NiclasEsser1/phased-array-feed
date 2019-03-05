@@ -24,7 +24,7 @@
 // Type of pol;
 
 // We can time accumulate in each stream to get monitor data for search mode
-// Tsamp for this case is 0.131072 seconds for 1024 DF per stream configuration
+// Tsamp for this case is 0.110592 seconds for 1024 DF per stream configuration
 // If we only want to monitor Stokes I, we can tranpose the TF data to FT and time accumulate it
 // If we want to monitor Stokes I, AABB or IQUV, we need to calculate the spectrum after the PTF
 // Frequency accumulate it, tranpose from PTF to PFT and accumulate in time
@@ -179,8 +179,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_unpack.y = NCHAN_PER_CHUNK;
   conf->blocksize_unpack.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of unpack kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_unpack.x, conf->gridsize_unpack.y, conf->gridsize_unpack.z,
-	      conf->blocksize_unpack.x, conf->blocksize_unpack.y, conf->blocksize_unpack.z);
+	  conf->gridsize_unpack.x, conf->gridsize_unpack.y, conf->gridsize_unpack.z,
+	  conf->blocksize_unpack.x, conf->blocksize_unpack.y, conf->blocksize_unpack.z);
 
   conf->n_transpose = conf->nchan_out;
   conf->m_transpose = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx;
@@ -192,8 +192,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_transpose.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of transpose kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_transpose.x, conf->gridsize_transpose.y, conf->gridsize_transpose.z,
-	      conf->blocksize_transpose.x, conf->blocksize_transpose.y, conf->blocksize_transpose.z);
+	  conf->gridsize_transpose.x, conf->gridsize_transpose.y, conf->gridsize_transpose.z,
+	  conf->blocksize_transpose.x, conf->blocksize_transpose.y, conf->blocksize_transpose.z);
   
   conf->gridsize_swap_select_transpose.x = conf->nchan_in;
   conf->gridsize_swap_select_transpose.y = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx;
@@ -202,8 +202,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_swap_select_transpose.y = 1;
   conf->blocksize_swap_select_transpose.z = 1;  
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of swap_select_transpose kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_swap_select_transpose.x, conf->gridsize_swap_select_transpose.y, conf->gridsize_swap_select_transpose.z,
-	      conf->blocksize_swap_select_transpose.x, conf->blocksize_swap_select_transpose.y, conf->blocksize_swap_select_transpose.z);        
+	  conf->gridsize_swap_select_transpose.x, conf->gridsize_swap_select_transpose.y, conf->gridsize_swap_select_transpose.z,
+	  conf->blocksize_swap_select_transpose.x, conf->blocksize_swap_select_transpose.y, conf->blocksize_swap_select_transpose.z);        
 
   conf->naccumulate_pad = conf->nchan_keep_band/conf->nchan_out;
   naccumulate_pow2      = (int)pow(2.0, floor(log2((double)conf->naccumulate_pad)));
@@ -214,8 +214,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_detect_faccumulate_pad_transpose.y = 1;
   conf->blocksize_detect_faccumulate_pad_transpose.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
-	      conf->gridsize_detect_faccumulate_pad_transpose.x, conf->gridsize_detect_faccumulate_pad_transpose.y, conf->gridsize_detect_faccumulate_pad_transpose.z,
-	      conf->blocksize_detect_faccumulate_pad_transpose.x, conf->blocksize_detect_faccumulate_pad_transpose.y, conf->blocksize_detect_faccumulate_pad_transpose.z, conf->naccumulate_pad);
+	  conf->gridsize_detect_faccumulate_pad_transpose.x, conf->gridsize_detect_faccumulate_pad_transpose.y, conf->gridsize_detect_faccumulate_pad_transpose.z,
+	  conf->blocksize_detect_faccumulate_pad_transpose.x, conf->blocksize_detect_faccumulate_pad_transpose.y, conf->blocksize_detect_faccumulate_pad_transpose.z, conf->naccumulate_pad);
 
   conf->naccumulate_scale = conf->nchan_keep_band/conf->nchan_out;
   naccumulate_pow2        = (int)pow(2.0, floor(log2((double)conf->naccumulate_scale)));
@@ -226,8 +226,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_detect_faccumulate_scale.y = 1;
   conf->blocksize_detect_faccumulate_scale.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
-	      conf->gridsize_detect_faccumulate_scale.x, conf->gridsize_detect_faccumulate_scale.y, conf->gridsize_detect_faccumulate_scale.z,
-	      conf->blocksize_detect_faccumulate_scale.x, conf->blocksize_detect_faccumulate_scale.y, conf->blocksize_detect_faccumulate_scale.z, conf->naccumulate_scale);
+	  conf->gridsize_detect_faccumulate_scale.x, conf->gridsize_detect_faccumulate_scale.y, conf->gridsize_detect_faccumulate_scale.z,
+	  conf->blocksize_detect_faccumulate_scale.x, conf->blocksize_detect_faccumulate_scale.y, conf->blocksize_detect_faccumulate_scale.z, conf->naccumulate_scale);
 
   conf->naccumulate = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx; 
   naccumulate_pow2  = (int)pow(2.0, floor(log2((double)conf->naccumulate)));
@@ -238,8 +238,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_taccumulate.y = 1;
   conf->blocksize_taccumulate.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
-	      conf->gridsize_taccumulate.x, conf->gridsize_taccumulate.y, conf->gridsize_taccumulate.z,
-	      conf->blocksize_taccumulate.x, conf->blocksize_taccumulate.y, conf->blocksize_taccumulate.z, conf->naccumulate);
+	  conf->gridsize_taccumulate.x, conf->gridsize_taccumulate.y, conf->gridsize_taccumulate.z,
+	  conf->blocksize_taccumulate.x, conf->blocksize_taccumulate.y, conf->blocksize_taccumulate.z, conf->naccumulate);
   
   conf->gridsize_scale.x = 1;
   conf->gridsize_scale.y = 1;
@@ -248,8 +248,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->blocksize_scale.y = 1;
   conf->blocksize_scale.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of scale kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_scale.x, conf->gridsize_scale.y, conf->gridsize_scale.z,
-	      conf->blocksize_scale.x, conf->blocksize_scale.y, conf->blocksize_scale.z);
+	  conf->gridsize_scale.x, conf->gridsize_scale.y, conf->gridsize_scale.z,
+	  conf->blocksize_scale.x, conf->blocksize_scale.y, conf->blocksize_scale.z);
   
   /* attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(NULL);
@@ -281,11 +281,10 @@ int initialize_baseband2filterbank(conf_t *conf)
   double elapsed_time;
   clock_gettime(CLOCK_REALTIME, &start);
   /* registers the existing host memory range for use by CUDA */
-  dada_cuda_dbregister(conf->hdu_in);  // To put this into capture does not improve the memcpy!!!
-  
+  dada_cuda_dbregister(conf->hdu_in);  // To put this into capture does not improve the memcpy!!!  
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "elapsed_time for filterbank for dbregister is %f\n", elapsed_time);
+  fprintf(stdout, "elapsed_time for dbregister of input ring buffer is %f\n", elapsed_time);
   fflush(stdout);
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
@@ -327,7 +326,14 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout1_size = ipcbuf_get_bufsz(conf->db_out);
+  
+  clock_gettime(CLOCK_REALTIME, &start);
+  /* registers the existing host memory range for use by CUDA */
   dada_cuda_dbregister(conf->hdu_out);  // To put this into capture does not improve the memcpy!!!
+  clock_gettime(CLOCK_REALTIME, &stop);
+  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+  fprintf(stdout, "elapsed_time for dbregister of output ring buffer is %f\n", elapsed_time);
+  fflush(stdout);
   
   if(conf->rbufout1_size % conf->bufout1_size != 0)  
     {
@@ -364,7 +370,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       exit(EXIT_FAILURE);
     }
 
-  if(!(conf->sod == 1))
+  if(conf->sod == 0)
     {
       if(ipcbuf_disable_sod(conf->db_out) < 0)
 	{
@@ -433,28 +439,42 @@ int baseband2filterbank(conf_t conf)
   fflush(stdout);
   log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   
-  if(read_register_header(&conf))
+  if(read_dada_header(&conf))
     {
-      log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "header read failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header read failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(conf);
       fclose(conf.log_file);
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
-    }
-
+    }  
   time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
   time_res_stream = conf.tsamp_in * conf.ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
   strptime(conf.utc_start, DADA_TIMESTR, &tm_stamp);
   time_stamp_f = mktime(&tm_stamp) + conf.picoseconds / 1.0E12 + 0.5 * time_res_stream;
   chan_width = conf.bandwidth/conf.nchan_out;
-  log_add(conf.log_file, "INFO", 1, log_mutex, "read_register_header done");
+  log_add(conf.log_file, "INFO", 1, log_mutex, "read_dada_header done");
+
+  if(conf.sod == 1)
+    {
+      if(register_dada_header(&conf))
+	{
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  
+	  destroy_baseband2filterbank(conf);
+	  fclose(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      log_add(conf.log_file, "INFO", 1, log_mutex, "register_dada_header done");
+    }
 
   /* Create socket */
   if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2filterbank(conf);
@@ -898,7 +918,7 @@ int baseband2filterbank(conf_t conf)
 	{
 	  if(sendto(sock_udp, (void *)&conf.fits[i], conf.pktsz_network, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
 	    {
-	      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      log_add(conf.log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      
 	      destroy_baseband2filterbank(conf);
@@ -1099,7 +1119,7 @@ int destroy_baseband2filterbank(conf_t conf)
       if(conf.streams[i])
 	CudaSafeCall(cudaStreamDestroy(conf.streams[i]));
       if(conf.fft_plans[i])
-      CufftSafeCall(cufftDestroy(conf.fft_plans[i]));
+	CufftSafeCall(cufftDestroy(conf.fft_plans[i]));
     }
   if(conf.streams)
     free(conf.streams);
@@ -1108,8 +1128,15 @@ int destroy_baseband2filterbank(conf_t conf)
   log_add(conf.log_file, "INFO", 1, log_mutex, "destroy fft plan and stream done");
 
   if(conf.fits)
-    free(conf.fits);
-  
+    {
+      for(i = 0; i < conf.neth_per_blk; i++)
+	cudaHostUnregister ((void *) conf.fits[i].data);
+      free(conf.fits);
+    }
+  if(conf.buf_rt1)
+    cudaFree(conf.buf_rt1);
+  if(conf.buf_rt2)
+    cudaFree(conf.buf_rt2);
   if(conf.dbuf_in)
     cudaFree(conf.dbuf_in);
   if(conf.dbuf_out1)
@@ -1143,260 +1170,11 @@ int destroy_baseband2filterbank(conf_t conf)
   return EXIT_SUCCESS;
 }
 
-int read_register_header(conf_t *conf)
-{
-  uint64_t hdrsz;
-  char *hdrbuf_in = NULL, *hdrbuf_out = NULL;
-  uint64_t file_size, bytes_per_second;
-  
-  hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
-  if (!hdrbuf_in)
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  if(hdrsz != DADA_HDRSZ)
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Header size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-
-  hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
-  if (!hdrbuf_out)
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }  
-  if (ascii_header_get(hdrbuf_in, "FILE_SIZE", "%"SCNu64"", &file_size) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", file_size);
-  
-  if (ascii_header_get(hdrbuf_in, "BYTES_PER_SECOND", "%"SCNu64"", &bytes_per_second) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", bytes_per_second);
-  
-  if (ascii_header_get(hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
-  
-  /* Get utc_start from hdrin */
-  
-  if (ascii_header_get(hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BEAM_INDEX, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
-  
-  if(ascii_header_get(hdrbuf_in, "FREQ", "%lf", &(conf->center_freq)) < 0)
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error egtting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      log_close(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  if (ascii_header_get(hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %f", conf->utc_start);
-  
-  if (ascii_header_get(hdrbuf_in, "PICOSECONDS", "%"SCNu64"", &(conf->picoseconds)) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting PICOSECONDS, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %f", conf->utc_start);
-  
-  memcpy(hdrbuf_out, hdrbuf_in, DADA_HDRSZ); // Pass the header
-  
-  file_size = (uint64_t)(file_size * conf->scale_dtsz);
-  bytes_per_second = (uint64_t)(bytes_per_second * conf->scale_dtsz);
-  
-  if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
-  
-  if (ascii_header_set(hdrbuf_out, "BW", "%f", -conf->bandwidth) < 0)  // Reverse frequency order
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BW to DADA header is %f", -conf->bandwidth);
-  
-  conf->tsamp_out1 = conf->tsamp_in * conf->cufft_nx;
-  if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out1) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out1);
-  
-  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_FILTERBANK) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_FILTERBANK);
-  
-  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_FILTERBANK) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", NDIM_FILTERBANK);
-  
-  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_FILTERBANK) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", NPOL_FILTERBANK);
-  
-  if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: BASEBAND2FILTERBANK_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
-  
-  if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_second) < 0)  
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
-  
-  if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  /* donot set header parameters anymore */
-  if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
-    {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-
-      destroy_baseband2filterbank(*conf);
-      fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-
-  return EXIT_SUCCESS;
-}
-
 int examine_record_arguments(conf_t conf, char **argv, int argc)
 {
   int i;
   char command_line[MSTR_LEN] = {'\0'};
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK HERE");
   
   /* Log the input */
   strcpy(command_line, argv[0]);
@@ -1466,13 +1244,20 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.sod == 1)
     log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
-  else
+  else if(conf.sod == 0)
     log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
-
-  if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_MAX)    
+  else
+    { 
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: The SOD is not set, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "The SOD is not set, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_FULL_BEAM)    
     {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_MAX, conf.nchunk_in, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       CudaSafeCall(cudaProfilerStop());
@@ -1512,5 +1297,261 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We output %d channels", conf.nchan_out);
   
+  return EXIT_SUCCESS;
+}
+
+int read_dada_header(conf_t *conf)
+{  
+  uint64_t hdrsz;
+  
+  conf->hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
+  if (!conf->hdrbuf_in)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  if(hdrsz != DADA_HDRSZ)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Header size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  
+  if(ascii_header_get(conf->hdrbuf_in, "PICOSECONDS", "%"SCNu64"", &(conf->picoseconds)) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
+  
+  if(ascii_header_get(conf->hdrbuf_in, "FREQ", "%lf", &(conf->center_freq)) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error egtting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FREQ from DADA header is %f", conf->center_freq);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "FILE_SIZE", "%"SCNu64"", &conf->file_size_in) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }   
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", conf->file_size_in);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "BYTES_PER_SECOND", "%"SCNu64"", &conf->bytes_per_second_in) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", conf->bytes_per_second_in);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
+  
+  /* Get utc_start from hdrin */
+  if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
+    
+  if (ascii_header_get(conf->hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting BEAM_INDEX, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
+  
+  if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  return EXIT_SUCCESS;
+}
+
+int register_dada_header(conf_t *conf)
+{
+  char *hdrbuf_out = NULL;
+  uint64_t file_size, bytes_per_second;
+  
+  hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
+  if (!hdrbuf_out)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }  
+  memcpy(hdrbuf_out, conf->hdrbuf_in, DADA_HDRSZ); // Pass the header
+  
+  file_size = (uint64_t)(conf->file_size_in * conf->scale_dtsz);
+  bytes_per_second = (uint64_t)(conf->bytes_per_second_in * conf->scale_dtsz);
+  
+  if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
+
+  conf->tsamp_out1 = conf->tsamp_in * conf->cufft_nx;
+  if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out1) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out1);
+  
+  if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_FILTERBANK) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_FILTERBANK);
+  
+  if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_FILTERBANK) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", NDIM_FILTERBANK);
+  
+  if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_FILTERBANK) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", NPOL_FILTERBANK);
+  
+  if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: BASEBAND2FILTERBANK_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
+  
+  if (ascii_header_set(hdrbuf_out, "BW", "%f", -conf->bandwidth) < 0)  // Reverse frequency order
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BW to DADA header is %f", -conf->bandwidth);
+  
+  if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_second) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
+  
+  /* donot set header parameters anymore */
+  if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2filterbank(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+
   return EXIT_SUCCESS;
 }

@@ -229,7 +229,7 @@ int initialize_capture(conf_t *conf)
   for(i = 0; i < conf->nport_dead; i++)
     conf->nchunk       += conf->nchunk_dead_on_port[i];
   if(conf->pad == 1)
-    conf->nchunk = NCHUNK_MAX;
+    conf->nchunk = NCHUNK_FULL_BEAM;
   if(conf->nchunk_alive == 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "None alive chunks, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);

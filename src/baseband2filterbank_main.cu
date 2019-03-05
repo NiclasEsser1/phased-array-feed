@@ -37,7 +37,6 @@ void usage ()
 	   " -i  Number of chunks of input\n"
 	   " -j  FFT length\n"
 	   " -k  The number of output channels\n"
-	   //" -l  Number of channels keep for the band\n"
 	   " -l  The type of polarisation\n"
 	   " -m  Network interface ip_port\n"
 	   );
@@ -56,7 +55,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
   
   /* Initializeial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:m:n:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:m:")) != -1)
     {
       switch(arg)
 	{

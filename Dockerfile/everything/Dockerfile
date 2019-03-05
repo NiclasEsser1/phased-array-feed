@@ -70,6 +70,7 @@ RUN apt-get --no-install-recommends -y install \
 RUN pip install --upgrade pip -U && \
     hash pip && \
     pip install setuptools -U && \
+#    pip install coloredlogs -U && \
     pip install wheel -U && \
     pip install numpy -U && \
     pip install scipy -U && \
