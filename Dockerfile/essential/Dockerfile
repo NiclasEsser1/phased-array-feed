@@ -15,11 +15,11 @@ ARG DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]          
 
 # update the system
-RUN apt-get -y check && \
-    apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-get -y install apt-utils software-properties-common && \
+RUN apt-get -y update && \
     apt-get -y update --fix-missing && \
+    apt-get -y check && \
+    apt-get -y upgrade && \
+    apt-get -y install apt-utils software-properties-common && \    
     apt-get -y upgrade
     
 # Install dependencies

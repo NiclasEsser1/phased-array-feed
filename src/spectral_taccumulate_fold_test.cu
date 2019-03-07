@@ -16,15 +16,15 @@
 #include "kernel.cuh"
 #include "constants.h"
 
-// ./spectral_taccumulate_test -a 48 -b 1024 -c 1024
-// ./spectral_taccumulate_test -a 33 -b 1024 -c 1024
+// ./spectral_taccumulate_fold_test -a 48 -b 1024 -c 1024
+// ./spectral_taccumulate_fold_test -a 33 -b 1024 -c 1024
 
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "spectral_taccumulate_test - Test the spectral_taccumulate kernel \n"
+	   "spectral_taccumulate_fold_test - Test the spectral_taccumulate_fold kernel \n"
 	   "\n"
-	   "Usage: spectral_taccumulate_test [options]\n"
+	   "Usage: spectral_taccumulate_fold_test [options]\n"
 	   " -a  Number of input frequency chunks\n"
 	   " -b  Number of packets of each stream per frequency chunk\n"
 	   " -c  Number of FFT points\n"
@@ -33,7 +33,8 @@ extern "C" void usage ()
 
 int main(int argc, char *argv[])
 {
-  int i, j, k, ndim = 6;
+  uint64_t i, j;
+  int ndim = 6;
   int arg, nchk_in, stream_ndf_chk, cufft_nx, nchan_in;
   uint64_t naccumulate, naccumulate_pow2;
   dim3 grid_size, block_size;
@@ -80,17 +81,18 @@ int main(int argc, char *argv[])
 
   /* Setup size */
   nchan_in = nchk_in * NCHAN_PER_CHUNK;
-  naccumulate = stream_ndf_chk * NSAMP_DF / cufft_nx;
+  naccumulate = stream_ndf_chk * NSAMP_DF /OVER_SAMP_RATE;
   naccumulate_pow2 = (uint64_t)pow(2.0, floor(log2((double)naccumulate)));
+  
   grid_size.x = nchan_in;
-  grid_size.y = cufft_nx / OVER_SAMP_RATE;
+  grid_size.y = 1;
   grid_size.z = 1;
   block_size.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   block_size.y = 1;
   block_size.z = 1;
   fprintf(stdout, "kernel configuration is (%d, %d, %d) and (%d, %d, %d), naccumulate is %"PRIu64"\n", grid_size.x, grid_size.y, grid_size.z, block_size.x, block_size.y, block_size.z, naccumulate);
   nsamp_in  = nchan_in * stream_ndf_chk * NSAMP_DF / OVER_SAMP_RATE;
-  nsamp_out = nchan_in * cufft_nx/OVER_SAMP_RATE;  
+  nsamp_out = nchan_in;
   npol_in   = nsamp_in * NPOL_BASEBAND;
   npol_out  = nsamp_out * ndim;
   fprintf(stdout, "%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", nsamp_in, nsamp_out, npol_in, npol_out);
@@ -108,30 +110,27 @@ int main(int argc, char *argv[])
   srand(time(NULL));
   for(i = 0; i < nchan_in; i++)
     {
-      for(j = 0; j < cufft_nx / OVER_SAMP_RATE; j++)
+      idx_out = i;
+      for(j = 0; j < naccumulate; j++)
 	{
-	  idx_out = i * cufft_nx / OVER_SAMP_RATE + j;
-	  for(k = 0; k < stream_ndf_chk * NSAMP_DF / cufft_nx; k++)
-	    {
-	      idx_in      = i * stream_ndf_chk * NSAMP_DF/OVER_SAMP_RATE + j * stream_ndf_chk * NSAMP_DF / cufft_nx + k;
+	  idx_in      = i * naccumulate + j;
 	      
-  	      data[idx_in].x = rand()*RAND_STD/RAND_MAX;
-  	      data[idx_in].y = rand()*RAND_STD/RAND_MAX;
-  	      data[idx_in+nsamp_in].x = rand()*RAND_STD/RAND_MAX;
-  	      data[idx_in+nsamp_in].y = rand()*RAND_STD/RAND_MAX;
-	      
-	      aa = data[idx_in].x * data[idx_in].x + data[idx_in].y * data[idx_in].y;
-	      bb = data[idx_in+nsamp_in].x * data[idx_in+nsamp_in].x + data[idx_in+nsamp_in].y * data[idx_in+nsamp_in].y;
-	      u = 2 * (data[idx_in].x * data[idx_in+nsamp_in].x + data[idx_in].y * data[idx_in+nsamp_in].y);
-	      v = 2 * (data[idx_in].x * data[idx_in+nsamp_in].y - data[idx_in].y * data[idx_in+nsamp_in].x);
-	      	      
-	      h_result[idx_out] += (aa + bb);
-	      h_result[idx_out + nsamp_out] += (aa - bb);
-	      h_result[idx_out + nsamp_out*2] += u;
-	      h_result[idx_out + nsamp_out*3] += v;
-	      h_result[idx_out + nsamp_out*4] += aa;
-	      h_result[idx_out + nsamp_out*5] += bb;
-	    }
+	  data[idx_in].x = rand()*RAND_STD/RAND_MAX;
+	  data[idx_in].y = rand()*RAND_STD/RAND_MAX;
+	  data[idx_in+nsamp_in].x = rand()*RAND_STD/RAND_MAX;
+	  data[idx_in+nsamp_in].y = rand()*RAND_STD/RAND_MAX;
+	  
+	  aa = data[idx_in].x * data[idx_in].x + data[idx_in].y * data[idx_in].y;
+	  bb = data[idx_in+nsamp_in].x * data[idx_in+nsamp_in].x + data[idx_in+nsamp_in].y * data[idx_in+nsamp_in].y;
+	  u = 2 * (data[idx_in].x * data[idx_in+nsamp_in].x + data[idx_in].y * data[idx_in+nsamp_in].y);
+	  v = 2 * (data[idx_in].x * data[idx_in+nsamp_in].y - data[idx_in].y * data[idx_in+nsamp_in].x);
+	  
+	  h_result[idx_out] += (aa + bb);
+	  h_result[idx_out + nsamp_out] += (aa - bb);
+	  h_result[idx_out + nsamp_out*2] += u;
+	  h_result[idx_out + nsamp_out*3] += v;
+	  h_result[idx_out + nsamp_out*4] += aa;
+	  h_result[idx_out + nsamp_out*5] += bb;
 	}
     }
   
@@ -141,47 +140,47 @@ int main(int argc, char *argv[])
   switch (block_size.x)
     {
     case 1024:
-      spectral_taccumulate_kernel<1024><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<1024><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 512:
-      spectral_taccumulate_kernel< 512><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel< 512><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 256:
-      spectral_taccumulate_kernel< 256><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel< 256><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 128:
-      spectral_taccumulate_kernel< 128><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel< 128><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 64:
-      spectral_taccumulate_kernel<  64><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<  64><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 32:
-      spectral_taccumulate_kernel<  32><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<  32><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 16:
-      spectral_taccumulate_kernel<  16><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<  16><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 8:
-      spectral_taccumulate_kernel<   8><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<   8><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 4:
-      spectral_taccumulate_kernel<   4><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<   4><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 2:
-      spectral_taccumulate_kernel<   2><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<   2><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 1:
-      spectral_taccumulate_kernel<   1><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_fold_kernel<   1><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
     }
   CudaSafeKernelLaunch();
@@ -196,7 +195,6 @@ int main(int argc, char *argv[])
 	    fprintf(stdout, "%d\t%d\t%f\t%f\t%E\t", i, j, h_result[i*ndim + j], g_result[i*ndim + j], (h_result[i*ndim + j] - g_result[i*ndim + j])/g_result[i*ndim + j]);
 	    fprintf(stdout, "\n");
 	  }
-      //fprintf(stdout, "\n");
     }
 
   /* Free buffer */

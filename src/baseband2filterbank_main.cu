@@ -38,7 +38,7 @@ void usage ()
 	   " -j  FFT length\n"
 	   " -k  The number of output channels\n"
 	   " -l  The type of polarisation\n"
-	   " -m  Network interface ip_port\n"
+	   " -m  Network interface Y_ip_port_ptype or N\n"
 	   );
 }
 
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
   
   /* Initializeial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:m:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:")) != -1)
     {
       switch(arg)
 	{
@@ -111,16 +111,12 @@ int main(int argc, char *argv[])
 	  sscanf(optarg, "%d", &conf.nchan_out);
 	  break;
 	  
-	//case 'l':
-	//  sscanf(optarg, "%d", &conf.nchan_keep_band);
-	//  break;
-	  
 	case 'l':
-	  sscanf(optarg, "%d", &conf.pol_type);
-	  break;
-	  
-	case 'm':
-	  sscanf(optarg, "%[^_]_%d", conf.ip, &conf.port);
+	  if(optarg[0] == 'Y')
+	    {
+	      conf.fits_flag = 1;
+	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d", conf.ip, &conf.port, &conf.pol_type);
+	    }
 	  break;
 	}
     }
@@ -157,7 +153,10 @@ int main(int argc, char *argv[])
   //fprintf(stderr, "FORCE TO QUIT\n");
   //exit(EXIT_FAILURE);
   
-  /* Play with data */
+  /* Play with data */  
+  fprintf(stdout, "BASEBAND2FILTERBANK_READY\n");  // Ready to take data from ring buffer, just before the header thing
+  fflush(stdout);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
   baseband2filterbank(conf);
 
   /* Destroy */

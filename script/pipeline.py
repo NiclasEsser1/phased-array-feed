@@ -22,8 +22,8 @@ EXECUTE = True
 FITSWRITER = True
 #FITSWRITER = False
 
-#SOD = True   # Start filterbank data
-SOD  = False  # Do not start filterbank data
+#DSPSR = True   # Start filterbank data
+DSPSR  = False  # Do not start filterbank data
 
 HEIMDALL = False   # To run heimdall on filterbank file or not
 #HEIMDALL       = True   # To run heimdall on filterbank file or not
@@ -166,8 +166,12 @@ FOLD_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                        "bind":                    1,
                        "subint":                  1, 
                        
+                       "ip":                      '134.104.70.90',
+                       "port":                    17106,
+                       
                        "pad":                     0,
                        "ndf_check_chk":           1024,
+                       "ptype":                   4,
 }
 
 FOLD_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
@@ -323,7 +327,16 @@ class Pipeline(object):
         self._npol_samp_baseband = PAF_CONFIG["npol_samp_baseband"]
         self._mem_node           = PAF_CONFIG["mem_node"]
         self._over_samp_rate     = PAF_CONFIG["over_samp_rate"]
-        self._cleanup_commands   = []
+        
+        self._cleanup_commands = ["pkill -9 -f dspsr",
+                                  "pkill -9 -f dada_db",
+                                  "pkill -9 -f heimdall",
+                                  "pkill -9 -f dada_diskdb",
+                                  "pkill -9 -f dada_dbdisk",
+                                  "pkill -9 -f baseband2filter", # process name, maximum 16 bytes (15 bytes visiable)
+                                  "pkill -9 -f baseband2spectr", # process name, maximum 16 bytes (15 bytes visiable)
+                                  "pkill -9 -f baseband2baseba", # process name, maximum 16 bytes (15 bytes visiable)                                  
+                                  "ipcrm -a"]
         
     def __del__(self):
         class_name = self.__class__.__name__
@@ -382,8 +395,11 @@ class Fold(Pipeline):
         self._dspsr_execution_instances = []
 
         self._pad = FOLD_CONFIG_GENERAL["pad"]
+        self._ip_udp = FOLD_CONFIG_GENERAL["ip"]
         self._bind = FOLD_CONFIG_GENERAL["bind"]
+        self._ptype = FOLD_CONFIG_GENERAL["ptype"]
         self._subint = FOLD_CONFIG_GENERAL["subint"]
+        self._port_udp = FOLD_CONFIG_GENERAL["port"]
         self._nstream = FOLD_CONFIG_GENERAL["nstream"]
         self._cufft_nx = FOLD_CONFIG_GENERAL["cufft_nx"]
         self._ndf_stream = FOLD_CONFIG_GENERAL["ndf_stream"]
@@ -398,12 +414,6 @@ class Fold(Pipeline):
         self._rbuf_fold_nread = FOLD_CONFIG_GENERAL["rbuf_fold_nread"]
         self._tbuf_baseband_ndf_chk = FOLD_CONFIG_GENERAL["tbuf_baseband_ndf_chk"]
         self._rbuf_fold_ndf_chk = FOLD_CONFIG_GENERAL["rbuf_fold_ndf_chk"]
-
-        self._cleanup_commands = ["pkill -9 -f dada_diskdb",
-                                  "pkill -9 -f baseband2baseba", # process name, maximum 16 bytes (15 bytes visiable)
-                                  "pkill -9 -f dada_db",
-                                  "pkill -9 -f dspsr",
-                                  "ipcrm -a"]
 
     def configure(self, ip, pipeline_config):
         # Setup parameters of the pipeline
@@ -468,10 +478,15 @@ class Fold(Pipeline):
                        "-f {} -g {} -i {} ").format(baseband2baseband, self._rbuf_baseband_key[i], 
                                                     self._rbuf_fold_key[i], self._rbuf_fold_ndf_chk, self._nstream,
                                                     self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx)
-            if SOD:
-                command += "-j 1"
+            if DSPSR:
+                command += "-j 1 "
             else:
-                command += "-j 0"
+                command += "-j 0 "
+
+            if FITSWRITER:
+                command += "-k Y_{}_{}_{} ".format(self._ip_udp, self._port_udp, self._ptype)
+            else:
+                command += "-k N "
             self._baseband2baseband_commands.append(command)
 
             # Command to run dspsr
@@ -551,7 +566,7 @@ class Fold(Pipeline):
             process_index += 1
             
         # Run dspsr
-        if SOD:
+        if DSPSR:
             process_index = 0
             self._dspsr_execution_instances = []
             for command in self._dspsr_commands:
@@ -563,7 +578,7 @@ class Fold(Pipeline):
                 process_index += 1 
 
     def stop(self):
-        if SOD:
+        if DSPSR:
             for execution_instance in self._dspsr_execution_instances:
                 execution_instance.finish()
         
@@ -674,13 +689,6 @@ class Search(Pipeline):
         self._tbuf_baseband_ndf_chk = SEARCH_CONFIG_GENERAL["tbuf_baseband_ndf_chk"]
         self._rbuf_filterbank_ndf_chk = SEARCH_CONFIG_GENERAL["rbuf_filterbank_ndf_chk"]
 
-        self._cleanup_commands = ["pkill -9 -f dada_diskdb",
-                                  "pkill -9 -f baseband2filter", # process name, maximum 16 bytes (15 bytes visiable)
-                                  "pkill -9 -f heimdall",
-                                  "pkill -9 -f dada_dbdisk",
-                                  "pkill -9 -f dada_db",
-                                  "ipcrm -a"]
-
     def configure(self, ip, pipeline_config):
         # Setup parameters of the pipeline
         self._ip = ip
@@ -747,14 +755,20 @@ class Search(Pipeline):
 
             # baseband2filterbank command
             command = ("{} -a {} -b {} -c {} -d {} -e {} "
-                       "-f {} -i {} -j {} -k {} -l {} -m {}_{} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
+                       "-f {} -i {} -j {} -k {} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
                                                                          self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
                                                                          self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
-                                                                         self._nchan_filterbank, self._ptype, self._ip_udp, self._port_udp)
-            if SOD:
-                command += "-g 1"
+                                                                         self._nchan_filterbank)
+            if DBDISK or HEIMDALL:
+                command += "-g 1 "
             else:
-                command += "-g 0"
+                command += "-g 0 "
+                
+            if FITSWRITER:
+                command += "-l Y_{}_{}_{} ".format(self._ip_udp, self._port_udp, self._ptype)
+            else:
+                command += "-l N "
+                
             self._baseband2filterbank_commands.append(command)
 
             # Command to create filterbank ring buffer
@@ -971,12 +985,6 @@ class Spectral(Pipeline):
             log.error("ndf_stream should be multiple times of cufft_nx")
             raise PipelineError("ndf_stream should be multiple times of cufft_nx")
         
-        self._cleanup_commands = ["pkill -9 -f dada_diskdb",
-                                  "pkill -9 -f baseband2spectr", # process name, maximum 16 bytes (15 bytes visiable)
-                                  "pkill -9 -f dada_dbdisk",
-                                  "pkill -9 -f dada_db",
-                                  "ipcrm -a"]
-
     def configure(self, ip, ptype, pipeline_config):
         # Setup parameters of the pipeline
         self._ip = ip
@@ -1058,7 +1066,7 @@ class Spectral(Pipeline):
                 self._runtime_directory[i], self._nchk_beam,
                 self._cufft_nx, self._ptype, self._nblk_accumulate)
             if not FITSWRITER:
-                if SOD:
+                if DBDISK:
                     command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
                 else:
                     command += "-b k_{}_0".format(self._rbuf_spectral_key[i])
@@ -1067,13 +1075,12 @@ class Spectral(Pipeline):
             self._baseband2spectral_commands.append(command)
 
             # Command to create spectral ring buffer
-            if not FITSWRITER:
-                self._spectral_create_buffer_commands.append(("dada_db -l -p -k {:} "
-                                                              "-b {:} -n {:} -r {:}").format(
-                                                                  self._rbuf_spectral_key[i],
-                                                                  self._rbuf_spectral_blksz,
-                                                                  self._rbuf_spectral_nblk,
-                                                                  self._rbuf_spectral_nread))
+            self._spectral_create_buffer_commands.append(("dada_db -l -p -k {:} "
+                                                          "-b {:} -n {:} -r {:}").format(
+                                                              self._rbuf_spectral_key[i],
+                                                              self._rbuf_spectral_blksz,
+                                                              self._rbuf_spectral_nblk,
+                                                              self._rbuf_spectral_nread))
 
             # command to create baseband ring buffer
             self._baseband_create_buffer_commands.append(("dada_db -l -p -k {:} "
@@ -1084,11 +1091,10 @@ class Spectral(Pipeline):
                                                               self._rbuf_baseband_nread))
             
             # command to delete spectral ring buffer
-            if not FITSWRITER:
-                self._spectral_delete_buffer_commands.append(
-                    "dada_db -d -k {:}".format(
-                        self._rbuf_spectral_key[i]))
-
+            self._spectral_delete_buffer_commands.append(
+                "dada_db -d -k {:}".format(
+                    self._rbuf_spectral_key[i]))
+            
             # command to delete baseband ring buffer
             self._baseband_delete_buffer_commands.append(
                 "dada_db -d -k {:}".format(
@@ -1109,13 +1115,14 @@ class Spectral(Pipeline):
             execution_instance.finish()
 
         # Create ring buffer for spectral data
-        process_index = 0
-        execution_instances = []
-        for command in self._spectral_create_buffer_commands:
-            execution_instances.append(ExecuteCommand(command, process_index))
-            process_index += 1
-        for execution_instance in execution_instances:         # Wait until the buffer creation is done
-            execution_instance.finish()
+        if not FITSWRITER:
+            process_index = 0
+            execution_instances = []
+            for command in self._spectral_create_buffer_commands:
+                execution_instances.append(ExecuteCommand(command, process_index))
+                process_index += 1
+            for execution_instance in execution_instances:         # Wait until the buffer creation is done
+                execution_instance.finish()
         
         # Execute the diskdb
         process_index = 0
@@ -1161,13 +1168,14 @@ class Spectral(Pipeline):
             execution_instance.finish()
             
         # To delete spectral ring buffer
-        process_index = 0
-        execution_instances = []
-        for command in self._spectral_delete_buffer_commands:
-            execution_instances.append(ExecuteCommand(command, process_index))
-            process_index += 1
-        for execution_instance in execution_instances:
-            execution_instance.finish()
+        if not FITSWRITER:        
+            process_index = 0
+            execution_instances = []
+            for command in self._spectral_delete_buffer_commands:
+                execution_instances.append(ExecuteCommand(command, process_index))
+                process_index += 1
+            for execution_instance in execution_instances:
+                execution_instance.finish()
         
         # To delete baseband ring buffer
         process_index = 0

@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <math.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <cuda_profiler_api.h>
 
 #include "log.h"
@@ -21,13 +24,20 @@ extern pthread_mutex_t log_mutex;
 int default_arguments(conf_t *conf)
 {
   memset(conf->dir, 0x00, sizeof(conf->dir));
-  sprintf(conf->dir, "unset"); // Default with "unset"  
+  sprintf(conf->dir, "unset"); // Default with "unset"
+  memset(conf->ip, 0x00, sizeof(conf->ip));
+  sprintf(conf->ip, "unset"); // Default with "unset"
+  
   conf->ndf_per_chunk_rbufin = 0; // Default with an impossible value
   conf->nstream          = -1; // Default with an impossible value
   conf->ndf_per_chunk_stream = 0; // Default with an impossible value
   conf->nchunk = -1;
   conf->cufft_nx = -1;
   conf->sod = -1;
+  
+  conf->port = -1;
+  conf->fits_flag = 0; // default not use FITSWriter interface
+  conf->pol_type = -1;
   
   return EXIT_SUCCESS;
 }
@@ -38,7 +48,7 @@ int initialize_baseband2baseband(conf_t *conf)
   int iembed1, istride1, idist1, oembed1, ostride1, odist1, batch1, nx1;
   int iembed2, istride2, idist2, oembed2, ostride2, odist2, batch2, nx2;
   uint64_t hdrsz;
-  int naccumulate_pow2;
+  uint64_t naccumulate_pow2;
 
   conf->nrepeat_per_blk = conf->ndf_per_chunk_rbufin / (conf->ndf_per_chunk_stream * conf->nstream);
   conf->nchan = conf->nchunk * NCHAN_PER_CHUNK;
@@ -50,11 +60,30 @@ int initialize_baseband2baseband(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
   log_add(conf->log_file, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrepeat_per_blk);
   
+  conf->fits = NULL;
+  if(conf->fits_flag == 1)
+    {
+      conf->nseg_per_blk = conf->nstream * conf->nrepeat_per_blk;
+      conf->neth_per_blk = conf->nseg_per_blk * NDATA_PER_SAMP_FULL;
+      conf->fits         = (fits_t *)malloc(conf->neth_per_blk * sizeof(fits_t));
+      for(i = 0; i < conf->neth_per_blk; i++)
+	{
+	  memset(conf->fits[i].data, 0x00, sizeof(conf->fits[i].data));
+	  cudaHostRegister ((void *) conf->fits[i].data, UDP_PAYLOAD_SIZE_MAX, 0);
+	}
+      log_add(conf->log_file, "INFO", 1, log_mutex, "%d network packets are requied for each buffer block", conf->neth_per_blk);
+      
+      conf->dtsz_network    = NBYTE_FLOAT * conf->nchan;
+      conf->pktsz_network   = conf->dtsz_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Network data size is %d", conf->dtsz_network);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size is %d", conf->pktsz_network); 
+    }
+  
   /* Prepare buffer, stream and fft plan for process */
   conf->ndim_scale = conf->ndf_per_chunk_rbufin * NSAMP_DF * NPOL_BASEBAND * NDIM_BASEBAND; // Only works when two polarisations has similar power level
-  conf->scale_dtsz = NBYTE_FOLD * NDIM_BASEBAND/((double)NBYTE_CUFFT_COMPLEX * OVER_SAMP_RATE);
+  conf->scale_dtsz = NBYTE_FOLD /((double)NBYTE_BASEBAND * OVER_SAMP_RATE);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The data size rate is %f", conf->scale_dtsz);
-
+  
   conf->nsamp1  = conf->ndf_per_chunk_stream * conf->nchan * NSAMP_DF;  // For each stream
   conf->npol1   = conf->nsamp1 * NPOL_BASEBAND;
   conf->ndata1  = conf->npol1  * NDIM_BASEBAND;
@@ -62,6 +91,10 @@ int initialize_baseband2baseband(conf_t *conf)
   conf->nsamp2  = conf->nsamp1 / OVER_SAMP_RATE;
   conf->npol2   = conf->nsamp2 * NPOL_BASEBAND;
   conf->ndata2  = conf->npol2  * NDIM_BASEBAND;
+  
+  conf->nsamp3      = conf->nchan;
+  conf->ndata3      = conf->nsamp3  * NDATA_PER_SAMP_RT;
+  
   nx1        = conf->cufft_nx;
   batch1     = conf->npol1 / conf->cufft_nx;
   
@@ -84,6 +117,9 @@ int initialize_baseband2baseband(conf_t *conf)
   ostride2   = 1;
   odist2     = nx2;
 
+  conf->streams = NULL;
+  conf->fft_plans1 = NULL;
+  conf->fft_plans2 = NULL;
   conf->streams = (cudaStream_t *)malloc(conf->nstream * sizeof(cudaStream_t));
   conf->fft_plans1 = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
   conf->fft_plans2 = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
@@ -98,10 +134,12 @@ int initialize_baseband2baseband(conf_t *conf)
     }
   
   conf->sbufin_size    = conf->ndata1 * NBYTE_BASEBAND;
-  conf->sbufout_size   = conf->ndata2 * NBYTE_FOLD;
+  conf->sbufout1_size   = conf->ndata2 * NBYTE_FOLD;
+  conf->sbufout2_size   = conf->ndata3 * NBYTE_FLOAT;
   
   conf->bufin_size     = conf->nstream * conf->sbufin_size;
-  conf->bufout_size    = conf->nstream * conf->sbufout_size;
+  conf->bufout1_size    = conf->nstream * conf->sbufout1_size;
+  conf->bufout2_size    = conf->nstream * conf->sbufout2_size;
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_CUFFT_COMPLEX;
   conf->sbufrt2_size = conf->npol2 * NBYTE_CUFFT_COMPLEX;
@@ -113,11 +151,20 @@ int initialize_baseband2baseband(conf_t *conf)
   conf->bufrt1_offset = conf->sbufrt1_size / NBYTE_CUFFT_COMPLEX;
   conf->bufrt2_offset = conf->sbufrt2_size / NBYTE_CUFFT_COMPLEX;
   
-  conf->dbufout_offset   = conf->sbufout_size / NBYTE_FOLD;
-  conf->hbufout_offset   = conf->sbufout_size;
+  conf->dbufout1_offset   = conf->sbufout1_size / NBYTE_FOLD;
+  conf->hbufout1_offset   = conf->sbufout1_size;
+  conf->dbufout2_offset   = conf->sbufout2_size / NBYTE_FLOAT;
 
+  conf->dbuf_in = NULL;
+  conf->dbuf_out1 = NULL;
+  conf->dbuf_out2 = NULL;
+  conf->buf_rt1 = NULL;
+  conf->buf_rt2 = NULL;
+  conf->offset_scale_d = NULL;
+  conf->offset_scale_h = NULL;
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out1, conf->bufout1_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out2, conf->bufout2_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
 
@@ -132,17 +179,18 @@ int initialize_baseband2baseband(conf_t *conf)
   conf->blocksize_unpack.y = NCHAN_PER_CHUNK;
   conf->blocksize_unpack.z = 1;
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of unpack kernel is (%d, %d, %d) and (%d, %d, %d)",
-	      conf->gridsize_unpack.x, conf->gridsize_unpack.y, conf->gridsize_unpack.z,
-	      conf->blocksize_unpack.x, conf->blocksize_unpack.y, conf->blocksize_unpack.z);
+	  conf->gridsize_unpack.x, conf->gridsize_unpack.y, conf->gridsize_unpack.z,
+	  conf->blocksize_unpack.x, conf->blocksize_unpack.y, conf->blocksize_unpack.z);
   
-  conf->naccumulate = conf->ndf_per_chunk_stream * NSAMP_DF;
-  naccumulate_pow2  = (int)pow(2.0, floor(log2((double)conf->naccumulate)));
+  conf->naccumulate = conf->ndf_per_chunk_stream * NSAMP_DF / OVER_SAMP_RATE;
+  naccumulate_pow2  = (uint64_t)pow(2.0, floor(log2((double)conf->naccumulate)));
   conf->gridsize_taccumulate.x = conf->nchan;
   conf->gridsize_taccumulate.y = 1;
   conf->gridsize_taccumulate.z = 1;
   conf->blocksize_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_taccumulate.y = 1;
   conf->blocksize_taccumulate.z = 1;
+  log_add(conf->log_file, "INFO", 1, log_mutex, "naccumulate is %"PRIu64"", conf->naccumulate);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of taccumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
 	  conf->gridsize_taccumulate.x, conf->gridsize_taccumulate.y, conf->gridsize_taccumulate.z,
 	  conf->blocksize_taccumulate.x, conf->blocksize_taccumulate.y, conf->blocksize_taccumulate.z);
@@ -187,6 +235,31 @@ int initialize_baseband2baseband(conf_t *conf)
 	  conf->gridsize_transpose_scale.x, conf->gridsize_transpose_scale.y, conf->gridsize_transpose_scale.z,
 	  conf->blocksize_transpose_scale.x, conf->blocksize_transpose_scale.y, conf->blocksize_transpose_scale.z);
     
+  conf->gridsize_transpose_complex.x = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx;
+  conf->gridsize_transpose_complex.y = conf->nchan;
+  conf->gridsize_transpose_complex.z = 1;  
+  conf->blocksize_transpose_complex.x = conf->nchan_keep_chan;
+  conf->blocksize_transpose_complex.y = 1;
+  conf->blocksize_transpose_complex.z = 1;  
+  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of transpose_complex kernel is (%d, %d, %d) and (%d, %d, %d)",
+	  conf->gridsize_transpose_complex.x, conf->gridsize_transpose_complex.y, conf->gridsize_transpose_complex.z,
+	  conf->blocksize_transpose_complex.x, conf->blocksize_transpose_complex.y, conf->blocksize_transpose_complex.z);
+    
+  conf->gridsize_spectral_taccumulate.x = conf->nchan;
+  conf->gridsize_spectral_taccumulate.y = 1;
+  conf->gridsize_spectral_taccumulate.z = 1;
+  conf->blocksize_spectral_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
+  conf->blocksize_spectral_taccumulate.y = 1;
+  conf->blocksize_spectral_taccumulate.z = 1; 
+  log_add(conf->log_file, "INFO", 1, log_mutex,
+	  "The configuration of spectral_taccumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
+	  conf->gridsize_spectral_taccumulate.x,
+	  conf->gridsize_spectral_taccumulate.y,
+	  conf->gridsize_spectral_taccumulate.z,
+	  conf->blocksize_spectral_taccumulate.x,
+	  conf->blocksize_spectral_taccumulate.y,
+	  conf->blocksize_spectral_taccumulate.z);
+  
   /* attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(NULL);
   dada_hdu_set_key(conf->hdu_in, conf->key_in);
@@ -248,10 +321,10 @@ int initialize_baseband2baseband(conf_t *conf)
       exit(EXIT_FAILURE);    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
-  conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
-  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout_size, conf->bufout_size);
+  conf->rbufout1_size = ipcbuf_get_bufsz(conf->db_out);
+  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout1_size, conf->bufout1_size);
     
-  if(conf->rbufout_size % conf->bufout_size != 0)  
+  if(conf->rbufout1_size % conf->bufout1_size != 0)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -310,14 +383,26 @@ int baseband2baseband(conf_t conf)
     4. Inverse FFT the data to get PTFT order data;
     5. Transpose the data to get TFP data and scale it;    
   */
-  uint64_t i, j;
-  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset;
+  uint64_t i, j, k;
+  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout1_offset, dbufout1_offset, dbufout2_offset;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
+  dim3 gridsize_transpose_complex, blocksize_transpose_complex;
+  dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
   uint64_t curbufsz;
   int first = 1;
-  double time_res_blk, time_offset = 0;
+  double time_res_blk, time_offset = 0;  
+  double chan_width; 
+  double time_res_stream;
+  int eth_index;
+  struct tm tm_stamp;
+  char time_stamp[MSTR_LEN];
+  double time_stamp_f;
+  time_t time_stamp_i;
+  int sock_udp, enable = 1;
+  struct sockaddr_in sa_udp;
+  socklen_t tolen = sizeof(sa_udp);
   
   gridsize_unpack                      = conf.gridsize_unpack;
   blocksize_unpack                     = conf.blocksize_unpack;
@@ -325,15 +410,42 @@ int baseband2baseband(conf_t conf)
   blocksize_swap_select_transpose_swap = conf.blocksize_swap_select_transpose_swap;  
   gridsize_transpose_scale             = conf.gridsize_transpose_scale;
   blocksize_transpose_scale            = conf.blocksize_transpose_scale;
-
-  fprintf(stdout, "BASEBAND2BASEBAND_READY\n");  // Ready to take data from ring buffer, just before the header thing
-  fflush(stdout);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2BASEBAND_READY");
-
+  gridsize_transpose_complex           = conf.gridsize_transpose_complex;
+  blocksize_transpose_complex          = conf.blocksize_transpose_complex;
+  gridsize_spectral_taccumulate        = conf.gridsize_spectral_taccumulate;
+  blocksize_spectral_taccumulate       = conf.blocksize_spectral_taccumulate;
+    
   read_dada_header(&conf); 
   time_res_blk = conf.tsamp * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
+  if(conf.fits_flag == 1)
+    {
+      time_res_stream = conf.tsamp * conf.ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
+      strptime(conf.utc_start, DADA_TIMESTR, &tm_stamp);
+      time_stamp_f = mktime(&tm_stamp) + conf.picoseconds / 1.0E12 + 0.5 * time_res_stream;
+      chan_width = 1.0;
+    }
   if(conf.sod == 1)
     register_dada_header(&conf); 
+  
+  /* Create socket */
+  if(conf.fits_flag == 1)
+    {
+      if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	{
+	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  
+	  destroy_baseband2baseband(conf);
+	  fclose(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      memset((char *) &sa_udp, 0, sizeof(sa_udp));
+      sa_udp.sin_family      = AF_INET;
+      sa_udp.sin_port        = htons(conf.port);
+      sa_udp.sin_addr.s_addr = inet_addr(conf.ip);
+      setsockopt(sock_udp, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+    }
   
   /* Do the real job */  
   while(!ipcbuf_eod(conf.db_in))
@@ -356,8 +468,9 @@ int baseband2baseband(conf_t conf)
 	      bufrt1_offset = j * conf.bufrt1_offset;
 	      bufrt2_offset = j * conf.bufrt2_offset;
 
-	      dbufout_offset = j * conf.dbufout_offset;
-	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
+	      dbufout1_offset = j * conf.dbufout1_offset;
+	      dbufout2_offset = j * conf.dbufout2_offset;
+	      hbufout1_offset = j * conf.hbufout1_offset + i * conf.bufout1_size;
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.curbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
 	      
@@ -376,21 +489,247 @@ int baseband2baseband(conf_t conf)
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 	      
 	      /* Get final output */
-	      transpose_scale_kernel<<<gridsize_transpose_scale, blocksize_transpose_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nchan_keep_chan, conf.nchan, conf.nsamp2, conf.offset_scale_d);
+	      transpose_scale_kernel<<<gridsize_transpose_scale, blocksize_transpose_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nchan_keep_chan, conf.nchan, conf.nsamp2, conf.offset_scale_d);
 	      CudaSafeKernelLaunch();
 	      
 	      /* Copy the final output to host */
-	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
+	      CudaSafeCall(cudaMemcpyAsync(&conf.curbuf_out[hbufout1_offset], &conf.dbuf_out1[dbufout1_offset], conf.sbufout1_size, cudaMemcpyDeviceToHost, conf.streams[j]));
+
+	      if(conf.fits_flag == 1)
+		{
+		  /* Tranpose from PTFT to PFT order */
+		  transpose_complex_kernel<<<gridsize_transpose_complex, blocksize_transpose_complex, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
+		  CudaSafeKernelLaunch();
+		  
+		  switch(blocksize_spectral_taccumulate.x)
+		    {
+		    case 1024:
+		      spectral_taccumulate_fold_kernel
+			<1024>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 512:
+		      spectral_taccumulate_fold_kernel
+			< 512>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 256:
+		      spectral_taccumulate_fold_kernel
+			< 256>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 128:
+		      spectral_taccumulate_fold_kernel
+			< 128>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  64:
+		      spectral_taccumulate_fold_kernel
+			<  64>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  32:
+		      spectral_taccumulate_fold_kernel
+			<  32>
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  16:
+		      spectral_taccumulate_fold_kernel
+			<  16>		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  8:
+		      spectral_taccumulate_fold_kernel
+			<   8>		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  4:
+		      spectral_taccumulate_fold_kernel
+			<   4>		    		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  2:
+		      spectral_taccumulate_fold_kernel
+			<   2>		    		    		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		      
+		    case  1:
+		      spectral_taccumulate_fold_kernel
+			<   1>		    		    		    
+			<<<gridsize_spectral_taccumulate,
+			blocksize_spectral_taccumulate,
+			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
+			conf.streams[j]>>>
+			(&conf.buf_rt1[conf.bufrt1_offset],
+			 &conf.dbuf_out2[dbufout2_offset],
+			 conf.nsamp2,
+			 conf.nsamp3,
+			 conf.naccumulate);
+		      break;
+		    }
+		  CudaSafeKernelLaunch();
+		  
+		  /* Setup ethernet packets */
+		  time_stamp_i = (time_t)time_stamp_f;
+		  strftime(time_stamp, FITS_TIME_STAMP_LEN, FITS_TIMESTR, gmtime(&time_stamp_i)); 
+		  sprintf(time_stamp, "%s.%04dUTC ", time_stamp, (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));
+		  for(k = 0; k < NDATA_PER_SAMP_FULL; k++)
+		    {		  
+		      eth_index = i * conf.nstream * NDATA_PER_SAMP_FULL + j * NDATA_PER_SAMP_FULL + k;
+		      
+		      strncpy(conf.fits[eth_index].time_stamp, time_stamp, FITS_TIME_STAMP_LEN);		  
+		      conf.fits[eth_index].tsamp = time_res_stream;
+		      conf.fits[eth_index].nchan = conf.nchan;
+		      conf.fits[eth_index].chan_width = chan_width;
+		      conf.fits[eth_index].pol_type = conf.pol_type;
+		      conf.fits[eth_index].pol_index = k;
+		      conf.fits[eth_index].beam_index  = conf.beam_index;
+		      conf.fits[eth_index].center_freq = conf.center_freq;
+		      conf.fits[eth_index].nchunk = 1;
+		      conf.fits[eth_index].chunk_index = 0;
+
+		      fprintf(stdout, "DBUFOUT2_OFFSET:\t%"PRIu64"\t%d\n", dbufout2_offset, eth_index);
+		      fflush(stdout);
+		      if(conf.pol_type == 2)
+		    	{
+		    	  if(k < conf.pol_type)
+		    	    CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
+		    					 &conf.dbuf_out2[dbufout2_offset +
+		    							 conf.nchan  *
+		    							 (NDATA_PER_SAMP_FULL + k)],
+		    					 conf.dtsz_network,
+		    					 cudaMemcpyDeviceToHost,
+		    					 conf.streams[j]));
+		    	}
+		      else
+		    	CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
+		    				     &conf.dbuf_out2[dbufout2_offset +
+		    						     k * conf.nchan],
+		    				     conf.dtsz_network,
+		    				     cudaMemcpyDeviceToHost,
+		    				     conf.streams[j]));
+		    }
+		  time_stamp_f += time_res_stream;
+		}
 	    }
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
+      /* Send all packets from the previous buffer block with one go */
+      if(conf.fits_flag == 1)
+	{
+	  for(i = 0; i < conf.neth_per_blk; i++)
+	    {
+	      if(sendto(sock_udp, (void *)&conf.fits[i], conf.pktsz_network, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
+		{
+		  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+		  log_add(conf.log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+		  
+		  destroy_baseband2baseband(conf);
+		  fclose(conf.log_file);
+		  CudaSafeCall(cudaProfilerStop());
+		  exit(EXIT_FAILURE);
+		}
+	    }
+	}
+      
       /* Close current buffer */
       ipcbuf_mark_filled(conf.db_out, (uint64_t)(curbufsz * conf.scale_dtsz));
       ipcbuf_mark_cleared(conf.db_in);
 
       time_offset += time_res_blk;
       fprintf(stdout, "BASEBAND2BASEBAND, finished %f seconds data\n", time_offset);
+      log_add(conf.log_file, "INFO", 1, log_mutex, "finished %f seconds data", time_offset);
       fflush(stdout);
     }
   return EXIT_SUCCESS;
@@ -417,8 +756,10 @@ int destroy_baseband2baseband(conf_t conf)
   if(conf.buf_rt2)
     cudaFree(conf.buf_rt2);
 
-  if(conf.dbuf_out)
-    cudaFree(conf.dbuf_out);
+  if(conf.dbuf_out1)
+    cudaFree(conf.dbuf_out1);
+  if(conf.dbuf_out2)
+    cudaFree(conf.dbuf_out2);
   if(conf.offset_scale_h)
     cudaFreeHost(conf.offset_scale_h);
   if(conf.offset_scale_d)
@@ -481,8 +822,8 @@ int offset_scale(conf_t conf)
   gridsize_transpose_pad               = conf.gridsize_transpose_pad;
   blocksize_transpose_pad              = conf.blocksize_transpose_pad;
   	         	               	
-  gridsize_scale             = conf.gridsize_scale;	       
-  blocksize_scale            = conf.blocksize_scale;
+  gridsize_scale        = conf.gridsize_scale;	       
+  blocksize_scale       = conf.blocksize_scale;
   gridsize_taccumulate  = conf.gridsize_taccumulate;
   blocksize_taccumulate = conf.blocksize_taccumulate;
   
@@ -664,9 +1005,9 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
   
   if(conf.sod == 1)
-    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is enabled at the beginning");
+    log_add(conf.log_file, "INFO", 1, log_mutex, "The baseband data is enabled at the beginning");
   else if(conf.sod == 0)
-    log_add(conf.log_file, "INFO", 1, log_mutex, "The filterbank data is NOT enabled at the beginning");
+    log_add(conf.log_file, "INFO", 1, log_mutex, "The baseband data is NOT enabled at the beginning");
   else
     {      
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: The SOD is not set, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
@@ -677,9 +1018,46 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       exit(EXIT_FAILURE);
     }
   
+  if(conf.fits_flag == 1)
+    {      
+      if(conf.pol_type == -1)
+	{
+	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      
+	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      else
+	log_add(conf.log_file, "INFO", 1, log_mutex, "pol_type is %d", conf.pol_type);
+            
+      if(conf.port == -1)
+	{
+	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port, __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      
+      if(strstr(conf.ip, "unset"))
+	{
+	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      log_add(conf.log_file, "INFO", 1, log_mutex, "We will send data to %s:%d", conf.ip, conf.port); 
+    }
+  else
+    log_add(conf.log_file, "INFO", 1, log_mutex, "We will not send data to FITSwriter interface");
+  
   return EXIT_SUCCESS;
 }
-
 
 int read_dada_header(conf_t *conf)
 {  
@@ -755,6 +1133,42 @@ int read_dada_header(conf_t *conf)
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
     
+  if(ascii_header_get(conf->hdrbuf_in, "PICOSECONDS", "%"SCNu64"", &(conf->picoseconds)) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_baseband2baseband(*conf);
+      log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
+  
+  if (ascii_header_get(conf->hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BEAM_INDEX, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+
+      destroy_baseband2baseband(*conf);
+      fclose(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
+  
+  if(ascii_header_get(conf->hdrbuf_in, "FREQ", "%lf", &(conf->center_freq)) < 0)
+    {
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error egtting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+      destroy_baseband2baseband(*conf);
+      log_close(conf->log_file);
+      CudaSafeCall(cudaProfilerStop());
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf->log_file, "INFO", 1, log_mutex, "FREQ from DADA header is %f", conf->center_freq);
+  
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);

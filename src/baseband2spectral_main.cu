@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
   int arg;
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
-  char temp[MSTR_LEN] = {'\0'};
+  //char temp[MSTR_LEN] = {'\0'};
   struct timespec start, stop;
   double elapsed_time;
       
@@ -73,16 +73,17 @@ int main(int argc, char *argv[])
 	  if(optarg[0] == 'k')
 	    {
 	      conf.output_network = 0;
-	      if(sscanf(optarg, "%*[^_]_%[^_]_%d", temp, &conf.sod) != 2)
+	      //if(sscanf(optarg, "%*[^_]_%[^_]_%d", temp, &conf.sod) != 2)
+	      if(sscanf(optarg, "%*[^_]_%x_%d", &conf.key_out, &conf.sod) != 2)
 		{
 	     	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer configuration, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	     	  exit(EXIT_FAILURE);
 	     	}
-	      if(sscanf(temp, "%x", &conf.key_out)!=1)		
-		{
-	     	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer key, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	     	  exit(EXIT_FAILURE);
-	     	}
+	     //if(sscanf(temp, "%x", &conf.key_out)!=1)		
+	     //	{
+	     //	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer key, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	     //	  exit(EXIT_FAILURE);
+	     //	}
 	    }
 	  if(optarg[0] == 'n')
 	    {
@@ -169,17 +170,19 @@ int main(int argc, char *argv[])
 
   /* check the command line and record it */
   examine_record_arguments(conf, argv, argc);
-  
-  clock_gettime(CLOCK_REALTIME, &start);
-  /* initialize */
-  initialize_baseband2spectral(&conf);
 
+  /* initialize */
+  clock_gettime(CLOCK_REALTIME, &start);
+  initialize_baseband2spectral(&conf);
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
   fprintf(stdout, "elapse_time for spectral for initialize is %f\n", elapsed_time);
   fflush(stdout);
   
-  /* Play with data */
+  /* Play with data */  
+  fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
+  fflush(stdout);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL_READY");
   baseband2spectral(conf);
 
   /* Destroy */

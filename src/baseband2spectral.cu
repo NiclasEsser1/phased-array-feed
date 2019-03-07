@@ -49,7 +49,7 @@ int initialize_baseband2spectral(conf_t *conf)
 {
   int i;
   int iembed, istride, idist, oembed, ostride, odist, batch, nx;
-  int naccumulate_pow2;
+  uint64_t naccumulate_pow2;
   
   /* Prepare parameters */
   conf->naccumulate     = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx;
@@ -88,7 +88,9 @@ int initialize_baseband2spectral(conf_t *conf)
   oembed    = nx;
   ostride   = 1;
   odist     = nx;
-  
+
+  conf->streams = NULL;
+  conf->fft_plans = NULL;
   conf->streams = (cudaStream_t *)malloc(conf->nstream * sizeof(cudaStream_t));
   conf->fft_plans = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
   for(i = 0; i < conf->nstream; i ++)
@@ -119,6 +121,10 @@ int initialize_baseband2spectral(conf_t *conf)
   
   conf->dbufout_offset = conf->sbufout_size / NBYTE_SPECTRAL;
 
+  conf->dbuf_in = NULL;
+  conf->dbuf_out = NULL;
+  conf->buf_rt1 = NULL;
+  conf->buf_rt2 = NULL;
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
@@ -150,7 +156,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	  conf->blocksize_swap_select_transpose_pft1.y,
 	  conf->blocksize_swap_select_transpose_pft1.z);
   
-  naccumulate_pow2 = (int)pow(2.0, floor(log2((double)conf->naccumulate)));
+  naccumulate_pow2 = (uint64_t)pow(2.0, floor(log2((double)conf->naccumulate)));
   conf->gridsize_spectral_taccumulate.x = conf->nchan_in;
   conf->gridsize_spectral_taccumulate.y = conf->nchan_keep_chan;
   conf->gridsize_spectral_taccumulate.z = 1;
@@ -365,10 +371,6 @@ int baseband2spectral(conf_t conf)
   gridsize_saccumulate        = conf.gridsize_saccumulate; 
   blocksize_saccumulate       = conf.blocksize_saccumulate;
   
-  fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
-  fflush(stdout);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL_READY");
-
   read_dada_header(&conf);
   time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after register_dada_header, in seconds
   if(conf.output_network == 0)
@@ -741,6 +743,7 @@ int baseband2spectral(conf_t conf)
 	}
       time_offset += (conf.nblk_accumulate * time_res_blk);
       fprintf(stdout, "BASEBAND2SPECTRAL, finished %f seconds data\n", time_offset);
+      log_add(conf.log_file, "INFO", 1, log_mutex, "finished %f seconds data", time_offset);
       fflush(stdout);
     }
 
@@ -1063,8 +1066,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       strcat(command_line, argv[i]);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in);
 
   if(conf.ndf_per_chunk_rbufin == 0)
     {

@@ -39,6 +39,7 @@ int default_arguments(conf_t *conf)
 {
   memset(conf->dir, 0x00, sizeof(conf->dir));
   sprintf(conf->dir, "unset"); // Default with "unset"
+  memset(conf->ip, 0x00, sizeof(conf->ip));
   sprintf(conf->ip, "unset"); // Default with "unset"
   
   conf->ndf_per_chunk_rbufin = 0; // Default with an impossible value
@@ -50,6 +51,7 @@ int default_arguments(conf_t *conf)
   conf->nchan_out = -1;
   conf->nchan_keep_band = -1;
   conf->port = -1;
+  conf->fits_flag = 0; // default not use FITSWriter interface
   
   return EXIT_SUCCESS;
 }
@@ -58,7 +60,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 {
   int i;
   int iembed, istride, idist, oembed, ostride, odist, batch, nx;
-  int naccumulate_pow2;
+  uint64_t naccumulate_pow2;
   
   /* Prepare parameters */
   conf->nrepeat_per_blk = conf->ndf_per_chunk_rbufin / (conf->ndf_per_chunk_stream * conf->nstream);
@@ -68,11 +70,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->cufft_mod       = (int)(0.5 * conf->nchan_keep_chan);
   conf->nchan_edge      = (int)(0.5 * conf->nchan_in * conf->nchan_keep_chan - 0.5 * conf->nchan_keep_band);
   conf->inverse_nchan_rate = conf->nchan_in * conf->nchan_keep_chan/(double)conf->nchan_keep_band;
-  conf->scale_dtsz         = NBYTE_FILTERBANK / OVER_SAMP_RATE * conf->nchan_out/ (double)(conf->inverse_nchan_rate * conf->nchan_keep_band * NPOL_BASEBAND * NDIM_BASEBAND * NBYTE_BASEBAND);
+  conf->scale_dtsz         = conf->nchan_out * NBYTE_FILTERBANK / (double)(conf->nchan_in * conf->cufft_nx * NPOL_BASEBAND * NDIM_BASEBAND * NBYTE_BASEBAND);
   conf->bandwidth       = conf->nchan_keep_band/(double)conf->nchan_keep_chan;
-  conf->dtsz_network    = NBYTE_FLOAT * conf->nchan_out;
-  conf->pktsz_network   = conf->dtsz_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
-    
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
@@ -85,13 +84,31 @@ int initialize_baseband2filterbank(conf_t *conf)
       log_close(conf->log_file);
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
-    }
-  
+    }  
   log_add(conf->log_file, "INFO", 1, log_mutex, "We will drop %d fine channels at the band edge for frequency accumulation", conf->nchan_edge);
   log_add(conf->log_file, "INFO", 1, log_mutex, "%f percent fine channels (after down sampling) are kept for frequency accumulation", 1.0/conf->inverse_nchan_rate * 100.);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The data size rate between filterbank and baseband data is %f", conf->scale_dtsz);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The bandwidth for the final output is %f MHz", conf->bandwidth);
   log_add(conf->log_file, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrepeat_per_blk);
+  
+  conf->fits = NULL;
+  if(conf->fits_flag == 1)
+    {
+      conf->nseg_per_blk = conf->nstream * conf->nrepeat_per_blk;
+      conf->neth_per_blk = conf->nseg_per_blk * NDATA_PER_SAMP_FULL;
+      conf->fits         = (fits_t *)malloc(conf->neth_per_blk * sizeof(fits_t));
+      for(i = 0; i < conf->neth_per_blk; i++)
+	{
+	  memset(conf->fits[i].data, 0x00, sizeof(conf->fits[i].data));
+	  cudaHostRegister ((void *) conf->fits[i].data, UDP_PAYLOAD_SIZE_MAX, 0);
+	}
+      log_add(conf->log_file, "INFO", 1, log_mutex, "%d network packets are requied for each buffer block", conf->neth_per_blk);
+      
+      conf->dtsz_network    = NBYTE_FLOAT * conf->nchan_out;
+      conf->pktsz_network   = conf->dtsz_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Network data size is %d", conf->dtsz_network);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size is %d", conf->pktsz_network); 
+    }
   
   /* Prepare buffer, stream and fft plan for process */
   conf->nsamp1       = conf->ndf_per_chunk_stream * conf->nchan_in * NSAMP_DF;
@@ -106,14 +123,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->nsamp3       = conf->nsamp2 * conf->nchan_out / conf->nchan_keep_band;
   conf->npol3        = conf->nsamp3 * NPOL_FILTERBANK;
   conf->ndata3       = conf->npol3  * NDIM_FILTERBANK;
-  conf->nseg_per_blk = conf->nstream * conf->nrepeat_per_blk;
-  conf->neth_per_blk = conf->nseg_per_blk * NDATA_PER_SAMP_FULL;
   conf->ndim_scale   = conf->ndf_per_chunk_rbufin * NSAMP_DF / conf->cufft_nx;   // We do not average in time and here we work on detected data;
-  
-  conf->fits         = (fits_t *)malloc(conf->neth_per_blk * sizeof(fits_t));
-  for(i = 0; i < conf->neth_per_blk; i++)
-    cudaHostRegister ((void *) conf->fits[i].data, UDP_PAYLOAD_SIZE_MAX, 0);
-  
+
   nx        = conf->cufft_nx;
   batch     = conf->npol1 / conf->cufft_nx;
   
@@ -124,7 +135,9 @@ int initialize_baseband2filterbank(conf_t *conf)
   oembed    = nx;
   ostride   = 1;
   odist     = nx;
-  
+
+  conf->streams = NULL;
+  conf->fft_plans = NULL;
   conf->streams = (cudaStream_t *)malloc(conf->nstream * sizeof(cudaStream_t));
   conf->fft_plans = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
   for(i = 0; i < conf->nstream; i ++)
@@ -158,7 +171,16 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->hbufout2_offset = conf->sbufout2_size;
 
   conf->dbufout4_offset = conf->nchan_out * NDATA_PER_SAMP_RT;
-  
+
+  conf->dbuf_in = NULL;
+  conf->dbuf_out1 = NULL;
+  conf->dbuf_out2 = NULL;
+  conf->dbuf_out3 = NULL;
+  conf->dbuf_out4 = NULL;
+  conf->buf_rt1 = NULL;
+  conf->buf_rt2 = NULL;
+  conf->offset_scale_d = NULL;
+  conf->offset_scale_h = NULL;
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out1, conf->bufout1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out2, conf->bufout2_size));
@@ -206,38 +228,38 @@ int initialize_baseband2filterbank(conf_t *conf)
 	  conf->blocksize_swap_select_transpose.x, conf->blocksize_swap_select_transpose.y, conf->blocksize_swap_select_transpose.z);        
 
   conf->naccumulate_pad = conf->nchan_keep_band/conf->nchan_out;
-  naccumulate_pow2      = (int)pow(2.0, floor(log2((double)conf->naccumulate_pad)));
+  naccumulate_pow2      = (uint64_t)pow(2.0, floor(log2((double)conf->naccumulate_pad)));
   conf->gridsize_detect_faccumulate_pad_transpose.x = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx;
   conf->gridsize_detect_faccumulate_pad_transpose.y = conf->nchan_out;
   conf->gridsize_detect_faccumulate_pad_transpose.z = 1;
   conf->blocksize_detect_faccumulate_pad_transpose.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_detect_faccumulate_pad_transpose.y = 1;
   conf->blocksize_detect_faccumulate_pad_transpose.z = 1;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_pad_transpose kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %"PRIu64"",
 	  conf->gridsize_detect_faccumulate_pad_transpose.x, conf->gridsize_detect_faccumulate_pad_transpose.y, conf->gridsize_detect_faccumulate_pad_transpose.z,
 	  conf->blocksize_detect_faccumulate_pad_transpose.x, conf->blocksize_detect_faccumulate_pad_transpose.y, conf->blocksize_detect_faccumulate_pad_transpose.z, conf->naccumulate_pad);
 
   conf->naccumulate_scale = conf->nchan_keep_band/conf->nchan_out;
-  naccumulate_pow2        = (int)pow(2.0, floor(log2((double)conf->naccumulate_scale)));
+  naccumulate_pow2        = (uint64_t)pow(2.0, floor(log2((double)conf->naccumulate_scale)));
   conf->gridsize_detect_faccumulate_scale.x = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx;
   conf->gridsize_detect_faccumulate_scale.y = conf->nchan_out;
   conf->gridsize_detect_faccumulate_scale.z = 1;
   conf->blocksize_detect_faccumulate_scale.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_detect_faccumulate_scale.y = 1;
   conf->blocksize_detect_faccumulate_scale.z = 1;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of detect_faccumulate_scale kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %"PRIu64"",
 	  conf->gridsize_detect_faccumulate_scale.x, conf->gridsize_detect_faccumulate_scale.y, conf->gridsize_detect_faccumulate_scale.z,
 	  conf->blocksize_detect_faccumulate_scale.x, conf->blocksize_detect_faccumulate_scale.y, conf->blocksize_detect_faccumulate_scale.z, conf->naccumulate_scale);
 
   conf->naccumulate = conf->ndf_per_chunk_stream * NSAMP_DF / conf->cufft_nx; 
-  naccumulate_pow2  = (int)pow(2.0, floor(log2((double)conf->naccumulate)));
+  naccumulate_pow2  = (uint64_t)pow(2.0, floor(log2((double)conf->naccumulate)));
   conf->gridsize_taccumulate.x = conf->nchan_out;
   conf->gridsize_taccumulate.y = 1;
   conf->gridsize_taccumulate.z = 1;
   conf->blocksize_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_taccumulate.y = 1;
   conf->blocksize_taccumulate.z = 1;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %d",
+  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of accumulate kernel is (%d, %d, %d) and (%d, %d, %d), naccumulate is %"PRIu64"",
 	  conf->gridsize_taccumulate.x, conf->gridsize_taccumulate.y, conf->gridsize_taccumulate.z,
 	  conf->blocksize_taccumulate.x, conf->blocksize_taccumulate.y, conf->blocksize_taccumulate.z, conf->naccumulate);
   
@@ -435,10 +457,6 @@ int baseband2filterbank(conf_t conf)
   gridsize_swap_select_transpose       = conf.gridsize_swap_select_transpose;   
   blocksize_swap_select_transpose      = conf.blocksize_swap_select_transpose;
 
-  fprintf(stdout, "BASEBAND2FILTERBANK_READY\n");  // Ready to take data from ring buffer, just before the header thing
-  fflush(stdout);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
-  
   if(read_dada_header(&conf))
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "header read failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -448,14 +466,17 @@ int baseband2filterbank(conf_t conf)
       fclose(conf.log_file);
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
-    }  
-  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
-  time_res_stream = conf.tsamp_in * conf.ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
-  strptime(conf.utc_start, DADA_TIMESTR, &tm_stamp);
-  time_stamp_f = mktime(&tm_stamp) + conf.picoseconds / 1.0E12 + 0.5 * time_res_stream;
-  chan_width = conf.bandwidth/conf.nchan_out;
+    }
   log_add(conf.log_file, "INFO", 1, log_mutex, "read_dada_header done");
-
+  
+  time_res_blk = conf.tsamp_in * conf.ndf_per_chunk_rbufin * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
+  if(conf.fits_flag == 1)
+    {
+      time_res_stream = conf.tsamp_in * conf.ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
+      strptime(conf.utc_start, DADA_TIMESTR, &tm_stamp);
+      time_stamp_f = mktime(&tm_stamp) + conf.picoseconds / 1.0E12 + 0.5 * time_res_stream;
+      chan_width = conf.bandwidth/conf.nchan_out;
+    }
   if(conf.sod == 1)
     {
       if(register_dada_header(&conf))
@@ -472,22 +493,25 @@ int baseband2filterbank(conf_t conf)
     }
 
   /* Create socket */
-  if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+  if(conf.fits_flag == 1)
     {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      
-      destroy_baseband2filterbank(conf);
-      fclose(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
+      if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  
+	  destroy_baseband2filterbank(conf);
+	  fclose(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      memset((char *) &sa_udp, 0, sizeof(sa_udp));
+      sa_udp.sin_family      = AF_INET;
+      sa_udp.sin_port        = htons(conf.port);
+      sa_udp.sin_addr.s_addr = inet_addr(conf.ip);
+      setsockopt(sock_udp, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
     }
-  memset((char *) &sa_udp, 0, sizeof(sa_udp));
-  sa_udp.sin_family      = AF_INET;
-  sa_udp.sin_port        = htons(conf.port);
-  sa_udp.sin_addr.s_addr = inet_addr(conf.ip);
-  setsockopt(sock_udp, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-
+  
   while(!ipcbuf_eod(conf.db_in))
     {
       log_add(conf.log_file, "INFO", 1, log_mutex, "before getting new buffer block");
@@ -708,225 +732,231 @@ int baseband2filterbank(conf_t conf)
 	      CudaSafeKernelLaunch();	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.cbuf_out[hbufout1_offset], &conf.dbuf_out1[dbufout1_offset], conf.sbufout1_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 
-	      /* Further process for another mode */
-	      transpose_kernel<<<gridsize_transpose, blocksize_transpose, 0, conf.streams[j]>>>(&conf.dbuf_out2[dbufout2_offset], &conf.dbuf_out3[dbufout2_offset], conf.nsamp3, conf.n_transpose, conf.m_transpose);
-	      CudaSafeKernelLaunch();
-	      
-	      switch (blocksize_taccumulate.x)
+	      if(conf.fits_flag == 1)
 		{
-		case 1024:
-		  taccumulate_float_kernel
-		    <1024>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-      
-		case 512:
-		  taccumulate_float_kernel
-		    < 512>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
+		  /* Further process for another mode */
+		  transpose_kernel<<<gridsize_transpose, blocksize_transpose, 0, conf.streams[j]>>>(&conf.dbuf_out2[dbufout2_offset], &conf.dbuf_out3[dbufout2_offset], conf.nsamp3, conf.n_transpose, conf.m_transpose);
+		  CudaSafeKernelLaunch();
 		  
-		case 256:
-		  taccumulate_float_kernel
-		    < 256>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
+		  switch (blocksize_taccumulate.x)
+		    {
+		    case 1024:
+		      taccumulate_float_kernel
+			<1024>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 512:
+		      taccumulate_float_kernel
+			< 512>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 256:
+		      taccumulate_float_kernel
+			< 256>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 128:
+		      taccumulate_float_kernel
+			< 128>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 64:
+		      taccumulate_float_kernel
+			<  64>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 32:
+		      taccumulate_float_kernel
+			<  32>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 16:
+		      taccumulate_float_kernel
+			<  16>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 8:
+		      taccumulate_float_kernel
+			<   8>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 4:
+		      taccumulate_float_kernel
+			<   4>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 2:
+		      taccumulate_float_kernel
+			<   2>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		      
+		    case 1:
+		      taccumulate_float_kernel
+			<   1>
+			<<<gridsize_taccumulate,
+			blocksize_taccumulate,
+			blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
+			conf.streams[j]>>>
+			(&conf.dbuf_out3[dbufout2_offset],
+			 &conf.dbuf_out4[dbufout4_offset],
+			 conf.nsamp3,
+			 conf.nchan_out,
+			 conf.naccumulate);
+		      break;
+		    }
+		  CudaSafeKernelLaunch();
 		  
-		case 128:
-		  taccumulate_float_kernel
-		    < 128>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 64:
-		  taccumulate_float_kernel
-		    <  64>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 32:
-		  taccumulate_float_kernel
-		    <  32>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 16:
-		  taccumulate_float_kernel
-		    <  16>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 8:
-		  taccumulate_float_kernel
-		    <   8>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 4:
-		  taccumulate_float_kernel
-		    <   4>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 2:
-		  taccumulate_float_kernel
-		    <   2>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
-		  
-		case 1:
-		  taccumulate_float_kernel
-		    <   1>
-		    <<<gridsize_taccumulate,
-		    blocksize_taccumulate,
-		    blocksize_taccumulate.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT,
-		    conf.streams[j]>>>
-		    (&conf.dbuf_out3[dbufout2_offset],
-		     &conf.dbuf_out4[dbufout4_offset],
-		     conf.nsamp3,
-		     conf.nchan_out,
-		     conf.naccumulate);
-		  break;
+		  /* Setup ethernet packets */
+		  time_stamp_i = (time_t)time_stamp_f;
+		  strftime(time_stamp, FITS_TIME_STAMP_LEN, FITS_TIMESTR, gmtime(&time_stamp_i)); 
+		  sprintf(time_stamp, "%s.%04dUTC ", time_stamp, (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));
+		  for(k = 0; k < NDATA_PER_SAMP_FULL; k++)
+		    {		  
+		      eth_index = i * conf.nstream * NDATA_PER_SAMP_FULL + j * NDATA_PER_SAMP_FULL + k;
+		      
+		      strncpy(conf.fits[eth_index].time_stamp, time_stamp, FITS_TIME_STAMP_LEN);		  
+		      conf.fits[eth_index].tsamp = time_res_stream;
+		      conf.fits[eth_index].nchan = conf.nchan_out;
+		      conf.fits[eth_index].chan_width = chan_width;
+		      conf.fits[eth_index].pol_type = conf.pol_type;
+		      conf.fits[eth_index].pol_index = k;
+		      conf.fits[eth_index].beam_index  = conf.beam_index;
+		      conf.fits[eth_index].center_freq = conf.center_freq;
+		      conf.fits[eth_index].nchunk = 1;
+		      conf.fits[eth_index].chunk_index = 0;
+		      
+		      if(conf.pol_type == 2)
+			{
+			  if(k < conf.pol_type)
+			    CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
+							 &conf.dbuf_out4[dbufout4_offset +
+									 conf.nchan_out  *
+									 (NDATA_PER_SAMP_FULL + k)],
+							 conf.dtsz_network,
+							 cudaMemcpyDeviceToHost,
+							 conf.streams[j]));
+			}
+		      else
+			CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
+						     &conf.dbuf_out4[dbufout4_offset +
+								     k * conf.nchan_out],
+						     conf.dtsz_network,
+						     cudaMemcpyDeviceToHost,
+						     conf.streams[j]));
+		    }
+		  time_stamp_f += time_res_stream;
 		}
-	      CudaSafeKernelLaunch();
-	      
-	      /* Setup ethernet packets */
-	      time_stamp_i = (time_t)time_stamp_f;
-	      strftime(time_stamp, FITS_TIME_STAMP_LEN, FITS_TIMESTR, gmtime(&time_stamp_i)); 
-	      sprintf(time_stamp, "%s.%04dUTC ", time_stamp, (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));
-	      for(k = 0; k < NDATA_PER_SAMP_FULL; k++)
-	      	{		  
-	      	  eth_index = i * conf.nstream * NDATA_PER_SAMP_FULL + j * NDATA_PER_SAMP_FULL + k;
-	      	  
-	      	  strncpy(conf.fits[eth_index].time_stamp, time_stamp, FITS_TIME_STAMP_LEN);		  
-	      	  conf.fits[eth_index].tsamp = time_res_stream;
-	      	  conf.fits[eth_index].nchan = conf.nchan_out;
-	      	  conf.fits[eth_index].chan_width = chan_width;
-	      	  conf.fits[eth_index].pol_type = conf.pol_type;
-		  conf.fits[eth_index].pol_index = k;
-	      	  conf.fits[eth_index].beam_index  = conf.beam_index;
-	      	  conf.fits[eth_index].center_freq = conf.center_freq;
-	      	  conf.fits[eth_index].nchunk = 1;
-	      	  conf.fits[eth_index].chunk_index = 0;
-		  	      	  
-	      	  if(conf.pol_type == 2)
-	      	    {
-	      	      if(k < conf.pol_type)
-	      		CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
-	      					     &conf.dbuf_out4[dbufout4_offset +
-	      							     conf.nchan_out  *
-	      							     (NDATA_PER_SAMP_FULL + k)],
-	      					     conf.dtsz_network,
-	      					     cudaMemcpyDeviceToHost,
-	      					     conf.streams[j]));
-	      	    }
-	      	  else
-	      	    CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
-	      					 &conf.dbuf_out4[dbufout4_offset +
-	      							 k * conf.nchan_out],
-	      					 conf.dtsz_network,
-	      					 cudaMemcpyDeviceToHost,
-	      					 conf.streams[j]));
-	      	}
-	      time_stamp_f += time_res_stream;
 	    }
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
       /* Send all packets from the previous buffer block with one go */
-      for(i = 0; i < conf.neth_per_blk; i++)
+      if(conf.fits_flag == 1)
 	{
-	  if(sendto(sock_udp, (void *)&conf.fits[i], conf.pktsz_network, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
+	  for(i = 0; i < conf.neth_per_blk; i++)
 	    {
-	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      log_add(conf.log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      
-	      destroy_baseband2filterbank(conf);
-	      fclose(conf.log_file);
-	      CudaSafeCall(cudaProfilerStop());
-	      exit(EXIT_FAILURE);
+	      if(sendto(sock_udp, (void *)&conf.fits[i], conf.pktsz_network, 0, (struct sockaddr *)&sa_udp, tolen) == -1)
+		{
+		  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+		  log_add(conf.log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+		  
+		  destroy_baseband2filterbank(conf);
+		  fclose(conf.log_file);
+		  CudaSafeCall(cudaProfilerStop());
+		  exit(EXIT_FAILURE);
+		}
 	    }
-	}	  
+	}
       log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
       ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
       ipcbuf_mark_cleared(conf.db_in);
@@ -934,6 +964,7 @@ int baseband2filterbank(conf_t conf)
 
       time_offset += time_res_blk;
       fprintf(stdout, "BASEBAND2FILTERBANK, finished %f seconds data\n", time_offset);
+      log_add(conf.log_file, "INFO", 1, log_mutex, "finished %f seconds data", time_offset);
       fflush(stdout);
     }
   
@@ -1187,26 +1218,43 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in); 
   log_add(conf.log_file, "INFO", 1, log_mutex, "The output ring buffer key is %x", conf.key_out);
 
-  if(conf.port == -1)
-    {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port, __FILE__, __LINE__);
+  if(conf.fits_flag == 1)
+    {   
+      if(conf.pol_type == -1)
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
-      log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  if(strstr(conf.ip, "unset"))
-    {
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      
-      log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
-      exit(EXIT_FAILURE);
-    }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We will send data to %s:%d", conf.ip, conf.port); 
-
+	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      else
+	log_add(conf.log_file, "INFO", 1, log_mutex, "pol_type is %d", conf.pol_type);
+            
+      if(conf.port == -1)
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port, __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      if(strstr(conf.ip, "unset"))
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  CudaSafeCall(cudaProfilerStop());
+	  exit(EXIT_FAILURE);
+	}
+      log_add(conf.log_file, "INFO", 1, log_mutex, "We will send data to %s:%d", conf.ip, conf.port); 
+    }  
+  else
+    log_add(conf.log_file, "INFO", 1, log_mutex, "We will not send data to FITSwriter interface");
+  
   if(conf.ndf_per_chunk_rbufin == 0)
     {
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);

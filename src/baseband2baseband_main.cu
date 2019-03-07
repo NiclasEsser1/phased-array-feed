@@ -31,6 +31,8 @@ void usage ()
 	   " -g  The number of input frequency chunks\n"
 	   " -h  show help\n"
 	   " -i  FFT length\n"
+	   " -j  Start-of-data or not\n"
+	   " -k  Network interface Y_ip_port_ptype or N\n"
 	   );
 }
 
@@ -44,7 +46,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
     
   /* Initial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:")) != -1)
     {
       switch(arg)
 	{
@@ -95,6 +97,14 @@ int main(int argc, char *argv[])
 	case 'j':
 	  sscanf(optarg, "%d", &conf.sod);
 	  break;
+	  
+	case 'k':
+	  if(optarg[0] == 'Y')
+	    {
+	      conf.fits_flag = 1;
+	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d", conf.ip, &conf.port, &conf.pol_type);
+	    }
+	  break;
 	}
     }
 
@@ -123,7 +133,10 @@ int main(int argc, char *argv[])
   /* Initialize */
   initialize_baseband2baseband(&conf);
 
-  /* Play with the data */
+  /* Play with the data */  
+  fprintf(stdout, "BASEBAND2BASEBAND_READY\n");  // Ready to take data from ring buffer, just before the header thing
+  fflush(stdout);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2BASEBAND_READY");
   baseband2baseband(conf);
   
   /* Destory */

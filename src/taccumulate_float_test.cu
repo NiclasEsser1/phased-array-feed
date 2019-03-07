@@ -30,9 +30,10 @@ extern "C" void usage ()
 // ./taccumulate_float_test -a 512 -b 512 -c 1024
 int main(int argc, char *argv[])
 {
-  int i, j, k, arg;
+  int k, arg;
+  uint64_t i, j;
   int grid_x, block_x;
-  int naccumulate;
+  uint64_t naccumulate;
   uint64_t len_in, len_out, nsamp_in, nsamp_out, idx_in, idx_out;
   dim3 gridsize, blocksize;
   float h_total = 0, g_total = 0;
@@ -64,16 +65,16 @@ int main(int argc, char *argv[])
 	  break;
 	  
 	case 'c':	  
-	  if (sscanf (optarg, "%d", &naccumulate) != 1)
+	  if (sscanf (optarg, "%"SCNu64"", &naccumulate) != 1)
 	    {
 	      fprintf (stderr, "Does not get naccumulate, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      exit(EXIT_FAILURE);
 	    }
-	  fprintf(stdout, "naccumulate is %d\n",  naccumulate);
+	  fprintf(stdout, "naccumulate is %"PRIu64"\n",  naccumulate);
 	  break;
 	}
     }
-  fprintf(stdout, "grid_x is %d, block_x is %d and naccumulate is %d\n", grid_x, block_x, naccumulate);
+  fprintf(stdout, "grid_x is %d, block_x is %d and naccumulate is %"PRIu64"\n", grid_x, block_x, naccumulate);
   
   /* Setup size */
   gridsize.x  = grid_x;

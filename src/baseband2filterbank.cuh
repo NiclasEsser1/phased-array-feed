@@ -40,7 +40,8 @@ typedef struct conf_t
   uint64_t picoseconds;
   double center_freq;
   int beam_index;
-  
+
+  int fits_flag;
   fits_t *fits;
   int neth_per_blk;
   int nseg_per_blk;
@@ -96,7 +97,7 @@ typedef struct conf_t
   dim3 gridsize_detect_faccumulate_pad_transpose, blocksize_detect_faccumulate_pad_transpose;
   dim3 gridsize_taccumulate, blocksize_taccumulate;
   dim3 gridsize_scale, blocksize_scale;
-  int naccumulate_pad, naccumulate_scale, naccumulate;
+  uint64_t naccumulate_pad, naccumulate_scale, naccumulate;
 
   uint64_t file_size_in, bytes_per_second_in;
 }conf_t; 
