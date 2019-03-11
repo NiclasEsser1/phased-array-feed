@@ -101,8 +101,8 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * sizeof(float)));
   CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * sizeof(cufftComplex)));
   CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * sizeof(float)));
-  CudaSafeCall(cudaMemset((void *)g_out,  0,      npol_out * sizeof(float)));
-  CudaSafeCall(cudaMemset((void *)h_result, 0,    npol_out * sizeof(float)));
+  CudaSafeCall(cudaMemset((void *)g_out,  0,      sizeof(g_out)));
+  CudaSafeCall(cudaMemset((void *)h_result, 0,    sizeof(h_result)));
   
   /* Prepare the data */
   srand(time(NULL));

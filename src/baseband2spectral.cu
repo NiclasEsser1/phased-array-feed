@@ -58,7 +58,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->nchan_keep_chan = (int)(conf->cufft_nx / OVER_SAMP_RATE);
   conf->nchan_out       = conf->nchan_in * conf->nchan_keep_chan;
   conf->cufft_mod       = (int)(0.5 * conf->nchan_keep_chan);
-  conf->scale_dtsz      = NBYTE_SPECTRAL * NDATA_PER_SAMP_FULL * conf->nchan_in * conf->nchan_keep_chan / (double)(NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND * conf->ndf_per_chunk_rbufin * conf->nchan_in * NSAMP_DF); // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
+  conf->scale_dtsz      = NBYTE_SPECTRAL * NDATA_PER_SAMP_FULL * conf->nchan_in * conf->nchan_keep_chan / (double)(NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND * conf->ndf_per_chunk_rbufin * conf->nchan_in * NSAMP_DF * conf->nblk_accumulate); // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
 
   log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
@@ -203,6 +203,7 @@ int initialize_baseband2spectral(conf_t *conf)
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "Input buffer block size is %"PRIu64".", conf->rbufin_size);
   if((conf->rbufin_size % conf->bufin_size != 0) || (conf->rbufin_size/conf->bufin_size)!= conf->nrepeat_per_blk)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -266,6 +267,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	}
       conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
       conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Output buffer block size is %"PRIu64".", conf->rbufout_size);
       
       clock_gettime(CLOCK_REALTIME, &start);
       dada_cuda_dbregister(conf->hdu_out); // To put this into capture does not improve the memcpy!!!
@@ -273,7 +275,6 @@ int initialize_baseband2spectral(conf_t *conf)
       elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
       fprintf(stdout, "elapse_time for dbregister of output ring buffer is %f\n", elapsed_time);
       fflush(stdout);
-
       
       if(conf->rbufout_size != conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL)
 	{
@@ -425,7 +426,7 @@ int baseband2spectral(conf_t conf)
   
   while(!ipcbuf_eod(conf.db_in))
     {
-      CudaSafeCall(cudaMemset((void *)conf.dbuf_out, 0, conf.bufout_size));// We have to clear the memory for this parameter
+      CudaSafeCall(cudaMemset((void *)conf.dbuf_out, 0, sizeof(conf.dbuf_out)));// We have to clear the memory for this parameter
       
       for(k = 0; k < conf.nblk_accumulate; k++)
 	{
@@ -441,7 +442,7 @@ int baseband2spectral(conf_t conf)
 	    {
 	      for(j = 0; j < conf.nstream; j++)
 		{
-		  hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
+		  hbufin_offset = (i * conf.nstream + j) * conf.hbufin_offset;// + i * conf.bufin_size;
 		  dbufin_offset = j * conf.dbufin_offset; 
 		  bufrt1_offset = j * conf.bufrt1_offset;
 		  bufrt2_offset = j * conf.bufrt2_offset;
@@ -700,17 +701,19 @@ int baseband2spectral(conf_t conf)
 		  memcpy_offset = i * fits.nchan +
 		    j * conf.nchan_per_chunk_network;
 		  fits.chunk_index = j;
-		  if((conf.pol_type == 2) && (i < 2))
-		    CudaSafeCall(cudaMemcpy(fits.data,
-					    &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL + memcpy_offset],
-					    conf.dtsz_network,
-					    cudaMemcpyDeviceToHost));
-		  if(conf.pol_type != 2)
-		    CudaSafeCall(cudaMemcpy(fits.data,
-					    &conf.dbuf_out[memcpy_offset],
-					    conf.dtsz_network,
-					    cudaMemcpyDeviceToHost));
-		  
+		  if(i < conf.pol_type)
+		    {
+		      if(conf.pol_type == 2)
+			CudaSafeCall(cudaMemcpy(fits.data,
+						&conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL + memcpy_offset],
+						conf.dtsz_network,
+						cudaMemcpyDeviceToHost));
+		      else
+			CudaSafeCall(cudaMemcpy(fits.data,
+						&conf.dbuf_out[memcpy_offset],
+						conf.dtsz_network,
+						cudaMemcpyDeviceToHost));
+		    }
 		  if(sendto(sock_udp,
 			    (void *)&fits,
 			    conf.pktsz_network,
@@ -739,7 +742,9 @@ int baseband2spectral(conf_t conf)
       if(conf.output_network == 0)
 	{
 	  log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
-	  ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
+	  //ipcbuf_mark_filled(conf.db_out, (uint64_t)(conf.nblk_accumulate * cbufsz * conf.scale_dtsz));
+	  //ipcbuf_mark_filled(conf.db_out, conf.bufout_size * conf.nrepeat_per_blk);
+	  ipcbuf_mark_filled(conf.db_out, conf.rbufout_size);
 	}
       time_offset += (conf.nblk_accumulate * time_res_blk);
       fprintf(stdout, "BASEBAND2SPECTRAL, finished %f seconds data\n", time_offset);
@@ -907,17 +912,17 @@ int read_dada_header(conf_t *conf)
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
 
-  if (ascii_header_get(conf->hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
+  if (ascii_header_get(conf->hdrbuf_in, "RECEIVER", "%d", &conf->beam_index) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BEAM_INDEX, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting RECEIVER, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting RECEIVER, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "RECEIVER from DADA header is %d", conf->beam_index);
       
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
@@ -1039,7 +1044,7 @@ int register_dada_header(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
   
   /* donot set header parameters anymore */
-  if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
+  if (ipcbuf_mark_filled (conf->hdu_out->header_block, DADA_HDRSZ) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

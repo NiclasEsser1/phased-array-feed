@@ -125,8 +125,8 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMallocHost((void **)&g_result, len_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMalloc((void **)&g_out,        len_out * NBYTE_CUFFT_COMPLEX));
   
-  CudaSafeCall(cudaMemset((void *)g_out,  0,      len_out * NBYTE_CUFFT_COMPLEX));
-  CudaSafeCall(cudaMemset((void *)h_result, 0,    len_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMemset((void *)g_out,  0,      sizeof(g_out)));
+  CudaSafeCall(cudaMemset((void *)h_result, 0,    sizeof(h_result)));
   
   /* cauculate on CPU */
   srand(time(NULL));

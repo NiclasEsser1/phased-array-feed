@@ -43,6 +43,7 @@ typedef struct conf_t
   int cufft_nx, cufft_mod, nchan_keep_chan;
   int ndf_per_chunk_stream;
   uint64_t naccumulate;
+  uint64_t naccumulate_spectral;
   int nstream;
   float ndim_scale;
   double scale_dtsz;
@@ -55,7 +56,7 @@ typedef struct conf_t
   
   key_t key_out, key_in;
   dada_hdu_t *hdu_out, *hdu_in;
-  char *curbuf_in, *curbuf_out;
+  char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;
   int8_t *dbuf_out1;
   float *dbuf_out2;

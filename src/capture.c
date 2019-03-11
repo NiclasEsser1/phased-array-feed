@@ -688,16 +688,16 @@ int register_dada_header(conf_t conf)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf.nchan);
   
-  if(ascii_header_set(hdrbuf, "BEAM_INDEX", "%d", conf.beam_index) < 0)
+  if(ascii_header_set(hdrbuf, "RECEIVER", "%d", conf.beam_index) < 0)
     {
-      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting BEAM_INDEX, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: Error setting BEAM_INDEX, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting RECEIVER, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting RECEIVER, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_capture(conf);
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BEAM_INDEX to DADA header is %d", conf.beam_index);
+  log_add(conf.log_file, "INFO", 1, log_mutex, "RECEIVER to DADA header is %d", conf.beam_index);
   
   /* donot set header parameters anymore */
   if(ipcbuf_mark_filled(conf.header_block, DADA_HDRSZ) < 0)
@@ -986,8 +986,8 @@ void *capture_control(void *conf)
   /* Create an unix socket for control */
   if((sock = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
     {
-      log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Can not create socket, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Can not create socket, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
       quit = 1;
       pthread_exit(NULL);
@@ -1020,7 +1020,7 @@ void *capture_control(void *conf)
       msg_len = 0;
       while(!(msg_len > 0) && !quit)
 	{
-	  memset(capture_control_command, 0, MSTR_LEN);
+	  memset(capture_control_command, 0, sizeof(capture_control_command));
 	  msg_len = recvfrom(sock, (void *)capture_control_command, MSTR_LEN, 0, (struct sockaddr*)&fromsa, &fromlen);
 	}
       
@@ -1059,7 +1059,7 @@ void *capture_control(void *conf)
 	  
 	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got END-OF-DATA signal, has to enable eod");
 	  ipcbuf_enable_eod(capture_conf->data_block);
-	  memset(capture_control_command, 0, MSTR_LEN);
+	  memset(capture_control_command, 0, sizeof(capture_control_command));
 	}
 	  
       if(strstr(capture_control_command, "START-OF-DATA") != NULL)
@@ -1109,7 +1109,7 @@ void *capture_control(void *conf)
 	      close(sock);
 	      pthread_exit(NULL);
 	    }
-	  memset(capture_control_command, 0, MSTR_LEN);
+	  memset(capture_control_command, 0, sizeof(capture_control_command));
 	}
     }
   

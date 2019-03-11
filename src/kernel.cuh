@@ -11,6 +11,7 @@
 
 /* For raw data unpack to get ready for forward FFT */
 __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_t offset_out);
+__global__ void unpack1_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_t offset_out, cufftComplex *dbuf_out_zoom, uint64_t offset_out_zoom, int zoom_start_chunk, int zoom_nchunk);
 
 /* Use after forward FFT to get ready for further steps */
 __global__ void swap_select_transpose_ptf_kernel(cufftComplex *dbuf_in, cufftComplex *dbuf_out, uint64_t offset_in, uint64_t offset_out, int cufft_nx, int cufft_mod, int nchan_keep_chan, int nchan_keep_band, int nchan_edge);
@@ -712,7 +713,7 @@ __global__ void detect_faccumulate_scale2_spectral_faccumulate_kernel(cufftCompl
 {
   extern volatile __shared__ float scale_sdata[];
   uint64_t i   = threadIdx.x, j;
-  uint64_t tid = i;
+  uint64_t tid = threadIdx.x;
   uint64_t loc;
   int loc_freq;
   float aa, bb, u, v;

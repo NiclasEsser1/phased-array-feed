@@ -26,9 +26,7 @@ extern "C" {
 #define NPOL_BASEBAND        2
 #define NDIM_BASEBAND        2
 #define NBYTE_BASEBAND       2    // int16_t
-#define TSAMP_BASEBAND       0.84375
   
-#define FREQ_RESOLUTION_BASEBAND 1.0 // MHz
 #define NBIT_FILTERBANK      8
 #define NDIM_FILTERBANK      1
 #define NPOL_FILTERBANK      1
@@ -45,7 +43,7 @@ extern "C" {
 #define NPORT_MAX       10
 #define NSAMP_DF        128
 #define NCHAN_PER_CHUNK 7
-#define OVER_SAMP_RATE  (32.0l/27.0)
+#define OVER_SAMP_RATE  (32.0/27.0)
 #define DFSZ            7232
 #define DF_HDRSZ        64
 #define PERIOD          27

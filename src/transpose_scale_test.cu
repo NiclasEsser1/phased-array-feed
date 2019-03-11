@@ -169,6 +169,9 @@ int main(int argc, char *argv[])
   	  //fflush(stdout);
   	}
     }
+
+  for(i = 0; i < 100; i++)
+    fprintf(stdout, "%d\t%d\t%d\n", h_result[i], g_result[i], (h_result[i] - g_result[i]));
   
   /* Free buffer */
   CudaSafeCall(cudaFreeHost(data));

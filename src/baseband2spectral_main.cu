@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
   int arg;
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
-  //char temp[MSTR_LEN] = {'\0'};
+  char temp[MSTR_LEN] = {'\0'};
   struct timespec start, stop;
   double elapsed_time;
       
@@ -73,17 +73,17 @@ int main(int argc, char *argv[])
 	  if(optarg[0] == 'k')
 	    {
 	      conf.output_network = 0;
-	      //if(sscanf(optarg, "%*[^_]_%[^_]_%d", temp, &conf.sod) != 2)
-	      if(sscanf(optarg, "%*[^_]_%x_%d", &conf.key_out, &conf.sod) != 2)
+	      if(sscanf(optarg, "%*[^_]_%[^_]_%d", temp, &conf.sod) != 2)
+		//if(sscanf(optarg, "%*[^_]_%x_%d", &conf.key_out, &conf.sod) != 2)
 		{
 	     	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer configuration, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	     	  exit(EXIT_FAILURE);
 	     	}
-	     //if(sscanf(temp, "%x", &conf.key_out)!=1)		
-	     //	{
-	     //	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer key, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	     //	  exit(EXIT_FAILURE);
-	     //	}
+	     if(sscanf(temp, "%x", &conf.key_out)!=1)		
+	     	{
+	     	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer key, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	     	  exit(EXIT_FAILURE);
+	     	}
 	    }
 	  if(optarg[0] == 'n')
 	    {

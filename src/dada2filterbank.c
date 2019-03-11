@@ -14,6 +14,7 @@ pthread_mutex_t log_mutex;
 
 int filterbank_header(conf_t conf)
 {
+  /* If the data is generated in a different machine, we may have litter and big proglem */
   char field[MSTR_LEN];
   int length;
 
@@ -26,62 +27,88 @@ int filterbank_header(conf_t conf)
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "HEADER_START");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+    
+  length = 11;
+  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  strcpy(field, "rawdatafile");
+  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite(conf.f_fname, NBYTE_INT, 1, conf.f_fp);
+  fprintf(stdout, "%s\n", conf.f_fname);
+  fflush(stdout);
   
   length = 12;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "telescope_id");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.telescope_id, NBYTE_INT, 1, conf.f_fp);
+  fprintf(stdout, "%d\n", conf.telescope_id);
+  fflush(stdout);
     
   length = 9;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "data_type");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.data_type, NBYTE_INT, 1, conf.f_fp);
- 
+  fprintf(stdout, "%d\n", conf.data_type);
+  fflush(stdout);
+  
   length = 5;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "tsamp");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.tsamp, sizeof(double), 1, conf.f_fp);
+  fprintf(stdout, "%f\n", conf.tsamp);
+  fflush(stdout);
   
   length = 6;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "tstart");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.mjd_start, sizeof(double), 1, conf.f_fp);
+  fprintf(stdout, "%f\n", conf.mjd_start);
+  fflush(stdout);
   
   length = 5;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "nbits");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.nbits, NBYTE_INT, 1, conf.f_fp);
-
+  fprintf(stdout, "%d\n", conf.nbits);
+  fflush(stdout);
+  
   length = 4;
   conf.nifs = conf.npol * conf.ndim;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "nifs");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.nifs, NBYTE_INT, 1, conf.f_fp);
+  fprintf(stdout, "%d\n", conf.nifs);
+  fflush(stdout);
   
   length = 4;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "fch1");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.fch1, sizeof(double), 1, conf.f_fp);
+  fprintf(stdout, "%f\n", conf.fch1);
+  fflush(stdout);
   
   length = 4;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "foff");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.foff, sizeof(double), 1, conf.f_fp);
-    
+  fwrite((char*)&conf.foff, sizeof(double), 1, conf.f_fp);  
+  fprintf(stdout, "%f\n", conf.foff);
+  fflush(stdout);
+  
   length = 6;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "nchans");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.nchans, NBYTE_INT, 1, conf.f_fp);
- 
+  fprintf(stdout, "%d\n", conf.nchans);
+  fflush(stdout);
+  
   length = 11;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "source_name");
@@ -90,43 +117,33 @@ int filterbank_header(conf_t conf)
   strncpy(field, conf.source_name, length);
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-
+  fprintf(stdout, "%s\n", conf.source_name);
+  fflush(stdout);
+  
   length = 7;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "src_raj");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  length = strlen(conf.ra);
-  strncpy(field, conf.ra, length);
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-
+  fwrite((char*)&conf.raj, sizeof(double), 1, conf.f_fp);
+  fprintf(stdout, "%f\n", conf.raj);
+  fflush(stdout);
+  
   length = 7;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "src_dej");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  length = strlen(conf.dec);
-  strncpy(field, conf.dec, length);
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  fwrite((char*)&conf.decj, sizeof(double), 1, conf.f_fp); 
+  fprintf(stdout, "%f\n", conf.decj);
+  fflush(stdout);
   
   length = 10;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "machine_id");
   fwrite(field, NBYTE_CHAR, length, conf.f_fp);
   fwrite((char*)&conf.machine_id, NBYTE_INT, 1, conf.f_fp);
-  
-  //length = 6;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "nbeams");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&conf.nbeams, NBYTE_INT, 1, conf.f_fp);
-  
-  //length = 7;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "beam_id");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&conf.beam_id, NBYTE_INT, 1, conf.f_fp);
-  
+  fprintf(stdout, "%d\n", conf.machine_id);
+  fflush(stdout);
+    
   length = 10;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "HEADER_END");
@@ -151,8 +168,8 @@ int dada_header(conf_t *conf)
     }
   ascii_header_get(hdrbuf, "NBIT", "%d", &conf->nbits);
   ascii_header_get(hdrbuf, "SOURCE", "%s", conf->source_name);
-  ascii_header_get(hdrbuf, "RA", "%s", conf->ra);
-  ascii_header_get(hdrbuf, "DEC", "%s", conf->dec);
+  ascii_header_get(hdrbuf, "RA", "%lf", conf->ra);
+  ascii_header_get(hdrbuf, "DEC", "%lf", conf->dec);
   ascii_header_get(hdrbuf, "MJD_START", "%lf", &conf->mjd_start);
   ascii_header_get(hdrbuf, "PICOSECONDS", "%lf", &conf->picoseconds);
   ascii_header_get(hdrbuf, "FREQ", "%lf", &conf->freq);
@@ -161,8 +178,7 @@ int dada_header(conf_t *conf)
   ascii_header_get(hdrbuf, "NDIM", "%d", &conf->ndim);
   ascii_header_get(hdrbuf, "TSAMP", "%lf", &conf->tsamp);
   ascii_header_get(hdrbuf, "BW", "%lf", &conf->bw);
-  //ascii_header_get(hdrbuf, "NBEAM", "%d", &conf->nbeams);
-  ascii_header_get(hdrbuf, "BEAM_INDEX", "%d", &conf->beam_id);
+  ascii_header_get(hdrbuf, "RECEIVER", "%d", &conf->beam_id);
 
   if(conf->file == 0)
     ipcbuf_mark_cleared(conf->hdu->header_block);

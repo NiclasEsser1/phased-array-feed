@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * NBYTE_CUFFT_COMPLEX));
-  CudaSafeCall(cudaMemset((void *)g_out,  0,      npol_out * NBYTE_CUFFT_COMPLEX));
+  CudaSafeCall(cudaMemset((void *)g_out,  0,      sizeof(g_out)));
   
   /* Prepare the data */
   srand(time(NULL));

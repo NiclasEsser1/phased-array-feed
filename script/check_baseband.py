@@ -1,67 +1,43 @@
 #!/usr/bin/env python
 
-import numpy as np
-import struct
-import ConfigParser
-import time
 import os
+import numpy as np
+import matplotlib.pyplot as plt
+import glob
+import subprocess
+import sys
+import numpy.fft as fft
 
-def keyword_value(data_file, nline_header, key_word):
-    data_file.seek(0)  # Go to the beginning of DADA file
-    for iline in range(nline_header):
-        line = data_file.readline()
-        if key_word in line and line[0] != '#':
-            return line.split()[1]
-    print "Can not find the keyword \"{:s}\" in header ...".format(key_word)
-    exit(1)
+nsamp_seek = 0
+nsamp      = 1
 
-def ConfigSectionMap(fname, section):
-    # Play with configuration file
-    Config = ConfigParser.ConfigParser()
-    Config.read(fname)
-    
-    dict_conf = {}
-    options = Config.options(section)
-    for option in options:
-        try:
-            dict_conf[option] = Config.get(section, option)
-            if dict_conf[option] == -1:
-                DebugPrint("skip: %s" % option)
-        except:
-            print("exception on %s!" % option)
-            dict_conf[option] = None
-    return dict_conf
+hdrsize    = 4096
+dsize      = 1
+ndata_samp = 4
+nchan      = 336
 
-dada_hdrsz  = 4096
-pkt_hdrsz   = 64
-pktsz       = 7232
-MJD1970     = 40587.0
-SECDAY      = 86400.0
-fname       = "/beegfs/DENG/AUG/baseband/J0332+5434/J0332+5434-baseband.dada"
-fname       = "/beegfs/DENG/AUG/baseband/J1939+2134/J1939+2134-baseband.dada"
-#fname       = "/beegfs/DENG/AUG/baseband/J1713+0747/J1713+0747-baseband.dada"
-#fname       = "/beegfs/DENG/AUG/baseband/J1819-1458/J1819-1458-baseband.dada"
+ndata      = ndata_samp * nsamp * nchan
+freq0      = 1340.5 - nchan/2.0
+freq       = freq0 + np.arange(int(nchan))
 
-system_conf = "../config/system.conf"
+fdir  = "/beegfs/DENG/pacifix8_numa0_process1/"
+fdir  = "/beegfs/DENG/pacifix7_numa0_process0/"
+fname = "2018-08-30-19:37:27_0000000000000000.000000.dada"
+fname = "2018-08-31-01:11:19_0000000000000000.000000.dada"
+#fname = "2018-08-30-20:11:41_0000000000000000.000000.dada"
 
-# To get timestamp from the first packet
-f = open(fname, "r")
-f.seek(dada_hdrsz)
-while True:
-    pkt_hdr = f.read(pkt_hdrsz)
-    f.seek(pktsz - pkt_hdrsz, os.SEEK_CUR)
-    
-    if pkt_hdr =='':
-        break
-    else:
-        data     = np.fromstring(pkt_hdr, 'uint64')
-        
-        hdr_part = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[0]))[0])
-        second   = (hdr_part & np.uint64(0x3fffffff00000000)) >> np.uint64(32)
-        idf      = hdr_part & np.uint64(0x00000000ffffffff)
-    
-        hdr_part = np.uint64(struct.unpack("<Q", struct.pack(">Q", data[2]))[0])
-        freq     = (hdr_part & np.uint64(0x00000000ffff0000)) >> np.uint64(16)    
-        
-        print second, idf, freq
+blksize = ndata * dsize
+fname   = os.path.join(fdir, fname)
+f       = open(fname, "r")
+f.seek(hdrsize + nsamp_seek * blksize)# * ndata_samp)
+sample  = np.array(np.fromstring(f.read(blksize), dtype='int8'))
+sample  = np.reshape(sample, (ndata_samp, nchan))
+
+plt.figure()
+plt.plot(freq, sample[0,:])
+plt.plot(freq, sample[1,:])
+plt.plot(freq, sample[2,:])
+plt.plot(freq, sample[3,:])
+plt.show()
+
 f.close()

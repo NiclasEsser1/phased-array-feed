@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMallocHost((void **)&h_result, npol_out * NBYTE_FLOAT));
   CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * NBYTE_FLOAT));
   CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * NBYTE_FLOAT));
-  CudaSafeCall(cudaMemset((void *)g_result, 0,    npol_out * NBYTE_FLOAT));
+  CudaSafeCall(cudaMemset((void *)g_result, 0,    sizeof(g_result)));
   //CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * NBYTE_FLOAT));
   
   /* Prepare the data and calculate on CPU */

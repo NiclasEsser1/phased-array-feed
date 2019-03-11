@@ -47,6 +47,52 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_
   dbuf_out[loc_out].y = (int16_t)((tmp & 0xffff000000000000ULL) >> 48);
 }
 
+__global__ void unpack1_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_out, uint64_t offset_out, cufftComplex *dbuf_out_zoom, uint64_t offset_out_zoom, int zoom_start_chunk, int zoom_nchunk)
+{
+  uint64_t loc_in, loc_out, loc_out_zoom;
+  int64_t tmp;
+  
+  /* 
+     Loc for the input array, it is in continuous order, it is in (STREAM_BUF_NDFSTP)T(NCHUNK_NIC)F(NSAMP_DF)T(NCHAN_CHUNK)F(NPOL_SAMP)P order
+     This is for entire setting, since gridDim.z =1 and blockDim.z = 1, we can simply it to the latter format;
+     Becareful here, if these number are not 1, we need to use a different format;
+  */
+  loc_in = blockIdx.x * gridDim.y * blockDim.x * blockDim.y +
+    blockIdx.y * blockDim.x * blockDim.y +
+    threadIdx.x * blockDim.y +
+    threadIdx.y;
+  tmp = BSWAP_64(dbuf_in[loc_in]);
+  
+  // Put the data into PFT order, full input chunks
+  loc_out = blockIdx.y * gridDim.x * blockDim.x * blockDim.y +
+    threadIdx.y * gridDim.x * blockDim.x +
+    blockIdx.x * blockDim.x +
+    threadIdx.x;
+  
+  dbuf_out[loc_out].x = (int16_t)((tmp & 0x000000000000ffffULL));  
+  dbuf_out[loc_out].y = (int16_t)((tmp & 0x00000000ffff0000ULL) >> 16);
+  
+  loc_out = loc_out + offset_out;
+  dbuf_out[loc_out].x = (int16_t)((tmp & 0x0000ffff00000000ULL) >> 32);
+  dbuf_out[loc_out].y = (int16_t)((tmp & 0xffff000000000000ULL) >> 48);
+
+  /* Required zoom chunks */
+  if((blockIdx.y >= zoom_start_chunk) && (blockIdx.y < (zoom_start_chunk + zoom_nchunk)))
+    {
+      loc_out_zoom = (blockIdx.y - zoom_start_chunk) * gridDim.x * blockDim.x * blockDim.y +
+	threadIdx.y * gridDim.x * blockDim.x +
+	blockIdx.x * blockDim.x +
+	threadIdx.x;
+  
+      dbuf_out_zoom[loc_out_zoom].x = (int16_t)((tmp & 0x000000000000ffffULL));  
+      dbuf_out_zoom[loc_out_zoom].y = (int16_t)((tmp & 0x00000000ffff0000ULL) >> 16);
+      
+      loc_out_zoom = loc_out_zoom + offset_out_zoom;
+      dbuf_out_zoom[loc_out_zoom].x = (int16_t)((tmp & 0x0000ffff00000000ULL) >> 32);
+      dbuf_out_zoom[loc_out_zoom].y = (int16_t)((tmp & 0xffff000000000000ULL) >> 48);
+    }
+}
+
 /* 
    This kernel is used to :
    1.  swap the halves of CUDA FFT output, we need to do that because CUDA FFT put the centre frequency at bin 0;
@@ -477,10 +523,10 @@ __global__ void detect_faccumulate_scale_kernel(cufftComplex *dbuf_in, uint8_t *
 
       if(ddat_scl[loc_freq] == 0.0)
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
+	dbuf_out[(blockIdx.x + 1) * gridDim.y - (blockIdx.y + 1)] = __float2uint_rz(power); // Reverse frequency order
       else
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8); // Reverse frequency order
+	dbuf_out[(blockIdx.x + 1) * gridDim.y - (blockIdx.y + 1)] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq] + OFFS_UINT8); // Reverse frequency order
     }
 }
 
@@ -533,10 +579,12 @@ __global__ void detect_faccumulate_scale1_kernel(cufftComplex *dbuf_in, uint8_t 
 
       if(offset_scale[loc_freq].y == 0.0)
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz(power);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
+	//dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz(power); // Reverse frequency order
+	dbuf_out[(blockIdx.x + 1) * gridDim.y - (blockIdx.y + 1)] = __float2uint_rz(power); // Reverse frequency order
       else
 	//dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8);
-	dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
+	//dbuf_out[blockIdx.x * gridDim.y + gridDim.y - blockIdx.y - 1] = __float2uint_rz((power - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
+	dbuf_out[(blockIdx.x + 1) * gridDim.y - (blockIdx.y + 1)] = __float2uint_rz((power - offset_scale[loc_freq].x) / offset_scale[loc_freq].y + OFFS_UINT8); // Reverse frequency order
     }
 }
 
@@ -622,7 +670,7 @@ __global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_in, cufftCo
 	blockIdx.y * blockDim.x +
 	threadIdx.x;
 
-      remainder2 = (remainder1 + nchan_keep_chan/2)%nchan_keep_chan; // The reverse FFT has to be done inside the original croase channel
+      remainder2 = (remainder1 + cufft_mod)%nchan_keep_chan; // The reverse FFT has to be done inside the original croase channel
       loc = remainder2 + blockIdx.x * nchan_keep_chan;
       
       loc_out = blockIdx.y * gridDim.x * nchan_keep_chan + loc;  
@@ -697,7 +745,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_in, int8_t *dbuf_out, 
 	      tile[0][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.x - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);
 	      tile[1][threadIdx.y+i][threadIdx.x] = __float2int_rz((p1.y - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);
 	      tile[2][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.x - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);	  
-	      tile[3][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.y - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);	  
+	      tile[3][threadIdx.y+i][threadIdx.x] = __float2int_rz((p2.y - offset_scale[i_m+i].x) / offset_scale[i_m+i].y);
 	    }
         }
     }

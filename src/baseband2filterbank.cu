@@ -33,6 +33,8 @@
 // Send the data once the buffer block is done
 
 // Make the scale calculation unblock, done;
+
+// Not because of nchan_keep_band
 extern pthread_mutex_t log_mutex;
 
 int default_arguments(conf_t *conf)
@@ -98,10 +100,10 @@ int initialize_baseband2filterbank(conf_t *conf)
       conf->neth_per_blk = conf->nseg_per_blk * NDATA_PER_SAMP_FULL;
       conf->fits         = (fits_t *)malloc(conf->neth_per_blk * sizeof(fits_t));
       for(i = 0; i < conf->neth_per_blk; i++)
-	{
-	  memset(conf->fits[i].data, 0x00, sizeof(conf->fits[i].data));
-	  cudaHostRegister ((void *) conf->fits[i].data, UDP_PAYLOAD_SIZE_MAX, 0);
-	}
+      	{
+      	  memset(conf->fits[i].data, 0x00, sizeof(conf->fits[i].data));
+      	  cudaHostRegister ((void *) conf->fits[i].data, sizeof(conf->fits[i].data), 0);
+      	}
       log_add(conf->log_file, "INFO", 1, log_mutex, "%d network packets are requied for each buffer block", conf->neth_per_blk);
       
       conf->dtsz_network    = NBYTE_FLOAT * conf->nchan_out;
@@ -115,8 +117,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->npol1        = conf->nsamp1 * NPOL_BASEBAND;
   conf->ndata1       = conf->npol1  * NDIM_BASEBAND;
   
-  //conf->nsamp2       = conf->nsamp1 / OVER_SAMP_RATE / conf->inverse_nchan_rate;
-  conf->nsamp2       = conf->nsamp1 * conf->nchan_keep_band / (OVER_SAMP_RATE * conf->nchan_in * conf->nchan_keep_chan);
+  conf->nsamp2       = conf->nsamp1 * conf->nchan_keep_band / (conf->nchan_in * conf->cufft_nx);
   conf->npol2        = conf->nsamp2 * NPOL_BASEBAND;
   conf->ndata2       = conf->npol2  * NDIM_BASEBAND;
 
@@ -187,11 +188,11 @@ int initialize_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out3, conf->bufout2_size));
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out4, conf->nchan_out * NDATA_PER_SAMP_RT * conf->nstream * NBYTE_FLOAT));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size))
-;
+  CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
+  
   CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * NBYTE_CUFFT_COMPLEX));
-  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, sizeof(conf->offset_scale_d)));// We have to clear the memory for this parameter
   
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->ndf_per_chunk_stream;
@@ -288,6 +289,7 @@ int initialize_baseband2filterbank(conf_t *conf)
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "Input buffer block size is %"PRIu64".", conf->rbufin_size);
   if((conf->rbufin_size % conf->bufin_size != 0) || (conf->rbufin_size/conf->bufin_size)!= conf->nrepeat_per_blk)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -348,6 +350,7 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout1_size = ipcbuf_get_bufsz(conf->db_out);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "Output buffer block size is %"PRIu64".", conf->rbufout1_size);
   
   clock_gettime(CLOCK_REALTIME, &start);
   /* registers the existing host memory range for use by CUDA */
@@ -359,8 +362,8 @@ int initialize_baseband2filterbank(conf_t *conf)
   
   if(conf->rbufout1_size % conf->bufout1_size != 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64"\t%"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout1_size, conf->bufout1_size, __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, %"PRIu64"\t%"PRIu64", which happens at \"%s\", line [%d].\n", conf->rbufout1_size, conf->bufout1_size, __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
@@ -531,18 +534,18 @@ int baseband2filterbank(conf_t conf)
 	{
 	  for(j = 0; j < conf.nstream; j++)
 	    {
-	      hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
+	      hbufin_offset = (i * conf.nstream + j) * conf.hbufin_offset;// + i * conf.bufin_size;
 	      dbufin_offset = j * conf.dbufin_offset; 
 	      bufrt1_offset = j * conf.bufrt1_offset;
 	      bufrt2_offset = j * conf.bufrt2_offset;
 	      dbufout1_offset = j * conf.dbufout1_offset;
 	      dbufout2_offset = j * conf.dbufout2_offset;
 	      dbufout4_offset = j * conf.dbufout4_offset;
-	      hbufout1_offset = j * conf.hbufout1_offset + i * conf.bufout1_size;
+	      hbufout1_offset = (i * conf.nstream + j) * conf.hbufout1_offset;// + i * conf.bufout1_size;
 	      
 	      /* Copy data into device */
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.cbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
-	      
+
 	      /* Unpack raw data into cufftComplex array */
 	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
 	      CudaSafeKernelLaunch();
@@ -914,25 +917,27 @@ int baseband2filterbank(conf_t conf)
 		      conf.fits[eth_index].center_freq = conf.center_freq;
 		      conf.fits[eth_index].nchunk = 1;
 		      conf.fits[eth_index].chunk_index = 0;
-		      
-		      if(conf.pol_type == 2)
+
+		      if(k < conf.pol_type)
 			{
-			  if(k < conf.pol_type)
+			  if(conf.pol_type == 2)
+			    {
+			      CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
+							   &conf.dbuf_out4[dbufout4_offset +
+									   conf.nchan_out  *
+									   (NDATA_PER_SAMP_FULL + k)],
+							   conf.dtsz_network,
+							   cudaMemcpyDeviceToHost,
+							   conf.streams[j]));
+			    }
+			  else
 			    CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
 							 &conf.dbuf_out4[dbufout4_offset +
-									 conf.nchan_out  *
-									 (NDATA_PER_SAMP_FULL + k)],
+									 k * conf.nchan_out],
 							 conf.dtsz_network,
 							 cudaMemcpyDeviceToHost,
 							 conf.streams[j]));
 			}
-		      else
-			CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
-						     &conf.dbuf_out4[dbufout4_offset +
-								     k * conf.nchan_out],
-						     conf.dtsz_network,
-						     cudaMemcpyDeviceToHost,
-						     conf.streams[j]));
 		    }
 		  time_stamp_f += time_res_stream;
 		}
@@ -958,7 +963,9 @@ int baseband2filterbank(conf_t conf)
 	    }
 	}
       log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
-      ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
+      //ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
+      //ipcbuf_mark_filled(conf.db_out, conf.bufout1_size * conf.nrepeat_per_blk);
+      ipcbuf_mark_filled(conf.db_out, conf.rbufout1_size);
       ipcbuf_mark_cleared(conf.db_in);
       log_add(conf.log_file, "INFO", 1, log_mutex, "after closing old buffer block");
 
@@ -1014,11 +1021,13 @@ int offset_scale(conf_t conf)
   gridsize_detect_faccumulate_pad_transpose         = conf.gridsize_detect_faccumulate_pad_transpose ;
   blocksize_detect_faccumulate_pad_transpose        = conf.blocksize_detect_faccumulate_pad_transpose ;
 
-  for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
+  //for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
+  for(i = 0; i < conf.nrepeat_per_blk; i ++)
     {
       for (j = 0; j < conf.nstream; j++)
 	{
-	  hbufin_offset = j * conf.hbufin_offset + i;
+	  //hbufin_offset = j * conf.hbufin_offset + i;
+	  hbufin_offset = (i * conf.nstream + j) * conf.hbufin_offset;
 	  dbufin_offset = j * conf.dbufin_offset; 
 	  bufrt1_offset = j * conf.bufrt1_offset;
 	  bufrt2_offset = j * conf.bufrt2_offset;
@@ -1123,7 +1132,7 @@ int offset_scale(conf_t conf)
   CudaSynchronizeCall();
   
   /* Record scale into file */
-  sprintf(fname, "%s/%s_scale.txt", conf.dir, conf.utc_start);
+  sprintf(fname, "%s/%s_baseband2filterbank.scl", conf.dir, conf.utc_start);
   fp = fopen(fname, "w");
   if(fp == NULL)
     {
@@ -1446,17 +1455,17 @@ int read_dada_header(conf_t *conf)
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
     
-  if (ascii_header_get(conf->hdrbuf_in, "BEAM_INDEX", "%d", &conf->beam_index) < 0)  
+  if (ascii_header_get(conf->hdrbuf_in, "RECEIVER", "%d", &conf->beam_index) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BEAM_INDEX, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting BEAM_INDEX, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting RECEIVER, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error getting RECEIVER, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2filterbank(*conf);
       fclose(conf->log_file);
       CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BEAM_INDEX from DADA header is %d", conf->beam_index);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "RECEIVER from DADA header is %d", conf->beam_index);
   
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
@@ -1566,6 +1575,7 @@ int register_dada_header(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
   
   if (ascii_header_set(hdrbuf_out, "BW", "%f", -conf->bandwidth) < 0)  // Reverse frequency order
+    //if (ascii_header_set(hdrbuf_out, "BW", "%f", conf->bandwidth) < 0)  // Reverse frequency order
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BW, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -1590,7 +1600,7 @@ int register_dada_header(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
   
   /* donot set header parameters anymore */
-  if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
+  if (ipcbuf_mark_filled (conf->hdu_out->header_block, DADA_HDRSZ) < 0)
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

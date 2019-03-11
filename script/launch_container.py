@@ -32,14 +32,16 @@ uid   = 50000
 gid   = 50000
 
 container_name = "{}.{}".format(image, numa)
-image          = "xinpingdeng/{}".format(image)
+image       = "xinpingdeng/{}".format(image)
 xauth       = "/home/pulsar/.Xauthority"
+sshauth     = "/home/pulsar/.ssh"
 dev_dir     = "/home/pulsar/xinping/"
 data_dir    = "/beegfs/"
 
 data_mount  = "{}:{}".format(data_dir, data_dir)
 dev_mount   = "{}:{}".format(dev_dir, dev_dir)
 xauth_mount = "{}:{}".format(xauth, xauth)
+sshauth_mount = "{}:{}".format(sshauth, sshauth)
 
 if(numa == 0):
     cpuset_cpus = "0-9"
@@ -47,10 +49,10 @@ if(numa == 1):
     cpuset_cpus = "10-19"
     
 if root:
-    #comline = "docker run --runtime=nvidia --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v {} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, numa, numa, cpuset_cpus, container_name, image)
-    comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v {} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, numa, numa, cpuset_cpus, container_name, image)
+    #comline = "docker run --runtime=nvidia --privileged --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -e DISPLAY --net=host -v {} -v {} -v {} -v {} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, sshauth_mount, numa, numa, cpuset_cpus, container_name, image)
+    comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v {} -v {} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, sshauth_mount, numa, numa, cpuset_cpus, container_name, image)
 else:    
-    comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v {} -u {}:{} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, uid, gid, numa, numa, cpuset_cpus, container_name, image)
+    comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v {} -v {} -u {}:{} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, sshauth_mount, uid, gid, numa, numa, cpuset_cpus, container_name, image)
     
 print comline
 print "\nYou are going to a docker container with the name {}{}!\n".format(image, numa)
