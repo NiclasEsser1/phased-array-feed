@@ -887,7 +887,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case 512:
@@ -901,7 +901,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case 256:
@@ -915,7 +915,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case 128:
@@ -929,7 +929,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  64:
@@ -943,7 +943,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  32:
@@ -957,7 +957,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  16:
@@ -971,7 +971,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  8:
@@ -985,7 +985,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  4:
@@ -999,7 +999,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  2:
@@ -1013,7 +1013,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		      
 		    case  1:
@@ -1027,7 +1027,7 @@ int baseband2filterbank(conf_t conf)
 			 &conf.dbuf_out_spectral[dbufout_offset_spectral],
 			 conf.nsamp_keep_spectral,
 			 conf.nsamp_out_spectral,
-			 conf.naccumulate);
+			 conf.naccumulate_spectral);
 		      break;
 		    }
 		}
@@ -1487,7 +1487,8 @@ int baseband2filterbank(conf_t conf)
 		}
 	    }
 	}
-      
+
+      if((conf.spectral2disk == 1) || (conf.spectral2network == 1))
       saccumulate_kernel
 	<<<gridsize_saccumulate,
 	blocksize_saccumulate>>>
