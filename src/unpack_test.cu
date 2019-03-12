@@ -123,7 +123,6 @@ int main(int argc, char *argv[])
   CudaSafeCall(cudaMemcpy(g_in, data_int16, ndata * sizeof(int16_t), cudaMemcpyHostToDevice));
   unpack_kernel<<<gridsize_unpack, blocksize_unpack>>>(g_in, g_out, nsamp);
   CudaSafeKernelLaunch();
-
   CudaSafeCall(cudaMemcpy(g_result, g_out, npol * NBYTE_CUFFT_COMPLEX, cudaMemcpyDeviceToHost));
 
   /* Check the result */
@@ -134,7 +133,9 @@ int main(int argc, char *argv[])
       if((h_result[i+nsamp].x - g_result[i+nsamp].x) !=0 || (h_result[i+nsamp].y - g_result[i+nsamp].y) !=0)
 	fprintf(stdout, "%f\t%f\t%f\t%f\t%f\t%f\n", h_result[i+nsamp].x, g_result[i+nsamp].x, h_result[i+nsamp].x - g_result[i+nsamp].x, h_result[i+nsamp].y, g_result[i+nsamp].y, h_result[i+nsamp].y - g_result[i+nsamp].y);
     }
+  
   /* Free buffer */
+  data_int64 = NULL;
   CudaSafeCall(cudaFreeHost(data_int16));
   CudaSafeCall(cudaFreeHost(h_result));
   CudaSafeCall(cudaFreeHost(g_result));

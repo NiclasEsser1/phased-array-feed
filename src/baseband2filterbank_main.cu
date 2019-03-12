@@ -37,8 +37,8 @@ void usage ()
 	   " -i  Number of chunks of input\n"
 	   " -j  FFT length\n"
 	   " -k  The number of output channels\n"
-	   " -l  The type of polarisation\n"
-	   " -m  Network interface Y_ip_port_ptype or N\n"
+	   " -l  Monitor, Y_ip_port_ptype or N\n"
+	   " -m  Commensal spectral, n_ip_port_ptype_chunk0_nchunk_naccumulate_cufft-nx, k_key_sod_ptype_chunk0_nchunk_naccumulate_cufft-nx or N\n"
 	   );
 }
 
@@ -47,7 +47,8 @@ int main(int argc, char *argv[])
   int arg;
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
-
+  char temp[MSTR_LEN] = {'\0'};
+  
   struct timespec start, stop;
   double elapsed_time;
   
@@ -55,7 +56,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
   
   /* Initializeial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:m:")) != -1)
     {
       switch(arg)
 	{
@@ -114,8 +115,47 @@ int main(int argc, char *argv[])
 	case 'l':
 	  if(optarg[0] == 'Y')
 	    {
-	      conf.fits_flag = 1;
-	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d", conf.ip, &conf.port, &conf.pol_type);
+	      conf.monitor = 1;
+	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d", conf.ip_monitor, &conf.port_monitor, &conf.ptype_monitor);
+	    }
+	  break;
+	  
+	case 'm':
+	  if(optarg[0] == 'n')
+	    {
+	      conf.spectral2network = 1;
+	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d_%d_%d_%d_%d", conf.ip_spectral, &conf.port_spectral, &conf.ptype_spectral, &conf.start_chunk, &conf.nchunk_in_spectral, &conf.nblk_accumulate, &conf.cufft_nx_spectral);
+	    }
+	  if(optarg[0] == 'k')
+	    {
+	      conf.spectral2disk = 1;
+	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d_%d_%d_%d_%d", temp, &conf.sod_spectral, &conf.ptype_spectral, &conf.start_chunk, &conf.nchunk_in_spectral, &conf.nblk_accumulate, &conf.cufft_nx_spectral);	      
+	      if(sscanf(temp, "%x", &conf.key_out_spectral)!=1)		
+	     	{
+	     	  fprintf (stderr, "BASEBAND2FILTERBANK_ERROR: Can not get spectral ring buffer key, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	     	  exit(EXIT_FAILURE);
+	     	}
+	      
+	      if(conf.ptype_spectral == 1)
+		{
+		  conf.ndim_spectral = 1;
+		  conf.npol_spectral = 1;
+		}
+	      else if(conf.ptype_spectral == 2)
+		{	      
+		  conf.ndim_spectral = 1;
+		  conf.npol_spectral = 2;
+		}
+	      else if(conf.ptype_spectral == 4)
+		{	      
+		  conf.ndim_spectral = 2;
+		  conf.npol_spectral = 2;
+		}
+	      else
+		{
+		  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ptype_spectral should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n",conf.ptype_spectral,  __FILE__, __LINE__);
+		  exit(EXIT_FAILURE);
+		}
 	    }
 	  break;
 	}

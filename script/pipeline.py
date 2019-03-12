@@ -19,11 +19,20 @@ import os
 EXECUTE = True
 #EXECUTE        = False
 
-FITSWRITER = True
-#FITSWRITER = False
+#SPECTRAL2FITS = True
+SPECTRAL2FITS = False
 
-DSPSR = True   # Start filterbank data
-#DSPSR  = False  # Do not start filterbank data
+SPECTRAL2DISK = True
+#SPECTRAL2DISK = False
+
+#MONITOR = True
+MONITOR = False
+
+COMMENSAL = True
+#COMMENSAL = False
+
+DSPSR = True  
+#DSPSR  = False  
 
 HEIMDALL = False   # To run heimdall on filterbank file or not
 #HEIMDALL       = True   # To run heimdall on filterbank file or not
@@ -86,8 +95,8 @@ SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                          "pad":                     0,
                          "ndf_check_chk":           1024,
                          
-                         "ip":                      '134.104.70.90',
-                         "port":                    17107,
+                         "ip_monitor":             '134.104.70.90',
+                         "port_monitor":           17107,
                          
                          "detect_thresh":           10,
                          "dm":                      [1, 3000],
@@ -98,6 +107,7 @@ SEARCH_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
 SEARCH_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                        "rbuf_baseband_key":      ["dada"],
                        "rbuf_filterbank_key":    ["dade"],
+                       "rbuf_spectral_key":      ["dadi"],
                        "nbeam":                  1,
                        "nport_beam":             3,
                        "nchk_port":              16,
@@ -106,6 +116,7 @@ SEARCH_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format
 SEARCH_CONFIG_2BEAMS = {"dada_fname":              "{}/{}/{}_33chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                         "rbuf_baseband_key":       ["dada", "dadc"],
                         "rbuf_filterbank_key":     ["dade", "dadg"],
+                        "rbuf_spectral_key":       ["dadi", "dadj"],
                         "nbeam":                   2,
                         "nport_beam":              3,
                         "nchk_port":               11,
@@ -170,10 +181,10 @@ FOLD_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
                        "nstream":                 2,
                        
                        "bind":                    1,
-                       "subint":                  10, 
+                       "subint":                  10, #0.110592, 
                        
-                       "ip":                      '134.104.70.90',
-                       "port":                    17107,
+                       "ip_monitor":              '134.104.70.90',
+                       "port_monitor":            17107,
                        
                        "pad":                     0,
                        "ndf_check_chk":           1024,
@@ -183,17 +194,19 @@ FOLD_CONFIG_GENERAL = {"rbuf_baseband_ndf_chk":   16384,
 FOLD_CONFIG_1BEAM = {"dada_fname":             "{}/{}/{}_48chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
                      "rbuf_baseband_key":      ["dada"],
                      "rbuf_fold_key":          ["dade"],
+                     "rbuf_spectral_key":      ["dadi"],
                      "nbeam":                  1,
                      "nport_beam":             3,
                      "nchk_port":              16,
 }
                        
 FOLD_CONFIG_2BEAMS = {"dada_fname":             "{}/{}/{}_33chunks.dada".format(DADA_ROOT, SOURCE, SOURCE),
-                       "rbuf_baseband_key":      ["dada", "dadc"],
-                       "rbuf_fold_key":          ["dade", "dadg"],
-                       "nbeam":                  2,
-                       "nport_beam":             3,
-                       "nchk_port":              11,
+                      "rbuf_baseband_key":      ["dada", "dadc"],
+                      "rbuf_fold_key":          ["dade", "dadg"],
+                      "rbuf_spectral_key":      ["dadi", "dadj"],
+                      "nbeam":                  2,
+                      "nport_beam":             3,
+                      "nchk_port":              11,
 }
 
 class PipelineError(Exception):
@@ -402,11 +415,11 @@ class Fold(Pipeline):
         self._dspsr_execution_instances = []
 
         self._pad = FOLD_CONFIG_GENERAL["pad"]
-        self._ip_udp = FOLD_CONFIG_GENERAL["ip"]
+        self._ip_monitor = FOLD_CONFIG_GENERAL["ip_monitor"]
         self._bind = FOLD_CONFIG_GENERAL["bind"]
         self._ptype = FOLD_CONFIG_GENERAL["ptype"]
         self._subint = FOLD_CONFIG_GENERAL["subint"]
-        self._port_udp = FOLD_CONFIG_GENERAL["port"]
+        self._port_monitor = FOLD_CONFIG_GENERAL["port_monitor"]
         self._nstream = FOLD_CONFIG_GENERAL["nstream"]
         self._cufft_nx = FOLD_CONFIG_GENERAL["cufft_nx"]
         self._ndf_stream = FOLD_CONFIG_GENERAL["ndf_stream"]
@@ -500,8 +513,8 @@ class Fold(Pipeline):
             # Temp test
             command += "-j 1 "
             
-            if FITSWRITER:
-                command += "-k Y_{}_{}_{} ".format(self._ip_udp, self._port_udp, self._ptype)
+            if MONITOR:
+                command += "-k Y_{}_{}_{} ".format(self._ip_monitor, self._port_monitor, self._ptype)
             else:
                 command += "-k N "
             self._baseband2baseband_commands.append(command)
@@ -703,10 +716,10 @@ class Search(Pipeline):
 
         self._dm = SEARCH_CONFIG_GENERAL["dm"]
         self._pad = SEARCH_CONFIG_GENERAL["pad"]
-        self._ip_udp = SEARCH_CONFIG_GENERAL["ip"]
+        self._ip_monitor = SEARCH_CONFIG_GENERAL["ip_monitor"]
         self._bind = SEARCH_CONFIG_GENERAL["bind"]
         self._ptype = SEARCH_CONFIG_GENERAL["ptype"]
-        self._port_udp = SEARCH_CONFIG_GENERAL["port"]
+        self._port_monitor = SEARCH_CONFIG_GENERAL["port_monitor"]
         self._nstream = SEARCH_CONFIG_GENERAL["nstream"]
         self._cufft_nx = SEARCH_CONFIG_GENERAL["cufft_nx"]
         self._zap_chans = SEARCH_CONFIG_GENERAL["zap_chans"]
@@ -797,7 +810,7 @@ class Search(Pipeline):
 
             # baseband2filterbank command
             command = ("{} -a {} -b {} -c {} -d {} -e {} "
-                       "-f {} -i {} -j {} -k {} ").format(baseband2filterbank, self._rbuf_baseband_key[i],
+                       "-f {} -i {} -j {} -k {} -m n_134.104.70.90_17107_1_24_2_2_1024 ").format(baseband2filterbank, self._rbuf_baseband_key[i],
                                                           self._rbuf_filterbank_key[i], self._rbuf_filterbank_ndf_chk, self._nstream,
                                                           self._ndf_stream, self._runtime_directory[i], self._nchk_beam, self._cufft_nx,
                                                           self._nchan_filterbank)
@@ -806,8 +819,8 @@ class Search(Pipeline):
             else:
                 command += "-g 0 "
                 
-            if FITSWRITER:
-                command += "-l Y_{}_{}_{} ".format(self._ip_udp, self._port_udp, self._ptype)
+            if MONITOR:
+                command += "-l Y_{}_{}_{} ".format(self._ip_monitor, self._port_monitor, self._ptype)
             else:
                 command += "-l N "
                 
@@ -1023,6 +1036,10 @@ class Spectral(Pipeline):
         self._tbuf_baseband_ndf_chk = SPECTRAL_CONFIG_GENERAL["tbuf_baseband_ndf_chk"]
         self._rbuf_spectral_ndf_chk = SPECTRAL_CONFIG_GENERAL["rbuf_spectral_ndf_chk"]
 
+        if (SPECTRAL2FITS and SPECTRAL2DISK):
+            log.error("spectral mode does not support simultaneous FITS and DISK output")
+            raise PipelineError("spectral mode does not support simultaneous FITS and DISK output")
+        
         if not (self._ndf_stream % self._cufft_nx == 0):
             log.error("ndf_stream should be multiple times of cufft_nx")
             raise PipelineError("ndf_stream should be multiple times of cufft_nx")
@@ -1113,13 +1130,12 @@ class Spectral(Pipeline):
                 self._nstream, self._ndf_stream,
                 self._runtime_directory[i], self._nchk_beam,
                 self._cufft_nx, self._ptype, self._nblk_accumulate)
-            if not FITSWRITER:
-                if DBDISK:
-                    command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
-                else:
-                    command += "-b k_{}_0".format(self._rbuf_spectral_key[i])
-            else:
+            if SPECTRAL2FITS:
                 command += "-b n_{}_{}".format(self._ip_out, self._port_out)
+            elif SPECTRAL2DISK:
+                command += "-b k_{}_1".format(self._rbuf_spectral_key[i])
+            else:
+                command += "-b k_{}_0".format(self._rbuf_spectral_key[i])
             self._baseband2spectral_commands.append(command)
 
             # Command to create spectral ring buffer
@@ -1163,7 +1179,7 @@ class Spectral(Pipeline):
             execution_instance.finish()
 
         # Create ring buffer for spectral data
-        if not FITSWRITER:
+        if not SPECTRAL2FITS:
             process_index = 0
             execution_instances = []
             for command in self._spectral_create_buffer_commands:
@@ -1193,7 +1209,7 @@ class Spectral(Pipeline):
             self._baseband2spectral_execution_instances.append(execution_instance)
             process_index += 1 
                 
-        if not FITSWRITER:   # Run dbdisk if required
+        if SPECTRAL2DISK:   # Run dbdisk if required
             process_index = 0
             self._dbdisk_execution_instances = []
             for command in self._dbdisk_commands:
@@ -1205,7 +1221,7 @@ class Spectral(Pipeline):
                 process_index += 1
 
     def stop(self):
-        if not FITSWRITER:
+        if SPECTRAL2DISK:
             for execution_instance in self._dbdisk_execution_instances:
                 execution_instance.finish()
 
@@ -1216,7 +1232,7 @@ class Spectral(Pipeline):
             execution_instance.finish()
             
         # To delete spectral ring buffer
-        if not FITSWRITER:        
+        if not SPECTRAL2FITS:        
             process_index = 0
             execution_instances = []
             for command in self._spectral_delete_buffer_commands:

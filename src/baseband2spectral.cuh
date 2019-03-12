@@ -14,21 +14,7 @@
 #include "daemon.h"
 #include "futils.h"
 #include "constants.h"
-
-typedef struct fits_t
-{
-  int beam_index;
-  char time_stamp[FITS_TIME_STAMP_LEN];
-  float tsamp;
-  int nchan;
-  float center_freq;
-  float chan_width;
-  int pol_type;
-  int pol_index;
-  int nchunk;
-  int chunk_index;
-  float data[UDP_PAYLOAD_SIZE_MAX]; // Can not alloc dynamic
-}fits_t;
+#include "fits.h"
 
 typedef struct conf_t
 {
@@ -51,7 +37,6 @@ typedef struct conf_t
   
   int ndf_per_chunk_stream;
   int nstream;
-  float ndim_scale;
   int sod;
 
   uint64_t file_size_in;
@@ -98,8 +83,6 @@ typedef struct conf_t
   dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
   dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
   dim3 gridsize_saccumulate, blocksize_saccumulate;
-
-  //fits_t fits;
 }conf_t; 
 
 int initialize_baseband2spectral(conf_t *conf);

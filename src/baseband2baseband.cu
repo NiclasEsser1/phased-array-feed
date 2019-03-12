@@ -510,7 +510,7 @@ int baseband2baseband(conf_t conf)
 	      dbufout1_offset = j * conf.dbufout1_offset;
 	      dbufout2_offset = j * conf.dbufout2_offset;
 	      hbufout1_offset = (i * conf.nstream + j) * conf.hbufout1_offset;// + i * conf.bufout1_size;
-
+	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.cbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
 
 	      /* Unpack raw data into cufftComplex array */
@@ -1069,10 +1069,10 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   
   if(conf.fits_flag == 1)
     {      
-      if(conf.pol_type == -1)
+      if(!((conf.pol_type == 1) || (conf.pol_type == 2) || (conf.pol_type == 4)))
 	{
-	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: pol_type should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.pol_type, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.pol_type, __FILE__, __LINE__);
       
 	  log_close(conf.log_file);
 	  CudaSafeCall(cudaProfilerStop());

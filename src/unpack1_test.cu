@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
     }
   
   /* Free buffer */
+  data_int64 = NULL;
   CudaSafeCall(cudaFreeHost(data_int16));
   CudaSafeCall(cudaFreeHost(h_result));
   CudaSafeCall(cudaFreeHost(g_result));
