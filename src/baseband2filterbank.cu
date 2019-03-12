@@ -865,7 +865,7 @@ int baseband2filterbank(conf_t conf)
 		    (&conf.buf_rt1_spectral[bufrt1_offset_spectral],
 		     &conf.buf_rt2_spectral[bufrt2_offset_spectral],
 		     conf.cufft_nx_spectral,
-		     conf.ndf_per_chunk_stream * NSAMP_DF / conf.cufft_nx,
+		     conf.ndf_per_chunk_stream * NSAMP_DF / conf.cufft_nx_spectral,
 		     conf.nsamp_in_spectral,
 		     conf.nsamp_keep_spectral,
 		     conf.cufft_nx_spectral,
