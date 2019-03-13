@@ -204,7 +204,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "Input buffer block size is %"PRIu64".", conf->rbufin_size);
-  if((conf->rbufin_size % conf->bufin_size != 0) || (conf->rbufin_size/conf->bufin_size)!= conf->nrepeat_per_blk)  
+  if(conf->rbufin_size != (conf->bufin_size * conf->nrepeat_per_blk))  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

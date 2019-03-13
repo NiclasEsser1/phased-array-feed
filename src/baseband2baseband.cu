@@ -312,7 +312,8 @@ int initialize_baseband2baseband(conf_t *conf)
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "Input buffer block size is %"PRIu64".", conf->rbufin_size);
   
-  if(conf->rbufin_size % conf->bufin_size != 0)  
+  //if(conf->rbufin_size % conf->bufin_size != 0)
+  if(conf->rbufin_size != conf->bufin_size*conf->nrepeat_per_blk)  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -363,7 +364,8 @@ int initialize_baseband2baseband(conf_t *conf)
   //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout1_size, conf->bufout1_size);
   log_add(conf->log_file, "INFO", 1, log_mutex, "Output buffer block size is %"PRIu64".", conf->rbufout1_size);
   
-  if(conf->rbufout1_size % conf->bufout1_size != 0)  
+  //if(conf->rbufout1_size % conf->bufout1_size != 0)
+  if(conf->rbufout1_size != (conf->bufout1_size * conf->nrepeat_per_blk))  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -542,7 +544,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -556,7 +558,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -570,7 +572,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -584,7 +586,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -598,7 +600,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -612,7 +614,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -626,7 +628,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -640,7 +642,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -654,7 +656,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -668,7 +670,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,
@@ -682,7 +684,7 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			(&conf.buf_rt1[conf.bufrt1_offset],
+			(&conf.buf_rt1[bufrt1_offset],
 			 &conf.dbuf_out2[dbufout2_offset],
 			 conf.nsamp2,
 			 conf.nsamp3,

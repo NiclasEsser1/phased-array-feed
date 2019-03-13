@@ -16,12 +16,14 @@ dsize      = 4
 ndata_samp = 4
 
 bw         = 336.0
+#bw         = 14.0
 #bw         = 231
 nchan_chan = 864
 c_freq     = 1340.5
 
 nchan_band = int(bw * nchan_chan)
 ndata      = ndata_samp * nsamp * nchan_band
+#freq0      = 1424.5 - bw/2.0
 freq0      = 1340.5 - bw/2.0
 freq       = freq0 + np.arange(int(nchan_band))/float(nchan_chan)
 

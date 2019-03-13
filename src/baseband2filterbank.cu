@@ -307,7 +307,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   conf->hdr_in = (ipcbuf_t *) conf->hdu_in->header_block;
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
   log_add(conf->log_file, "INFO", 1, log_mutex, "Input buffer block size is %"PRIu64".", conf->rbufin_size);
-  if((conf->rbufin_size % conf->bufin_size != 0) || (conf->rbufin_size/conf->bufin_size)!= conf->nrepeat_per_blk)  
+  if(conf->rbufin_size != (conf->bufin_size * conf->nrepeat_per_blk))  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -377,7 +377,7 @@ int initialize_baseband2filterbank(conf_t *conf)
   fprintf(stdout, "elapsed_time for dbregister of output ring buffer is %f\n", elapsed_time);
   fflush(stdout);
   
-  if(conf->rbufout_size_filterbank % conf->bufout_size_filterbank != 0)  
+  if(conf->rbufout_size_filterbank != (conf->bufout_size_filterbank * conf->nrepeat_per_blk))  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64"\t%"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout_size_filterbank, conf->bufout_size_filterbank, __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, %"PRIu64"\t%"PRIu64", which happens at \"%s\", line [%d].\n", conf->rbufout_size_filterbank, conf->bufout_size_filterbank, __FILE__, __LINE__);
@@ -449,7 +449,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       conf->npol_keep_spectral  = conf->nsamp_keep_spectral * NPOL_BASEBAND;
       conf->ndata_keep_spectral = conf->npol_keep_spectral  * NDIM_BASEBAND;
       
-      conf->nsamp_out_spectral = conf->nsamp_keep / conf->naccumulate_spectral;
+      conf->nsamp_out_spectral = conf->nsamp_keep_spectral / conf->naccumulate_spectral;
       conf->ndata_out_spectral = conf->nsamp_out_spectral  * NDATA_PER_SAMP_RT;
             
       nx        = conf->cufft_nx_spectral;
@@ -582,7 +582,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 	      exit(EXIT_FAILURE);    
 	    }
 	  
-	  if(ipcbuf_get_bufsz(conf->hdr_out) != DADA_HDRSZ)    // This number should match
+	  if(ipcbuf_get_bufsz(conf->hdr_out_spectral) != DADA_HDRSZ)    // This number should match
 	    {
 	      log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -594,7 +594,7 @@ int initialize_baseband2filterbank(conf_t *conf)
 	    }
 	  
 	  /* make ourselves the write client */
-	  if(dada_hdu_lock_write(conf->hdu_out) < 0)
+	  if(dada_hdu_lock_write(conf->hdu_out_spectral) < 0)
 	    {
 	      log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -1489,14 +1489,15 @@ int baseband2filterbank(conf_t conf)
 	}
 
       if((conf.spectral2disk == 1) || (conf.spectral2network == 1))
-      saccumulate_kernel
-	<<<gridsize_saccumulate,
-	blocksize_saccumulate>>>
-	(conf.dbuf_out_spectral,
-	 conf.ndata_out_spectral,
-	 conf.nstream);  
-      CudaSafeKernelLaunch();
-      
+	{
+	  saccumulate_kernel
+	    <<<gridsize_saccumulate,
+	    blocksize_saccumulate>>>
+	    (conf.dbuf_out_spectral,
+	     conf.ndata_out_spectral,
+	     conf.nstream);  
+	  CudaSafeKernelLaunch();
+	}
       log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
       //ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
       //ipcbuf_mark_filled(conf.db_out, conf.bufout_size_filterbank * conf.nrepeat_per_blk);
@@ -1581,9 +1582,9 @@ int baseband2filterbank(conf_t conf)
 	  if(conf.spectral2disk == 1)
 	    {
 	      log_add(conf.log_file, "INFO", 1, log_mutex, "before closing old buffer block");
-	      //ipcbuf_mark_filled(conf.db_out, (uint64_t)(conf.nblk_accumulate * cbufsz * conf.scale_dtsz));
-	      //ipcbuf_mark_filled(conf.db_out, conf.bufout_size * conf.nrepeat_per_blk);
-	      ipcbuf_mark_filled(conf.db_out, conf.rbufout_size_spectral);
+	      //ipcbuf_mark_filled(conf.db_out_spectral, (uint64_t)(conf.nblk_accumulate * cbufsz * conf.scale_dtsz));
+	      //ipcbuf_mark_filled(conf.db_out_spectral, conf.bufout_size * conf.nrepeat_per_blk);
+	      ipcbuf_mark_filled(conf.db_out_spectral, conf.rbufout_size_spectral);
 	    }
 	  
 	  nblk_accumulate = 0;
@@ -1832,6 +1833,12 @@ int destroy_baseband2filterbank(conf_t conf)
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }  
+  if(conf.db_out_spectral)
+    {
+      dada_cuda_dbunregister(conf.hdu_out_spectral);
+      dada_hdu_unlock_write(conf.hdu_out_spectral);
+      dada_hdu_destroy(conf.hdu_out_spectral);
+    }  
   log_add(conf.log_file, "INFO", 1, log_mutex, "destory hdu done");  
 
   return EXIT_SUCCESS;
@@ -1884,7 +1891,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  exit(EXIT_FAILURE);
 	}
       else
-	log_add(conf.log_file, "ERR", 1, log_mutex, "start_chunk is %d and nchunk_in_spectral is %d, which happens at \"%s\", line [%d], has to abort", conf.start_chunk, conf.nchunk_in_spectral, __FILE__, __LINE__);
+	log_add(conf.log_file, "ERR", 1, log_mutex, "start_chunk is %d and nchunk_in_spectral is %d", conf.start_chunk, conf.nchunk_in_spectral);
       
       if(!((conf.ptype_spectral == 1) || (conf.ptype_spectral == 2) || (conf.ptype_spectral == 4)))
 	{
@@ -1924,9 +1931,9 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	{
 	  log_add(conf.log_file, "INFO", 1, log_mutex, "We will send spectral data with ring buffer");
 	  
-	  if(conf.sod == 1)
+	  if(conf.sod_spectral == 1)
 	    log_add(conf.log_file, "INFO", 1, log_mutex, "The spectral data is enabled at the beginning");
-	  else if(conf.sod == 0)
+	  else if(conf.sod_spectral == 0)
 	    log_add(conf.log_file, "INFO", 1, log_mutex, "The spectral data is NOT enabled at the beginning");
 	  else
 	    {
