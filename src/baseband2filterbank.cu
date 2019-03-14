@@ -1833,7 +1833,7 @@ int destroy_baseband2filterbank(conf_t conf)
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }  
-  if(conf.db_out_spectral)
+  if(conf.spectral2disk && conf.db_out_spectral)
     {
       dada_cuda_dbunregister(conf.hdu_out_spectral);
       dada_hdu_unlock_write(conf.hdu_out_spectral);

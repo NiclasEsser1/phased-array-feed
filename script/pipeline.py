@@ -16,15 +16,17 @@ import threading
 import inspect
 import os
 
-EXECUTE = True
-#EXECUTE        = False
-
 # Spectrometer output currently can only be network output or disk output;
 # Monitor output currently can only be network output
 
-PAF_ROOT       = "/home/pulsar/xinping/phased-array-feed/"
-DATA_ROOT      = "/beegfs/DENG/"
-DADA_ROOT      = "{}/AUG/baseband/".format(DATA_ROOT)
+# Configuration of input for different number of beams 
+INPUT_1BEAM = {"input_nbeam":                  1,
+               "input_nchunk":                 48,
+}
+
+INPUT_2BEAMS = {"input_nbeam":                  2,
+                "input_nchunk":                 33,
+}
 
 # We can turn the configuratio directory here to json in future
 # Configuration of PAF system, including GPU servers
@@ -43,17 +45,12 @@ SYSTEM_CONFIG = {"paf_nchan_per_chunk":    	     7,        # MHz
                  "pacifix_memory_limit_per_numa_node":  60791751475, # has 10% spare
 }
 
-# Configuration of input for different number of beams 
-INPUT_1BEAM = {"input_nbeam":                  1,
-               "input_nchunk":                 48,
-}
-
-INPUT_2BEAMS = {"input_nbeam":                  2,
-                "input_nchunk":                 33,
-}
-
 # Configuration for pipelines
-PIPELINE_CONFIG = {"rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
+PIPELINE_CONFIG = {"execution":                    1,
+                   "root_software":                "/home/pulsar/xinping/phased-array-feed/",
+                   "root_runtime":                 "/beegfs/DENG/",
+                   "root_data":                    "/beegfs/DENG/AUG/baseband/",
+                   "rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
 
                    # Configuration of input
                    #"input_source_name":          "J1819-1458",
@@ -86,7 +83,8 @@ PIPELINE_CONFIG = {"rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
                    "search_detect_thresh":10,
                    "search_dm":           [1, 3000],
                    "search_zap_chans":    [],
-
+                   "search_software_name":  "baseband2filterbank_main",
+                   
                    "spectrometer_keys":           ["dcda", "dcdc"], # To put independent or commensal spectral data
                    "spectrometer_nblk":           2,
                    "spectrometer_nreader":        1,
@@ -99,7 +97,8 @@ PIPELINE_CONFIG = {"rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
                    "spectrometer_dbdisk":         0,
                    "spectrometer_monitor":        1,
                    "spectrometer_accumulate_nblk": 1,
-
+                   "spectrometer_software_name":  "baseband2spectral_main",
+                   
                    # Spectral parameters for the simultaneous spectral output from fold and search mode
                    # The rest configuration of this output is the same as the normal spectrometer mode
                    "simultaneous_spectrometer_start_chunk":    35,
@@ -116,6 +115,7 @@ PIPELINE_CONFIG = {"rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
                    "fold_monitor":        1,
                    "fold_spectrometer":   1,
                    "fold_subint":         10,
+                   "fold_software_name":  "baseband2baseband_main",
                    
                    "monitor_keys":            ["deda", "dedc"], # To put monitor data
                    "monitor_ip":      	      '134.104.70.90',
@@ -135,8 +135,9 @@ def register_pipeline(name):
     return _register
 
 class ExecuteCommand(object):
-    def __init__(self, command, process_index = None):
+    def __init__(self, command, execution = True, process_index = None):
         self._command = command
+        self._execution = execution
         self.stdout_callbacks = set()
         self.stderr_callbacks = set()
         self.returncode_callbacks = set()
@@ -151,7 +152,7 @@ class ExecuteCommand(object):
         log.debug(self._command)
         self._executable_command = shlex.split(self._command)
 
-        if EXECUTE:
+        if self._execution:
             try:
                 self._process = Popen(self._executable_command,
                                       stdout=PIPE,
@@ -176,7 +177,7 @@ class ExecuteCommand(object):
         class_name = self.__class__.__name__
 
     def finish(self):
-        if EXECUTE:
+        if self._execution:
             for thread in self._monitor_threads:
                 thread.join()
 
@@ -221,7 +222,7 @@ class ExecuteCommand(object):
 
     
     def _stdout_monitor(self):
-        if EXECUTE:
+        if self._execution:
             while self._process.poll() == None:
                 stdout = self._process.stdout.readline().rstrip("\n\r")
                 if stdout != b"":
@@ -235,7 +236,7 @@ class ExecuteCommand(object):
                 self.returncode = self._command + "; RETURNCODE is: " + str(self._process.returncode)
             
     def _stderr_monitor(self):
-        if EXECUTE:
+        if self._execution:
             while self._process.poll() == None:
                 stderr = self._process.stderr.readline().rstrip("\n\r")
                 if stderr != b"":
@@ -258,7 +259,11 @@ class Pipeline(object):
         self._paf_ndf_per_chunk_per_period       = SYSTEM_CONFIG["paf_ndf_per_chunk_per_period"]
         self._pacifix_ncpu_per_numa_node         = SYSTEM_CONFIG["pacifix_ncpu_per_numa_node"]
         self._pacifix_memory_limit_per_numa_node = SYSTEM_CONFIG["pacifix_memory_limit_per_numa_node"]
-        
+
+        self._execution                    = PIPELINE_CONFIG["execution"]
+        self._root_software                = PIPELINE_CONFIG["root_software"]
+        self._root_runtime                 = PIPELINE_CONFIG["root_runtime"]
+        self._root_data                    = PIPELINE_CONFIG["root_data"]
         self._rbuf_ndf_per_chunk_per_block = PIPELINE_CONFIG["rbuf_ndf_per_chunk_per_block"]
         self._rbuf_blk_res                 = self._paf_df_res * self._rbuf_ndf_per_chunk_per_block
         self._rbuf_nsamp_per_chan_per_block = self._rbuf_ndf_per_chunk_per_block * self._paf_nsamp_per_df
@@ -297,7 +302,8 @@ class Pipeline(object):
             self._spectrometer_create_rbuf_commands = []
             self._spectrometer_delete_rbuf_commands = []
             self._spectrometer_dbdisk_execution_instances = []
-        self._spectrometer_main = "{}/src/baseband2spectral_main".format(PAF_ROOT)
+        self._spectrometer_software_name = PIPELINE_CONFIG["spectrometer_software_name"]
+        self._spectrometer_main = "{}/src/{}".format(self._root_software, self._spectrometer_software_name)
 
         self._simultaneous_spectrometer_start_chunk  = PIPELINE_CONFIG["simultaneous_spectrometer_start_chunk"]
         self._simultaneous_spectrometer_nchunk       = PIPELINE_CONFIG["simultaneous_spectrometer_nchunk"]
@@ -328,8 +334,8 @@ class Pipeline(object):
         if self._search_dbdisk:
             self._search_dbdisk_commands = []
             self._search_dbdisk_execution_instances = []
-            
-        self._search_main = "{}/src/baseband2filterbank_main".format(PAF_ROOT)
+        self._search_software_name = PIPELINE_CONFIG["search_software_name"]
+        self._search_main = "{}/src/{}".format(self._root_software, self._search_software_name)
         
         self._fold_keys       = PIPELINE_CONFIG["fold_keys"]
         self._fold_nblk       = PIPELINE_CONFIG["fold_nblk"]
@@ -352,7 +358,8 @@ class Pipeline(object):
         if self._fold_dbdisk:
             self._fold_dbdisk_commands = []
             self._fold_dbdisk_execution_instances = []
-        self._fold_main       = "{}/src/baseband2baseband_main".format(PAF_ROOT)
+        self._fold_software_name = PIPELINE_CONFIG["fold_software_name"]
+        self._fold_main       = "{}/src/{}".format(self._root_software, self._fold_software_name)
 
         self._pipeline_runtime_directory = []
 
@@ -378,16 +385,29 @@ class Pipeline(object):
            (self._gpu_ndf_per_chunk_per_stream * self._gpu_nstream):
             raise PipelineError("data in input ring buffer block can only "
                                 "be processed by baseband2baseband with integer repeats")
+
         
-        self._cleanup_commands = ["pkill -9 -f dspsr",
-                                  "pkill -9 -f dada_db",
-                                  "pkill -9 -f heimdall",
-                                  "pkill -9 -f dada_diskdb",
-                                  "pkill -9 -f dada_dbdisk",
-                                  "pkill -9 -f baseband2filter", # process name, maximum 16 bytes (15 bytes visiable)
-                                  "pkill -9 -f baseband2spectr", # process name, maximum 16 bytes (15 bytes visiable)
-                                  "pkill -9 -f baseband2baseba", # process name, maximum 16 bytes (15 bytes visiable)                                  
-                                  "ipcrm -a"]
+        self._cleanup_commands_at_config = ["pkill -9 -f capture",
+                                            "pkill -9 -f dspsr",
+                                            "pkill -9 -f dada_db",
+                                            "pkill -9 -f heimdall",
+                                            "pkill -9 -f dada_diskdb",
+                                            "pkill -9 -f dada_dbdisk",
+                                            "pkill -9 -f baseband2filter", # process name, maximum 16 bytes (15 bytes visiable)
+                                            "pkill -9 -f baseband2spectr", # process name, maximum 16 bytes (15 bytes visiable)
+                                            "pkill -9 -f baseband2baseba", # process name, maximum 16 bytes (15 bytes visiable)
+                                            "ipcrm -a"]
+        self._cleanup_commands_at_start = ["pkill -9 -f dspsr",
+                                           "pkill -9 -f dada_db",
+                                           "pkill -9 -f heimdall",
+                                           "pkill -9 -f dada_diskdb",
+                                           "pkill -9 -f dada_dbdisk",
+                                           "pkill -9 -f baseband2filter", # process name, maximum 16 bytes (15 bytes visiable)
+                                           "pkill -9 -f baseband2spectr", # process name, maximum 16 bytes (15 bytes visiable)
+                                           "pkill -9 -f baseband2baseba"]
+        
+        # Cleanup at very beginning
+        self._cleanup(self._cleanup_commands_at_config)       
         
     def __del__(self):
         class_name = self.__class__.__name__
@@ -405,25 +425,25 @@ class Pipeline(object):
         raise NotImplementedError
 
     def _handle_execution_stdout(self, stdout, callback):
-        if EXECUTE:
+        if self._execution:
             log.debug(stdout)
 
     def _handle_execution_returncode(self, returncode, callback):
-        if EXECUTE:
+        if self._execution:
             log.debug(returncode)
             if returncode:
                 raise PipelineError(returncode)
 
     def _handle_execution_stderr(self, stderr, callback):
-        if EXECUTE:
+        if self._execution:
             log.error(stderr)
             #raise PipelineError(stderr)
 
-    def cleanup(self):
+    def cleanup(self, cleanup_commands):
         # Kill existing process and free shared memory if there is any
         execution_instances = []
-        for command in self._cleanup_commands:
-            execution_instances.append(ExecuteCommand(command))            
+        for command in cleanup_commands:
+            execution_instances.append(ExecuteCommand(command, self._execution))            
         for execution_instance in execution_instances:         # Wait until the cleanup is done
             execution_instance.finish()
 
@@ -431,7 +451,6 @@ class Pipeline(object):
 class Fold(Pipeline):
     def __init__(self):
         super(Fold, self).__init__()
-        self.cleanup()
 
     def configure(self, input_ip, input_source, length):
         # Setup parameters of the pipeline
@@ -443,11 +462,10 @@ class Fold(Pipeline):
         self._input_nbeam      = self._input_source["input_nbeam"]
         self._input_nchunk     = self._input_source["input_nchunk"]
         self._input_nchan      = self._input_nchunk * self._paf_nchan_per_chunk
-        self._input_dada_fname = "{}/{}/{}_{}chunks.dada".format(DADA_ROOT,
+        self._input_dada_fname = "{}/{}/{}_{}chunks.dada".format(self._root_data,
                                                                  self._input_source_name,
                                                                  self._input_source_name,
                                                                  self._input_nchunk)
-        self._pacifix_ncpu_per_instance = self._pacifix_ncpu_per_numa_node / self._input_nbeam
         
         self._input_blksz = self._input_nchunk * self._paf_df_dtsz * self._rbuf_ndf_per_chunk_per_block
         self._fold_blksz  = int(self._input_blksz * self._fold_nbyte * self._fold_npol * self._fold_ndim /
@@ -498,7 +516,7 @@ class Fold(Pipeline):
         # To set up rest configurations
         for i in range(self._input_nbeam):      
             # To get directory for runtime information
-            pipeline_runtime_directory = "{}/pacifix{}_numa{}_process{}".format(DATA_ROOT,
+            pipeline_runtime_directory = "{}/pacifix{}_numa{}_process{}".format(self._root_runtime,
                                                                                 self._server,
                                                                                 self._numa,
                                                                                 i)
@@ -579,17 +597,19 @@ class Fold(Pipeline):
                 "dada_db -d -k {:}".format(self._fold_keys[i]))
 
     def start(self):
+        self._cleanup(self._cleanup_commands_at_start)
+        
         # Update file size
         command = "dada_install_header -p FILE_SIZE={} {}".format(self._input_file_size,
                                                                   self._input_dada_fname)
-        execution_instance = ExecuteCommand(command)
+        execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
         
         # Create input ring buffer
         process_index = 0
         execution_instances = []
         for command in self._input_create_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution,
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:
@@ -599,7 +619,7 @@ class Fold(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._fold_create_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution,
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:         # Wait until the buffer creation is done
@@ -607,8 +627,9 @@ class Fold(Pipeline):
             
         # Execute the input
         process_index = 0
+        self._input_execution_instances = []
         for command in self._input_commands:
-            execution_instance = ExecuteCommand(command, process_index)
+            execution_instance = ExecuteCommand(command, self._execution, process_index)
             #self._execution_instances.append(execution_instance)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._input_execution_instances.append(execution_instance)
@@ -617,8 +638,9 @@ class Fold(Pipeline):
         # Run dspsr
         if self._fold_dspsr:
             process_index = 0
+            self._fold_dspsr_execution_instances = []
             for command in self._fold_dspsr_commands:
-                execution_instance = ExecuteCommand(command, process_index)
+                execution_instance = ExecuteCommand(command, self._execution, process_index)
                 #execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
                 #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
                 #execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -628,8 +650,9 @@ class Fold(Pipeline):
         # Run dbdisk
         if self._fold_dbdisk:
             process_index = 0
+            self._fold_dbdisk_execution_instances = []
             for command in self._fold_dbdisk_commands:
-                execution_instance = ExecuteCommand(command, process_index)
+                execution_instance = ExecuteCommand(command, self._execution, process_index)
                 execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
                 execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -638,8 +661,9 @@ class Fold(Pipeline):
 
         # Run baseband2baseband
         process_index = 0
+        self._fold_execution_instances = []
         for command in self._fold_commands:
-            execution_instance = ExecuteCommand(command, process_index)
+            execution_instance = ExecuteCommand(command, self._execution, process_index)
             #execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
             #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -665,7 +689,7 @@ class Fold(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._fold_delete_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution, 
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:
@@ -675,7 +699,7 @@ class Fold(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._input_delete_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution, 
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:
@@ -739,7 +763,7 @@ class Search(Pipeline):
         self._input_nbeam  = self._input_source["input_nbeam"]
         self._input_nchunk = self._input_source["input_nchunk"]
         self._input_nchan  = self._input_nchunk * self._paf_nchan_per_chunk
-        self._input_dada_fname = "{}/{}/{}_{}chunks.dada".format(DADA_ROOT,
+        self._input_dada_fname = "{}/{}/{}_{}chunks.dada".format(self._root_data,
                                                                  self._input_source_name,
                                                                  self._input_source_name,
                                                                  self._input_nchunk)
@@ -800,7 +824,7 @@ class Search(Pipeline):
         # To setup commands for each process
         for i in range(self._input_nbeam):      
             # To get directory for runtime information
-            pipeline_runtime_directory = "{}/pacifix{}_numa{}_process{}".format(DATA_ROOT,
+            pipeline_runtime_directory = "{}/pacifix{}_numa{}_process{}".format(self._root_runtime,
                                                                                 self._server,
                                                                                 self._numa,
                                                                                 i)
@@ -917,17 +941,19 @@ class Search(Pipeline):
                     "dada_db -d -k {:}".format(self._spectrometer_keys[i]))
 
     def start(self):
+        self._cleanup(self._cleanup_commands_at_start)
+        
         # Update file size
         command = "dada_install_header -p FILE_SIZE={} {}".format(self._input_file_size,
                                                                   self._input_dada_fname)
-        execution_instance = ExecuteCommand(command)
+        execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
         
         # Create input ring buffer
         process_index = 0
         execution_instances = []
         for command in self._input_create_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution, 
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:
@@ -938,7 +964,7 @@ class Search(Pipeline):
             process_index = 0
             execution_instances = []
             for command in self._spectrometer_create_rbuf_commands:
-                execution_instances.append(ExecuteCommand(command,
+                execution_instances.append(ExecuteCommand(command, self._execution, 
                                                           process_index))
                 process_index += 1
             for execution_instance in execution_instances:
@@ -948,7 +974,7 @@ class Search(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._search_create_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution, 
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:         # Wait until the buffer creation is done
@@ -956,8 +982,9 @@ class Search(Pipeline):
 
         # Execute the diskdb
         process_index = 0
+        self._input_execution_instances = []
         for command in self._input_commands:
-            execution_instance = ExecuteCommand(command,
+            execution_instance = ExecuteCommand(command, self._execution, 
                                                 process_index)
             #self._execution_instances.append(execution_instance)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -966,8 +993,9 @@ class Search(Pipeline):
             
         # Run baseband2filterbank
         process_index = 0
+        self._search_execution_instances = []
         for command in self._search_commands:
-            execution_instance = ExecuteCommand(command, process_index)
+            execution_instance = ExecuteCommand(command, self._execution, process_index)
             execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
             execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -976,8 +1004,9 @@ class Search(Pipeline):
 
         if self._search_heimdall:  # run heimdall if required
             process_index = 0
+            self._search_heimdall_execution_instances = []
             for command in self._search_heimdall_commands:
-                execution_instance = ExecuteCommand(command,
+                execution_instance = ExecuteCommand(command, self._execution, 
                                                     process_index)
                 execution_instance.returncode_callbacks.add(
                     self._handle_execution_returncode)
@@ -987,8 +1016,9 @@ class Search(Pipeline):
 
         if self._search_dbdisk:
             process_index = 0
+            self._search_dbdisk_execution_instances = []
             for command in self._search_dbdisk_commands:
-                execution_instance = ExecuteCommand(command,
+                execution_instance = ExecuteCommand(command, self._execution, 
                                                     process_index)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
                 execution_instance.returncode_callbacks.add(
@@ -998,8 +1028,9 @@ class Search(Pipeline):
         
         if self._search_spectrometer and self._spectrometer_dbdisk:
             process_index = 0
+            self._spectrometer_dbdisk_execution_instances = []
             for command in self._spectrometer_dbdisk_commands:
-                execution_instance = ExecuteCommand(command,
+                execution_instance = ExecuteCommand(command, self._execution, 
                                                     process_index)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
                 execution_instance.returncode_callbacks.add(
@@ -1031,7 +1062,7 @@ class Search(Pipeline):
             process_index = 0
             execution_instances = []
             for command in self._spectrometer_delete_rbuf_commands:
-                execution_instances.append(ExecuteCommand(command,
+                execution_instances.append(ExecuteCommand(command, self._execution, 
                                                           process_index))
                 process_index += 1
             for execution_instance in execution_instances:
@@ -1041,7 +1072,7 @@ class Search(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._search_delete_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution, 
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:
@@ -1051,7 +1082,7 @@ class Search(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._input_delete_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command,
+            execution_instances.append(ExecuteCommand(command, self._execution, 
                                                       process_index))
             process_index += 1
         for execution_instance in execution_instances:
@@ -1117,7 +1148,7 @@ class Spectrometer(Pipeline):
         self._input_nchunk = self._input_source["input_nchunk"]
         self._input_nchan  = self._input_nchunk * self._paf_nchan_per_chunk
         self._input_nbeam  = self._input_source["input_nbeam"]
-        self._input_dada_fname = "{}/{}/{}_{}chunks.dada".format(DADA_ROOT,
+        self._input_dada_fname = "{}/{}/{}_{}chunks.dada".format(self._root_data,
                                                                  self._input_source_name,
                                                                  self._input_source_name,
                                                                  self._input_nchunk)
@@ -1126,7 +1157,8 @@ class Spectrometer(Pipeline):
         self._spectrometer_blksz = int(self._spectrometer_ndata_per_samp * self._input_nchan * 
                                        self._spectrometer_cufft_nx /
                                        self._paf_over_samp_rate *
-                                       self._spectrometer_nbyte)
+                                       self._spectrometer_nbyte *
+                                       self._spectrometer_dbdisk)
 
         # To check pol type
         if self._spectrometer_ptype not in [1, 2, 4]:  # We can only have three possibilities
@@ -1155,7 +1187,7 @@ class Spectrometer(Pipeline):
         
         for i in range(self._input_nbeam):      
             # To get directory for runtime information
-            pipeline_runtime_directory = "{}/pacifix{}_numa{}_process{}".format(DATA_ROOT,
+            pipeline_runtime_directory = "{}/pacifix{}_numa{}_process{}".format(self._root_runtime,
                                                                                 self._server,
                                                                                 self._numa, i)
             if not os.path.isdir(pipeline_runtime_directory):
@@ -1171,7 +1203,7 @@ class Spectrometer(Pipeline):
                                                                                   self._input_dada_fname,
                                                                                   0))
 
-            # baseband2spectral command
+            # spectrometer command
             command = "{} -a {} -c {} -d {} -e {} -f {} -g {} -i {} -j {} -k {} ".format(
                 self._spectrometer_main,
                 self._input_keys[i],self._rbuf_ndf_per_chunk_per_block,
@@ -1218,17 +1250,19 @@ class Spectrometer(Pipeline):
                 self._spectrometer_dbdisk_commands.append(command)
 
     def start(self):
+        self._cleanup(self._cleanup_commands_at_start)
+        
         # To update file size
         command = "dada_install_header -p FILE_SIZE={} {}".format(self._input_file_size,
                                                                   self._input_dada_fname)
-        execution_instance = ExecuteCommand(command)
+        execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
 
         # Create baseband ring buffer
         process_index = 0
         execution_instances = []
         for command in self._input_create_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command, process_index))
+            execution_instances.append(ExecuteCommand(command, self._execution,  process_index))
             process_index += 1
         for execution_instance in execution_instances:
             execution_instance.finish()
@@ -1238,15 +1272,16 @@ class Spectrometer(Pipeline):
             process_index = 0
             execution_instances = []
             for command in self._spectrometer_create_rbuf_commands:
-                execution_instances.append(ExecuteCommand(command, process_index))
+                execution_instances.append(ExecuteCommand(command, self._execution,  process_index))
                 process_index += 1
             for execution_instance in execution_instances:         # Wait until the buffer creation is done
                 execution_instance.finish()
         
         # Execute the diskdb
         process_index = 0
+        self._input_execution_instances = []
         for command in self._input_commands:
-            execution_instance = ExecuteCommand(command, process_index)
+            execution_instance = ExecuteCommand(command, self._execution,  process_index)
             #self._execution_instances.append(execution_instance)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._input_execution_instances.append(execution_instance)
@@ -1254,8 +1289,9 @@ class Spectrometer(Pipeline):
             
         # Run baseband2spectral
         process_index = 0
+        self._spectrometer_execution_instances = []
         for command in self._spectrometer_commands:
-            execution_instance = ExecuteCommand(command, process_index)
+            execution_instance = ExecuteCommand(command, self._execution,  process_index)
             execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
             #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
@@ -1264,8 +1300,9 @@ class Spectrometer(Pipeline):
                 
         if self._spectrometer_dbdisk:
             process_index = 0
+            self._spectrometer_dbdisk_execution_instances = []
             for command in self._spectrometer_dbdisk_commands:
-                execution_instance = ExecuteCommand(command, process_index)
+                execution_instance = ExecuteCommand(command, self._execution,  process_index)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
                 execution_instance.returncode_callbacks.add(
                     self._handle_execution_returncode)
@@ -1288,7 +1325,7 @@ class Spectrometer(Pipeline):
             process_index = 0
             execution_instances = []
             for command in self._spectrometer_delete_rbuf_commands:
-                execution_instances.append(ExecuteCommand(command, process_index))
+                execution_instances.append(ExecuteCommand(command, self._execution, process_index))
                 process_index += 1
             for execution_instance in execution_instances:
                 execution_instance.finish()
@@ -1297,7 +1334,7 @@ class Spectrometer(Pipeline):
         process_index = 0
         execution_instances = []
         for command in self._input_delete_rbuf_commands:
-            execution_instances.append(ExecuteCommand(command, process_index))
+            execution_instances.append(ExecuteCommand(command, self._execution, process_index))
             process_index += 1
         for execution_instance in execution_instances:
             execution_instance.finish()

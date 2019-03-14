@@ -53,7 +53,7 @@ if root:
     comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v {} -v {} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, sshauth_mount, numa, numa, cpuset_cpus, container_name, image)
 else:    
     comline = "docker run --runtime=nvidia --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -it --rm -e DISPLAY --net=host -v {} -v {} -v {} -v {} -u {}:{} -e NVIDIA_VISIBLE_DEVICES={} -e NVIDIA_DRIVER_CAPABILITIES=all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --cpuset-mems={} --cpuset-cpus={} --name {} {}".format(data_mount, xauth_mount, dev_mount, sshauth_mount, uid, gid, numa, numa, cpuset_cpus, container_name, image)
-    
+        
 print comline
 print "\nYou are going to a docker container with the name {}{}!\n".format(image, numa)
 
