@@ -106,7 +106,7 @@ typedef struct conf_t
   float *dbuf_out_spectral;
   int nblk_accumulate;
 
-  int nchunk_network, nchan_per_chunk_network;
+  int nchunk_network_spectral, nchan_per_chunk_network_spectral;
   
   dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
   dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;

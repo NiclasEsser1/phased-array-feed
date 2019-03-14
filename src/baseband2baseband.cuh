@@ -44,32 +44,32 @@ typedef struct conf_t
   dada_hdu_t *hdu_out, *hdu_in;
   char *cbuf_in, *cbuf_out;
   int64_t *dbuf_in;
-  int8_t *dbuf_out1;
-  float *dbuf_out2;
+  int8_t *dbuf_out;
+  float *dbuf_out_monitor;
   int beam_index;
   int pol_type;
   double center_freq;
 
   cufftComplex *buf_rt1, *buf_rt2;
   uint64_t ndf_per_chunk_rbufin;
-  uint64_t bufin_size, bufout1_size;
-  uint64_t sbufin_size, sbufout1_size;
+  uint64_t bufin_size, bufout_size;
+  uint64_t sbufin_size, sbufout_size;
   uint64_t bufrt1_size, bufrt2_size;
   uint64_t sbufrt1_size, sbufrt2_size;
   uint64_t hbufin_offset, dbufin_offset;
   uint64_t bufrt1_offset, bufrt2_offset;
-  uint64_t dbufout1_offset, hbufout1_offset; 
-  uint64_t nsamp1, npol1, ndata1;
-  uint64_t nsamp2, npol2, ndata2;
-  uint64_t nsamp3, npol3, ndata3;
-  uint64_t sbufout2_size, bufout2_size, dbufout2_offset;  
-  uint64_t rbufin_size, rbufout1_size;
+  uint64_t dbufout_offset, hbufout_offset; 
+  uint64_t nsamp_in, npol_in, ndata_in;
+  uint64_t nsamp_keep, npol_keep, ndata_keep;
+  uint64_t nsamp_out, npol_out, ndata_out;
+  uint64_t sbufout_size_monitor, bufout_size_monitor, dbufout_offset_monitor;  
+  uint64_t rbufin_size, rbufout_size;
   
   ipcbuf_t *db_in, *db_out;
 
   cufftComplex *offset_scale_d, *offset_scale_h;
   cudaStream_t *streams;
-  cufftHandle *fft_plans1, *fft_plans2;
+  cufftHandle *fft_plans_forward, *fft_plans_backward;
   
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;

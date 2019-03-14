@@ -85,22 +85,22 @@ int initialize_baseband2baseband(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "ndim_scale %f", conf->ndim_scale);
   log_add(conf->log_file, "INFO", 1, log_mutex, "The data size rate is %f", conf->scale_dtsz);
   
-  conf->nsamp1  = conf->ndf_per_chunk_stream * conf->nchan * NSAMP_DF;  // For each stream
-  conf->npol1   = conf->nsamp1 * NPOL_BASEBAND;
-  conf->ndata1  = conf->npol1  * NDIM_BASEBAND;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "nsamp1 %"PRIu64", npol1 %"PRIu64", ndata1 %"PRIu64"", conf->nsamp1, conf->npol1, conf->ndata1);
+  conf->nsamp_in  = conf->ndf_per_chunk_stream * conf->nchan * NSAMP_DF;  // For each stream
+  conf->npol_in   = conf->nsamp_in * NPOL_BASEBAND;
+  conf->ndata_in  = conf->npol_in  * NDIM_BASEBAND;
+  log_add(conf->log_file, "INFO", 1, log_mutex, "nsamp_in %"PRIu64", npol_in %"PRIu64", ndata_in %"PRIu64"", conf->nsamp_in, conf->npol_in, conf->ndata_in);
   
-  conf->nsamp2  = conf->nsamp1 / OVER_SAMP_RATE;
-  conf->npol2   = conf->nsamp2 * NPOL_BASEBAND;
-  conf->ndata2  = conf->npol2  * NDIM_BASEBAND;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "nsamp2 %"PRIu64", npol2 %"PRIu64", ndata2 %"PRIu64"", conf->nsamp2, conf->npol2, conf->ndata2);
+  conf->nsamp_keep  = conf->nsamp_in / OVER_SAMP_RATE;
+  conf->npol_keep   = conf->nsamp_keep * NPOL_BASEBAND;
+  conf->ndata_keep  = conf->npol_keep  * NDIM_BASEBAND;
+  log_add(conf->log_file, "INFO", 1, log_mutex, "nsamp_keep %"PRIu64", npol_keep %"PRIu64", ndata_keep %"PRIu64"", conf->nsamp_keep, conf->npol_keep, conf->ndata_keep);
   
-  conf->nsamp3      = conf->nchan;
-  conf->ndata3      = conf->nsamp3  * NDATA_PER_SAMP_RT;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "nsamp3 %"PRIu64", ndata3 %"PRIu64"", conf->nsamp3, conf->ndata3);
+  conf->nsamp_out      = conf->nchan;
+  conf->ndata_out      = conf->nsamp_out  * NDATA_PER_SAMP_RT;
+  log_add(conf->log_file, "INFO", 1, log_mutex, "nsamp_out %"PRIu64", ndata_out %"PRIu64"", conf->nsamp_out, conf->ndata_out);
   
   nx1        = conf->cufft_nx;
-  batch1     = conf->npol1 / conf->cufft_nx;
+  batch1     = conf->npol_in / conf->cufft_nx;
   log_add(conf->log_file, "INFO", 1, log_mutex, "nx1 %d, batch1 %d", nx1, batch1);
   
   iembed1    = nx1;
@@ -112,7 +112,7 @@ int initialize_baseband2baseband(conf_t *conf)
   odist1     = nx1;
   
   nx2        = conf->nchan_keep_chan;
-  batch2     = conf->npol2 / conf->nchan_keep_chan;
+  batch2     = conf->npol_keep / conf->nchan_keep_chan;
   log_add(conf->log_file, "INFO", 1, log_mutex, "nx2 %d, batch2 %d", nx2, batch2);
   
   iembed2    = nx2;
@@ -124,41 +124,41 @@ int initialize_baseband2baseband(conf_t *conf)
   odist2     = nx2;
 
   conf->streams = NULL;
-  conf->fft_plans1 = NULL;
-  conf->fft_plans2 = NULL;
+  conf->fft_plans_forward = NULL;
+  conf->fft_plans_backward = NULL;
   conf->streams = (cudaStream_t *)malloc(conf->nstream * sizeof(cudaStream_t));
-  conf->fft_plans1 = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
-  conf->fft_plans2 = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
+  conf->fft_plans_forward = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
+  conf->fft_plans_backward = (cufftHandle *)malloc(conf->nstream * sizeof(cufftHandle));
   for(i = 0; i < conf->nstream; i ++)
     {
       CudaSafeCall(cudaStreamCreate(&conf->streams[i]));
-      CufftSafeCall(cufftPlanMany(&conf->fft_plans1[i], CUFFT_RANK, &nx1, &iembed1, istride1, idist1, &oembed1, ostride1, odist1, CUFFT_C2C, batch1));
-      CufftSafeCall(cufftPlanMany(&conf->fft_plans2[i], CUFFT_RANK, &nx2, &iembed2, istride2, idist2, &oembed2, ostride2, odist2, CUFFT_C2C, batch2));
+      CufftSafeCall(cufftPlanMany(&conf->fft_plans_forward[i], CUFFT_RANK, &nx1, &iembed1, istride1, idist1, &oembed1, ostride1, odist1, CUFFT_C2C, batch1));
+      CufftSafeCall(cufftPlanMany(&conf->fft_plans_backward[i], CUFFT_RANK, &nx2, &iembed2, istride2, idist2, &oembed2, ostride2, odist2, CUFFT_C2C, batch2));
       
-      CufftSafeCall(cufftSetStream(conf->fft_plans1[i], conf->streams[i]));
-      CufftSafeCall(cufftSetStream(conf->fft_plans2[i], conf->streams[i]));
+      CufftSafeCall(cufftSetStream(conf->fft_plans_forward[i], conf->streams[i]));
+      CufftSafeCall(cufftSetStream(conf->fft_plans_backward[i], conf->streams[i]));
     }
   
-  conf->sbufin_size    = conf->ndata1 * NBYTE_BASEBAND;
-  conf->sbufout1_size   = conf->ndata2 * NBYTE_FOLD;
-  conf->sbufout2_size   = conf->ndata3 * NBYTE_FLOAT;
+  conf->sbufin_size    = conf->ndata_in * NBYTE_BASEBAND;
+  conf->sbufout_size   = conf->ndata_keep * NBYTE_FOLD;
+  conf->sbufout_size_monitor   = conf->ndata_out * NBYTE_FLOAT;
   log_add(conf->log_file, "INFO", 1, log_mutex,
-	  "sbufin_size %"PRIu64", sbufout1_size %"PRIu64" and sbufout2_size %"PRIu64"",
+	  "sbufin_size %"PRIu64", sbufout_size %"PRIu64" and sbufout_size_monitor %"PRIu64"",
 	  conf->sbufin_size,
-	  conf->sbufout1_size,
-	  conf->sbufout2_size);
+	  conf->sbufout_size,
+	  conf->sbufout_size_monitor);
   
   conf->bufin_size     = conf->nstream * conf->sbufin_size;
-  conf->bufout1_size    = conf->nstream * conf->sbufout1_size;
-  conf->bufout2_size    = conf->nstream * conf->sbufout2_size;
+  conf->bufout_size    = conf->nstream * conf->sbufout_size;
+  conf->bufout_size_monitor    = conf->nstream * conf->sbufout_size_monitor;
   log_add(conf->log_file, "INFO", 1, log_mutex,
-	  "bufin_size %"PRIu64", bufout1_size %"PRIu64" and bufout2_size %"PRIu64"",
+	  "bufin_size %"PRIu64", bufout_size %"PRIu64" and bufout_size_monitor %"PRIu64"",
 	  conf->bufin_size,
-	  conf->bufout1_size,
-	  conf->bufout2_size);
+	  conf->bufout_size,
+	  conf->bufout_size_monitor);
 
-  conf->sbufrt1_size = conf->npol1 * NBYTE_CUFFT_COMPLEX;
-  conf->sbufrt2_size = conf->npol2 * NBYTE_CUFFT_COMPLEX;
+  conf->sbufrt1_size = conf->npol_in * NBYTE_CUFFT_COMPLEX;
+  conf->sbufrt2_size = conf->npol_keep * NBYTE_CUFFT_COMPLEX;
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
   log_add(conf->log_file, "INFO", 1, log_mutex,
@@ -179,31 +179,31 @@ int initialize_baseband2baseband(conf_t *conf)
 	  conf->bufrt1_offset,
 	  conf->bufrt2_offset);
   
-  conf->dbufout1_offset   = conf->sbufout1_size / NBYTE_FOLD;
-  conf->hbufout1_offset   = conf->sbufout1_size;
-  conf->dbufout2_offset   = conf->sbufout2_size / NBYTE_FLOAT;
+  conf->dbufout_offset   = conf->sbufout_size / NBYTE_FOLD;
+  conf->hbufout_offset   = conf->sbufout_size;
+  conf->dbufout_offset_monitor   = conf->sbufout_size_monitor / NBYTE_FLOAT;
   log_add(conf->log_file, "INFO", 1, log_mutex,
-	  "dbufout1_offset %"PRIu64", hbufout1_offset %"PRIu64" and dbufout2_offset %"PRIu64"",
-	  conf->dbufout1_offset,
-	  conf->hbufout1_offset,
-	  conf->dbufout2_offset);
+	  "dbufout_offset %"PRIu64", hbufout_offset %"PRIu64" and dbufout_offset_monitor %"PRIu64"",
+	  conf->dbufout_offset,
+	  conf->hbufout_offset,
+	  conf->dbufout_offset_monitor);
 
   conf->dbuf_in = NULL;
-  conf->dbuf_out1 = NULL;
-  conf->dbuf_out2 = NULL;
+  conf->dbuf_out = NULL;
+  conf->dbuf_out_monitor = NULL;
   conf->buf_rt1 = NULL;
   conf->buf_rt2 = NULL;
   conf->offset_scale_d = NULL;
   conf->offset_scale_h = NULL;
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));  
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out1, conf->bufout1_size));
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out2, conf->bufout2_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size));
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_monitor, conf->bufout_size_monitor));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
   CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, sizeof(conf->offset_scale_d)));// We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dbuf_out2, 0, sizeof(conf->dbuf_out2)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->dbuf_out_monitor, 0, sizeof(conf->dbuf_out_monitor)));// We have to clear the memory for this parameter
   
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->ndf_per_chunk_stream;
@@ -360,12 +360,12 @@ int initialize_baseband2baseband(conf_t *conf)
       exit(EXIT_FAILURE);    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
-  conf->rbufout1_size = ipcbuf_get_bufsz(conf->db_out);
-  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout1_size, conf->bufout1_size);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "Output buffer block size is %"PRIu64".", conf->rbufout1_size);
+  conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
+  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout_size, conf->bufout_size);
+  log_add(conf->log_file, "INFO", 1, log_mutex, "Output buffer block size is %"PRIu64".", conf->rbufout_size);
   
-  //if(conf->rbufout1_size % conf->bufout1_size != 0)
-  if(conf->rbufout1_size != (conf->bufout1_size * conf->nrepeat_per_blk))  
+  //if(conf->rbufout_size % conf->bufout_size != 0)
+  if(conf->rbufout_size != (conf->bufout_size * conf->nrepeat_per_blk))  
     {
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -425,7 +425,7 @@ int baseband2baseband(conf_t conf)
     5. Transpose the data to get TFP data and scale it;    
   */
   uint64_t i, j, k;
-  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout1_offset, dbufout1_offset, dbufout2_offset;
+  uint64_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset, dbufout_offset_monitor;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
   dim3 gridsize_transpose_scale, blocksize_transpose_scale;
@@ -509,30 +509,30 @@ int baseband2baseband(conf_t conf)
 	      bufrt1_offset = j * conf.bufrt1_offset;
 	      bufrt2_offset = j * conf.bufrt2_offset;
 
-	      dbufout1_offset = j * conf.dbufout1_offset;
-	      dbufout2_offset = j * conf.dbufout2_offset;
-	      hbufout1_offset = (i * conf.nstream + j) * conf.hbufout1_offset;// + i * conf.bufout1_size;
+	      dbufout_offset = j * conf.dbufout_offset;
+	      dbufout_offset_monitor = j * conf.dbufout_offset_monitor;
+	      hbufout_offset = (i * conf.nstream + j) * conf.hbufout_offset;// + i * conf.bufout_size;
 	      
 	      CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.cbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
 
 	      /* Unpack raw data into cufftComplex array */
-	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
+	      unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp_in);
 	      CudaSafeKernelLaunch();
 	      
 	      /* Do forward FFT */
-	      CufftSafeCall(cufftExecC2C(conf.fft_plans1[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
+	      CufftSafeCall(cufftExecC2C(conf.fft_plans_forward[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 
 	      /* Prepare for inverse FFT */
-	      swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan);
+	      swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp_in, conf.nsamp_keep, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan);
 	      CudaSafeKernelLaunch();
 	      
 	      /* Do inverse FFT */
-	      CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
+	      CufftSafeCall(cufftExecC2C(conf.fft_plans_backward[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 	      
 	      if(conf.fits_flag == 1)
 		{
 		  /* Tranpose from PTFT to PFT order */
-		  transpose_complex_kernel<<<gridsize_transpose_complex, blocksize_transpose_complex, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
+		  transpose_complex_kernel<<<gridsize_transpose_complex, blocksize_transpose_complex, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp_keep, &conf.buf_rt1[bufrt1_offset]);
 		  CudaSafeKernelLaunch();
 		  
 		  switch(blocksize_spectral_taccumulate.x)
@@ -545,9 +545,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -559,9 +559,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -573,9 +573,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -587,9 +587,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -601,9 +601,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -615,9 +615,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -629,9 +629,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -643,9 +643,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -657,9 +657,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -671,9 +671,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		      
@@ -685,9 +685,9 @@ int baseband2baseband(conf_t conf)
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
 			(&conf.buf_rt1[bufrt1_offset],
-			 &conf.dbuf_out2[dbufout2_offset],
-			 conf.nsamp2,
-			 conf.nsamp3,
+			 &conf.dbuf_out_monitor[dbufout_offset_monitor],
+			 conf.nsamp_keep,
+			 conf.nsamp_out,
 			 conf.naccumulate_spectral);
 		      break;
 		    }
@@ -712,7 +712,7 @@ int baseband2baseband(conf_t conf)
 		      conf.fits[eth_index].nchunk = 1;
 		      conf.fits[eth_index].chunk_index = 0;
 
-		      //fprintf(stdout, "DBUFOUT2_OFFSET:\t%"PRIu64"\t%d\n", dbufout2_offset, eth_index);
+		      //fprintf(stdout, "DBUFOUT_OFFSET_MONITOR:\t%"PRIu64"\t%d\n", dbufout_offset_monitor, eth_index);
 		      //fflush(stdout);
 
 		      if(k < conf.pol_type)
@@ -720,7 +720,7 @@ int baseband2baseband(conf_t conf)
 			  if(conf.pol_type == 2)
 			    {
 			      CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
-							   &conf.dbuf_out2[dbufout2_offset +
+							   &conf.dbuf_out_monitor[dbufout_offset_monitor +
 									   conf.nchan  *
 									   (NDATA_PER_SAMP_FULL + k)],
 							   conf.dtsz_network,
@@ -729,8 +729,8 @@ int baseband2baseband(conf_t conf)
 			    }
 			  else
 			    CudaSafeCall(cudaMemcpyAsync(conf.fits[eth_index].data,
-							 &conf.dbuf_out2[dbufout2_offset +
-									 k * conf.nchan],
+							 &conf.dbuf_out_monitor[dbufout_offset_monitor +
+										k * conf.nchan],
 							 conf.dtsz_network,
 							 cudaMemcpyDeviceToHost,
 							 conf.streams[j]));
@@ -740,11 +740,11 @@ int baseband2baseband(conf_t conf)
 		}
 	      
 	      /* Get baseband output */
-	      transpose_scale_kernel<<<gridsize_transpose_scale, blocksize_transpose_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out1[dbufout1_offset], conf.nchan_keep_chan, conf.nchan, conf.nsamp2, conf.offset_scale_d);
+	      transpose_scale_kernel<<<gridsize_transpose_scale, blocksize_transpose_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nchan_keep_chan, conf.nchan, conf.nsamp_keep, conf.offset_scale_d);
 	      CudaSafeKernelLaunch();
 	      
 	      /* Copy the final output to host */
-	      CudaSafeCall(cudaMemcpyAsync(&conf.cbuf_out[hbufout1_offset], &conf.dbuf_out1[dbufout1_offset], conf.sbufout1_size, cudaMemcpyDeviceToHost, conf.streams[j]));
+	      CudaSafeCall(cudaMemcpyAsync(&conf.cbuf_out[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
 	    }
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
@@ -769,9 +769,9 @@ int baseband2baseband(conf_t conf)
       
       /* Close current buffer */
       //ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
-      //ipcbuf_mark_filled(conf.db_out, conf.bufout1_size * conf.nrepeat_per_blk);
-      ipcbuf_mark_filled(conf.db_out, conf.rbufout1_size);
-      fprintf(stdout, "%"PRIu64"\n", conf.rbufout1_size);
+      //ipcbuf_mark_filled(conf.db_out, conf.bufout_size * conf.nrepeat_per_blk);
+      ipcbuf_mark_filled(conf.db_out, conf.rbufout_size);
+      fprintf(stdout, "%"PRIu64"\n", conf.rbufout_size);
       fflush(stdout);
       ipcbuf_mark_cleared(conf.db_in);
 
@@ -791,10 +791,10 @@ int destroy_baseband2baseband(conf_t conf)
     {
       if(conf.streams[i])
 	CudaSafeCall(cudaStreamDestroy(conf.streams[i]));
-      if(conf.fft_plans1[i])
-	CufftSafeCall(cufftDestroy(conf.fft_plans1[i]));
-      if(conf.fft_plans2[i])
-	CufftSafeCall(cufftDestroy(conf.fft_plans2[i]));
+      if(conf.fft_plans_forward[i])
+	CufftSafeCall(cufftDestroy(conf.fft_plans_forward[i]));
+      if(conf.fft_plans_backward[i])
+	CufftSafeCall(cufftDestroy(conf.fft_plans_backward[i]));
     }
 
   if(conf.dbuf_in)
@@ -804,10 +804,10 @@ int destroy_baseband2baseband(conf_t conf)
   if(conf.buf_rt2)
     cudaFree(conf.buf_rt2);
 
-  if(conf.dbuf_out1)
-    cudaFree(conf.dbuf_out1);
-  if(conf.dbuf_out2)
-    cudaFree(conf.dbuf_out2);
+  if(conf.dbuf_out)
+    cudaFree(conf.dbuf_out);
+  if(conf.dbuf_out_monitor)
+    cudaFree(conf.dbuf_out_monitor);
   if(conf.offset_scale_h)
     cudaFreeHost(conf.offset_scale_h);
   if(conf.offset_scale_d)
@@ -829,10 +829,10 @@ int destroy_baseband2baseband(conf_t conf)
   
   if(conf.streams)
     free(conf.streams);
-  if(conf.fft_plans1)
-    free(conf.fft_plans1);
-  if(conf.fft_plans2)
-    free(conf.fft_plans2);
+  if(conf.fft_plans_forward)
+    free(conf.fft_plans_forward);
+  if(conf.fft_plans_backward)
+    free(conf.fft_plans_backward);
   
   return EXIT_SUCCESS;
 }
@@ -891,21 +891,21 @@ int offset_scale(conf_t conf)
 	  CudaSafeCall(cudaMemcpyAsync(&conf.dbuf_in[dbufin_offset], &conf.cbuf_in[hbufin_offset], conf.sbufin_size, cudaMemcpyHostToDevice, conf.streams[j]));
 
 	  /* Unpack raw data into cufftComplex array */
-	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp1);
+	  unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp_in);
 	  CudaSafeKernelLaunch();
 	  
 	  /* Do forward FFT */
-	  CufftSafeCall(cufftExecC2C(conf.fft_plans1[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
+	  CufftSafeCall(cufftExecC2C(conf.fft_plans_forward[j], &conf.buf_rt1[bufrt1_offset], &conf.buf_rt1[bufrt1_offset], CUFFT_FORWARD));
 
 	  /* Prepare for inverse FFT */
-	  swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan);
+	  swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp_in, conf.nsamp_keep, conf.cufft_nx, conf.cufft_mod, conf.nchan_keep_chan);
 	  CudaSafeKernelLaunch();
 	  
 	  /* Do inverse FFT */
-	  CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
+	  CufftSafeCall(cufftExecC2C(conf.fft_plans_backward[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 	  
 	  /* Transpose the data from PTFT to FTP for later calculation */
-	  transpose_pad_kernel<<<gridsize_transpose_pad, blocksize_transpose_pad, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
+	  transpose_pad_kernel<<<gridsize_transpose_pad, blocksize_transpose_pad, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp_keep, &conf.buf_rt1[bufrt1_offset]);
 	  CudaSafeKernelLaunch();
 	  
 	  switch (blocksize_taccumulate.x)

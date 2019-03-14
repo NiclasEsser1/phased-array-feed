@@ -196,15 +196,19 @@ int initialize_baseband2filterbank(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_filterbank, conf->bufout_size_filterbank));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size));
-
+  log_add(conf->log_file, "INFO", 1, log_mutex, "bufin_size is %"PRIu64", bufout_size_filterbank is %"PRIu64", bufrt1_size is %"PRIu64" and bufrt2_size is %"PRIu64"",
+	  conf->bufin_size, conf->bufrt1_size, conf->bufrt2_size, conf->bufout_size_filterbank);
+  
   if(conf->monitor == 1)
     {      
       conf->dbuf_out_monitor1 = NULL;
       conf->dbuf_out_monitor2 = NULL;
       conf->dbuf_out_monitor3 = NULL;
       CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_monitor1, conf->bufout_size_monitor));
+      log_add(conf->log_file, "INFO", 1, log_mutex, "bufout_size_monitor is %"PRIu64"", conf->bufout_size_monitor);      
       CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_monitor2, conf->bufout_size_monitor));
       CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_monitor3, conf->nchan_out * NDATA_PER_SAMP_RT * conf->nstream * NBYTE_FLOAT));
+      log_add(conf->log_file, "INFO", 1, log_mutex, "bufout_size_monitor is %"PRIu64"", conf->nchan_out * NDATA_PER_SAMP_RT * conf->nstream * NBYTE_FLOAT);      
     }
   CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * NBYTE_CUFFT_COMPLEX));
@@ -453,7 +457,7 @@ int initialize_baseband2filterbank(conf_t *conf)
       conf->ndata_out_spectral = conf->nsamp_out_spectral  * NDATA_PER_SAMP_RT;
             
       nx        = conf->cufft_nx_spectral;
-      batch     = conf->npol_in / conf->cufft_nx_spectral;
+      batch     = conf->npol_in_spectral / conf->cufft_nx_spectral;
       
       iembed    = nx;
       istride   = 1;
@@ -496,7 +500,8 @@ int initialize_baseband2filterbank(conf_t *conf)
       CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_spectral, conf->bufout_size_spectral));
       CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1_spectral, conf->bufrt1_size_spectral));
       CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2_spectral, conf->bufrt2_size_spectral));
-
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral out size is %"PRIu64", spectral rt1 size is %"PRIu64" and spectral rt2 size is %"PRIu64"", conf->bufout_size_spectral, conf->bufrt1_size_spectral, conf->bufrt2_size_spectral);
+      
       /* Prepare the setup of kernels */
       conf->gridsize_swap_select_transpose_pft1.x = ceil(conf->cufft_nx_spectral / (double)TILE_DIM);  
       conf->gridsize_swap_select_transpose_pft1.y = ceil(conf->ndf_per_chunk_stream * NSAMP_DF / (double) (conf->cufft_nx_spectral * TILE_DIM));
@@ -621,12 +626,12 @@ int initialize_baseband2filterbank(conf_t *conf)
 	}
       if(conf->spectral2network == 1)
 	{	  
-	  conf->nchunk_network = conf->nchan_in_spectral; // We send spectral of one input channel per udp packet;
-	  conf->nchan_per_chunk_network = conf->nchan_keep_chan_spectral;
-	  conf->dtsz_network_spectral = NBYTE_FLOAT * conf->nchan_per_chunk_network;
+	  conf->nchunk_network_spectral = conf->nchan_in_spectral; // We send spectral of one input channel per udp packet;
+	  conf->nchan_per_chunk_network_spectral = conf->nchan_keep_chan_spectral;
+	  conf->dtsz_network_spectral = NBYTE_FLOAT * conf->nchan_per_chunk_network_spectral;
 	  conf->pktsz_network_spectral     = conf->dtsz_network_spectral + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
-	  log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network);
-	  log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
+	  log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network_spectral);
+	  log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network_spectral);
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network_spectral);
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network_spectral);
 	}
@@ -1030,6 +1035,7 @@ int baseband2filterbank(conf_t conf)
 			 conf.naccumulate_spectral);
 		      break;
 		    }
+		  CudaSafeKernelLaunch();
 		}
 	      else
 		unpack_kernel<<<gridsize_unpack, blocksize_unpack, 0, conf.streams[j]>>>(&conf.dbuf_in[dbufin_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp_in);
@@ -1541,10 +1547,10 @@ int baseband2filterbank(conf_t conf)
 	      for(i = 0; i < NDATA_PER_SAMP_FULL; i++)
 		{
 		  conf.fits_spectral.pol_index = i;
-		  for(j = 0; j < conf.nchunk_network; j++)
+		  for(j = 0; j < conf.nchunk_network_spectral; j++)
 		    {
 		      memcpy_offset = i * conf.nchan_out_spectral +
-			j * conf.nchan_per_chunk_network;
+			j * conf.nchan_per_chunk_network_spectral;
 		      conf.fits_spectral.chunk_index = j;
 		      if(i < conf.ptype_spectral)
 			{
@@ -1795,11 +1801,14 @@ int destroy_baseband2filterbank(conf_t conf)
       if(conf.fft_plans_spectral)
 	free(conf.fft_plans_spectral);
     }
-  if(conf.fits_monitor)
+  if(conf.monitor)
     {
-      for(i = 0; i < conf.neth_per_blk; i++)
-	cudaHostUnregister ((void *) conf.fits_monitor[i].data);
-      free(conf.fits_monitor);
+      if(conf.fits_monitor)
+	{
+	  for(i = 0; i < conf.neth_per_blk; i++)
+	    cudaHostUnregister ((void *) conf.fits_monitor[i].data);
+	  free(conf.fits_monitor);
+	}
       if(conf.dbuf_out_monitor1)
 	cudaFree(conf.dbuf_out_monitor1);
       if(conf.dbuf_out_monitor2)

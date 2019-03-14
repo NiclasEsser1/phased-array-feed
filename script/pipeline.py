@@ -76,7 +76,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "search_nbyte":        1,
                    "search_npol":         1,
                    "search_ndim":         1,
-                   "search_heimdall":     1,
+                   "search_heimdall":     0,
                    "search_dbdisk":       0,
                    "search_monitor":      1,
                    "search_spectrometer": 1,
@@ -94,14 +94,14 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "spectrometer_ptype":          1,
                    "spectrometer_ip":    	  '134.104.70.90',
                    "spectrometer_port":    	  17108,
-                   "spectrometer_dbdisk":         0,
+                   "spectrometer_dbdisk":         1,
                    "spectrometer_monitor":        1,
                    "spectrometer_accumulate_nblk": 1,
                    "spectrometer_software_name":  "baseband2spectral_main",
                    
                    # Spectral parameters for the simultaneous spectral output from fold and search mode
                    # The rest configuration of this output is the same as the normal spectrometer mode
-                   "simultaneous_spectrometer_start_chunk":    35,
+                   "simultaneous_spectrometer_start_chunk":    30,
                    "simultaneous_spectrometer_nchunk":         2,
                    
                    "fold_keys":           ["ddda", "dddc"], # To put processed baseband data 
@@ -439,7 +439,7 @@ class Pipeline(object):
             log.error(stderr)
             #raise PipelineError(stderr)
 
-    def cleanup(self, cleanup_commands):
+    def _cleanup(self, cleanup_commands):
         # Kill existing process and free shared memory if there is any
         execution_instances = []
         for command in cleanup_commands:
@@ -897,24 +897,25 @@ class Search(Pipeline):
                                                                          self._input_nchunk, self._search_cufft_nx,
                                                                          self._search_nchan)
 
-            if self._search_spectrometer and not self._spectrometer_dbdisk:
-                command += "-m n_{}_{}_{}_{}_{}_{}_{} ".format(self._spectrometer_ip,
-                                                               self._spectrometer_port,
-                                                               self._spectrometer_ptype,
-                                                               self._simultaneous_spectrometer_start_chunk,
-                                                               self._simultaneous_spectrometer_nchunk,
-                                                               self._spectrometer_accumulate_nblk,
-                                                               self._spectrometer_cufft_nx)
-                
-            if self._search_spectrometer and self._spectrometer_dbdisk:
-                command += "-m k_{}_{}_{}_{}_{}_{}_{} ".format(self._spectrometer_keys[i],
-                                                               self._spectrometer_sod,
-                                                               self._spectrometer_ptype,
-                                                               self._simultaneous_spectrometer_start_chunk,
-                                                               self._simultaneous_spectrometer_nchunk,
-                                                               self._spectrometer_accumulate_nblk,
-                                                               self._spectrometer_cufft_nx)
-                    
+            if self._search_spectrometer:                
+                if self._spectrometer_dbdisk:
+                    command += "-m k_{}_{}_{}_{}_{}_{}_{} ".format(self._spectrometer_keys[i],
+                                                                   self._spectrometer_sod,
+                                                                   self._spectrometer_ptype,
+                                                                   self._simultaneous_spectrometer_start_chunk,
+                                                                   self._simultaneous_spectrometer_nchunk,
+                                                                   self._spectrometer_accumulate_nblk,
+                                                                   self._spectrometer_cufft_nx)
+                else:
+                    command += "-m n_{}_{}_{}_{}_{}_{}_{} ".format(self._spectrometer_ip,
+                                                                   self._spectrometer_port,
+                                                                   self._spectrometer_ptype,
+                                                                   self._simultaneous_spectrometer_start_chunk,
+                                                                   self._simultaneous_spectrometer_nchunk,
+                                                                   self._spectrometer_accumulate_nblk,
+                                                                   self._spectrometer_cufft_nx)
+            else:
+                command += "-m N "                    
             
             if self._search_sod:
                 command += "-g 1 "
