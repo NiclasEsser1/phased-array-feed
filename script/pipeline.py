@@ -53,8 +53,8 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
 
                    # Configuration of input
-                   #"input_source_name":          "J1819-1458",
-                   "input_source_name":          "J0332+5434",
+                   "input_source_name":          "J1819-1458",
+                   #"input_source_name":          "J0332+5434",
                    #"input_source_name":          "J1939+2134",
                    "input_keys":                 ["dada", "dadc"], # To put baseband data from file
                    "input_nblk":                 5,
@@ -101,8 +101,8 @@ PIPELINE_CONFIG = {"execution":                    1,
                    
                    # Spectral parameters for the simultaneous spectral output from fold and search mode
                    # The rest configuration of this output is the same as the normal spectrometer mode
-                   "simultaneous_spectrometer_start_chunk":    30,
-                   "simultaneous_spectrometer_nchunk":         2,
+                   "simultaneous_spectrometer_start_chunk":    33,
+                   "simultaneous_spectrometer_nchunk":         5,
                    
                    "fold_keys":           ["ddda", "dddc"], # To put processed baseband data 
                    "fold_nblk":           2,

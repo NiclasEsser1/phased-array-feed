@@ -613,6 +613,16 @@ int register_dada_header(conf_t conf)
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "UTC_START to DADA header is %s", conf.utc_start);
   
+  if(ascii_header_set(hdrbuf, "OBS_ID", "%s", conf.obs_id) < 0)  
+    {
+      log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting OBS_ID, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: Error setting OBS_ID, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1, log_mutex, "OBS_ID to DADA header is %s", conf.obs_id);
+  
   if(ascii_header_set(hdrbuf, "RA", "%s", conf.ra) < 0)  
     {
       log_add(conf.log_file, "ERR", 1, log_mutex, "Error setting RA, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -975,8 +985,7 @@ void *capture_control(void *conf)
   socklen_t fromlen = sizeof(fromsa);
   conf_t *capture_conf = (conf_t *)conf;
   char capture_control_command[MSTR_LEN], capture_control_keyword[MSTR_LEN];
-  int64_t start_buf;
-  int64_t available_buf;
+  int64_t start_buf, start_buf_mini;
   double seconds_offset; // Offset from the reference time;
   uint64_t picoseconds_offset; // The seconds_offset fraction part in picoseconds
   int msg_len;
@@ -1069,9 +1078,18 @@ void *capture_control(void *conf)
 	  
 	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got START-OF-DATA signal, has to enable sod");
 	  
-	  sscanf(capture_control_command, "%[^_]_%[^_]_%[^_]_%[^_]_%"SCNd64"", capture_control_keyword, capture_conf->source, capture_conf->ra, capture_conf->dec, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
-	  available_buf = ipcbuf_get_write_count(capture_conf->data_block);
-	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "The data is enabled at %"PRIu64" buffer block, the most recent buffer block is %"PRIu64"", start_buf, available_buf);
+	  sscanf(capture_control_command, "%[^_]_%[^_]_%[^_]_%[^_]_%[^_]_%"SCNd64"", capture_control_keyword, capture_conf->source, capture_conf->ra, capture_conf->dec, capture_conf->obs_id, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
+	  start_buf_mini = ipcbuf_get_sod_minbuf (capture_conf->data_block);
+	  if(start_buf < start_buf_mini)
+	    {
+	      log_add(capture_conf->log_file, "ERR", 1, log_mutex, "start_buf [%"PRIu64"] < start_buf_mini [%"PRIu64"], which happens at \"%s\", line [%d]", start_buf, start_buf_mini, __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: start_buf [%"PRIu64"] < start_buf_mini [%"PRIu64"], has to abort, which happens at \"%s\", line [%d].\n", start_buf, start_buf_mini, __FILE__, __LINE__);
+	      
+	      quit = 2;
+	      close(sock);
+	      pthread_exit(NULL);	      
+	    }
+	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "The data is enabled at %"PRIu64" buffer block, the mini start buffer block is %"PRIu64"", start_buf, start_buf_mini);
 	  ipcbuf_enable_sod(capture_conf->data_block, (uint64_t)start_buf, 0);
 	  
 	  /* To get time stamp for current header */
@@ -1195,7 +1213,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "The reference information for the capture is: epoch %d, seconds %"PRId64" and location of packet in the period %"PRId64"", conf.days_from_1970, conf.seconds_from_epoch, conf.df_in_period);
-
+  
   log_add(conf.log_file, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir); // This has already been checked before
 
   if(conf.cpu_bind)  
@@ -1279,7 +1297,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 int default_arguments(conf_t *conf)
 {
   int i;
-  
+
   conf->dfsz_seek      = 0;      // Default to record the packet header
   conf->center_freq    = 0;      // Default with an impossible number
   conf->days_from_1970 = 0;      // Default with an impossible number

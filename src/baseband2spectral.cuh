@@ -68,9 +68,9 @@ typedef struct conf_t
   uint64_t hbufin_offset, dbufin_offset;
   uint64_t bufrt1_offset, bufrt2_offset;
   uint64_t dbufout_offset;
-  uint64_t nsamp1, npol1, ndata1;
-  uint64_t nsamp2, npol2, ndata2;
-  uint64_t nsamp3, ndata3; 
+  uint64_t nsamp_in, npol_in, ndata_in;
+  uint64_t nsamp_keep, npol_keep, ndata_keep;
+  uint64_t nsamp_out, ndata_out; 
   
   uint64_t hdrsz, rbufin_size, rbufout_size; // HDR size for both HDU and ring buffer size of input HDU;
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;

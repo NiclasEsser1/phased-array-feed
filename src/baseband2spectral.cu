@@ -67,19 +67,19 @@ int initialize_baseband2spectral(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrepeat_per_blk);
   
   /* Prepare buffer, stream and fft plan for process */
-  conf->nsamp1      = conf->ndf_per_chunk_stream * conf->nchan_in * NSAMP_DF;
-  conf->npol1       = conf->nsamp1 * NPOL_BASEBAND;
-  conf->ndata1      = conf->npol1  * NDIM_BASEBAND;
+  conf->nsamp_in      = conf->ndf_per_chunk_stream * conf->nchan_in * NSAMP_DF;
+  conf->npol_in       = conf->nsamp_in * NPOL_BASEBAND;
+  conf->ndata_in      = conf->npol_in  * NDIM_BASEBAND;
   
-  conf->nsamp2      = conf->nsamp1 / OVER_SAMP_RATE;
-  conf->npol2       = conf->nsamp2 * NPOL_BASEBAND;
-  conf->ndata2      = conf->npol2  * NDIM_BASEBAND;
+  conf->nsamp_keep      = conf->nsamp_in / OVER_SAMP_RATE;
+  conf->npol_keep       = conf->nsamp_keep * NPOL_BASEBAND;
+  conf->ndata_keep      = conf->npol_keep  * NDIM_BASEBAND;
 
-  conf->nsamp3      = conf->nsamp2 / conf->naccumulate;
-  conf->ndata3      = conf->nsamp3  * NDATA_PER_SAMP_RT;
+  conf->nsamp_out      = conf->nsamp_keep / conf->naccumulate;
+  conf->ndata_out      = conf->nsamp_out  * NDATA_PER_SAMP_RT;
   
   nx        = conf->cufft_nx;
-  batch     = conf->npol1 / conf->cufft_nx;
+  batch     = conf->npol_in / conf->cufft_nx;
   
   iembed    = nx;
   istride   = 1;
@@ -103,14 +103,14 @@ int initialize_baseband2spectral(conf_t *conf)
       CufftSafeCall(cufftSetStream(conf->fft_plans[i], conf->streams[i]));
     }
   
-  conf->sbufin_size  = conf->ndata1 * NBYTE_BASEBAND;
-  conf->sbufout_size = conf->ndata3 * NBYTE_SPECTRAL;
+  conf->sbufin_size  = conf->ndata_in * NBYTE_BASEBAND;
+  conf->sbufout_size = conf->ndata_out * NBYTE_SPECTRAL;
   
   conf->bufin_size   = conf->nstream * conf->sbufin_size;
   conf->bufout_size  = conf->nstream * conf->sbufout_size;
   
-  conf->sbufrt1_size = conf->npol1 * NBYTE_CUFFT_COMPLEX;
-  conf->sbufrt2_size = conf->npol2 * NBYTE_CUFFT_COMPLEX;
+  conf->sbufrt1_size = conf->npol_in * NBYTE_CUFFT_COMPLEX;
+  conf->sbufrt2_size = conf->npol_keep * NBYTE_CUFFT_COMPLEX;
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
@@ -276,11 +276,11 @@ int initialize_baseband2spectral(conf_t *conf)
       fprintf(stdout, "elapse_time for dbregister of output ring buffer is %f\n", elapsed_time);
       fflush(stdout);
       
-      if(conf->rbufout_size != conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL)
+      if(conf->rbufout_size != conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL)
 	{
 	  // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
-	  log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout_size, conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
-	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].\n", conf->rbufout_size, conf->nsamp3 * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
+	  log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout_size, conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].\n", conf->rbufout_size, conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
 	  
 	  destroy_baseband2spectral(*conf);
 	  fclose(conf->log_file);
@@ -458,7 +458,7 @@ int baseband2spectral(conf_t conf)
 		conf.streams[j]>>>
 		(&conf.dbuf_in[dbufin_offset],
 		 &conf.buf_rt1[bufrt1_offset],
-		 conf.nsamp1);
+		 conf.nsamp_in);
 	      CudaSafeKernelLaunch();
 	      
 	      /* Do forward FFT */
@@ -477,8 +477,8 @@ int baseband2spectral(conf_t conf)
 		 &conf.buf_rt2[bufrt2_offset],
 		 conf.cufft_nx,
 		 conf.ndf_per_chunk_stream * NSAMP_DF / conf.cufft_nx,
-		 conf.nsamp1,
-		 conf.nsamp2,
+		 conf.nsamp_in,
+		 conf.nsamp_keep,
 		 conf.cufft_nx,
 		 conf.cufft_mod,
 		 conf.nchan_keep_chan);
@@ -497,8 +497,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -512,8 +512,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -527,8 +527,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -542,8 +542,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -557,8 +557,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -572,8 +572,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -587,8 +587,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -602,8 +602,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -617,8 +617,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -632,8 +632,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		  
@@ -647,8 +647,8 @@ int baseband2spectral(conf_t conf)
 		    //(&conf.buf_rt2[conf.bufrt2_offset],
 		    (&conf.buf_rt2[bufrt2_offset],
 		     &conf.dbuf_out[dbufout_offset],
-		     conf.nsamp2,
-		     conf.nsamp3,
+		     conf.nsamp_keep,
+		     conf.nsamp_out,
 		     conf.naccumulate);
 		  break;
 		}
@@ -661,7 +661,7 @@ int baseband2spectral(conf_t conf)
 	<<<conf.gridsize_saccumulate,
 	conf.blocksize_saccumulate>>>
 	(conf.dbuf_out,
-	 conf.ndata3,
+	 conf.ndata_out,
 	 conf.nstream);  
       CudaSafeKernelLaunch();
       
@@ -675,13 +675,13 @@ int baseband2spectral(conf_t conf)
 	    {
 	      if(conf.pol_type == 2)
 		CudaSafeCall(cudaMemcpy(conf.cbuf_out,
-					&conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL],
-					2 * conf.nsamp3 * NBYTE_SPECTRAL,
+					&conf.dbuf_out[conf.nsamp_out  * NDATA_PER_SAMP_FULL],
+					2 * conf.nsamp_out * NBYTE_SPECTRAL,
 					cudaMemcpyDeviceToHost));
 	      else
 		CudaSafeCall(cudaMemcpy(conf.cbuf_out,
 					conf.dbuf_out,
-					conf.nsamp3  * conf.pol_type * NBYTE_SPECTRAL,
+					conf.nsamp_out  * conf.pol_type * NBYTE_SPECTRAL,
 					cudaMemcpyDeviceToHost));
 	    }
 	  if(conf.output_network == 1)
@@ -708,7 +708,7 @@ int baseband2spectral(conf_t conf)
 			{
 			  if(conf.pol_type == 2)
 			    CudaSafeCall(cudaMemcpy(fits.data,
-						    &conf.dbuf_out[conf.nsamp3  * NDATA_PER_SAMP_FULL + memcpy_offset],
+						    &conf.dbuf_out[conf.nsamp_out  * NDATA_PER_SAMP_FULL + memcpy_offset],
 						    conf.dtsz_network,
 						    cudaMemcpyDeviceToHost));
 			  else

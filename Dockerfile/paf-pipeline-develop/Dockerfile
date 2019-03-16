@@ -79,6 +79,7 @@ RUN pip install --upgrade pip -U && \
     pip install tornado -U && \
     pip install astropy -U	&& \
     pip install paramiko -U && \
+    pip install sympy -U && \
     pip install cmd2 -U	
 
 # PGPLOT
