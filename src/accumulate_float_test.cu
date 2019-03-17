@@ -119,47 +119,47 @@ int main(int argc, char *argv[])
   switch (blocksize.x)
     {
     case 1024:
-      taccumulate_float_kernel<1024><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<1024><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 512:															              
-      taccumulate_float_kernel< 512><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel< 512><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 256:															              
-      taccumulate_float_kernel< 256><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel< 256><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 128:															              
-      taccumulate_float_kernel< 128><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel< 128><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 64:															              
-      taccumulate_float_kernel<  64><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_in, naccumulate);
+      accumulate_float_kernel<  64><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_in, naccumulate);
       break;															              
       																              
     case 32:															              
-      taccumulate_float_kernel<  32><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<  32><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 16:															              
-      taccumulate_float_kernel<  16><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<  16><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 8:															              
-      taccumulate_float_kernel<   8><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<   8><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 4:															              
-      taccumulate_float_kernel<   4><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<   4><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 2:															              
-      taccumulate_float_kernel<   2><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<   2><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;															              
       																              
     case 1:															              
-      taccumulate_float_kernel<   1><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      accumulate_float_kernel<   1><<<gridsize, blocksize, blocksize.x * NBYTE_FLOAT * NDATA_PER_SAMP_RT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
       break;
     }
   CudaSafeKernelLaunch();

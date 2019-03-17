@@ -16,15 +16,15 @@
 #include "kernel.cuh"
 #include "constants.h"
 
-// ./spectral_taccumulate_test -a 48 -b 1024 -c 1024
-// ./spectral_taccumulate_test -a 33 -b 1024 -c 1024
+// ./spectral_taccumulate_dual_test -a 48 -b 1024 -c 1024
+// ./spectral_taccumulate_dual_test -a 33 -b 1024 -c 1024
 
 extern "C" void usage ()
 {
   fprintf (stdout,
-	   "spectral_taccumulate_test - Test the spectral_taccumulate kernel \n"
+	   "spectral_taccumulate_dual_test - Test the spectral_taccumulate_dual kernel \n"
 	   "\n"
-	   "Usage: spectral_taccumulate_test [options]\n"
+	   "Usage: spectral_taccumulate_dual_test [options]\n"
 	   " -a  Number of input frequency chunks\n"
 	   " -b  Number of packets of each stream per frequency chunk\n"
 	   " -c  Number of FFT points\n"
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
   dim3 grid_size, block_size;
   uint64_t nsamp_in, nsamp_out, npol_in, npol_out, idx_in, idx_out;
   cufftComplex *data = NULL, *g_in = NULL;
-  float *h_result = NULL, *g_result = NULL, *g_out = NULL, aa, bb, u, v;
+  float *h_result1 = NULL, *g_result1 = NULL, *h_result2 = NULL, *g_result2 = NULL, *g_out1 = NULL, *g_out2 = NULL, aa, bb, u, v;
   
   /* Read in parameters */
   while((arg=getopt(argc,argv,"a:b:hc:")) != -1)
@@ -97,12 +97,19 @@ int main(int argc, char *argv[])
   
   /* Create buffer */
   CudaSafeCall(cudaMallocHost((void **)&data,     npol_in * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMallocHost((void **)&h_result, npol_out * sizeof(float)));
-  CudaSafeCall(cudaMallocHost((void **)&g_result, npol_out * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&h_result1, npol_out * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&h_result2, npol_out * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&g_result1, npol_out * sizeof(float)));
+  CudaSafeCall(cudaMallocHost((void **)&g_result2, npol_out * sizeof(float)));
+
   CudaSafeCall(cudaMalloc((void **)&g_in,         npol_in * sizeof(cufftComplex)));
-  CudaSafeCall(cudaMalloc((void **)&g_out,        npol_out * sizeof(float)));
-  CudaSafeCall(cudaMemset((void *)g_out,  0,      sizeof(g_out)));
-  CudaSafeCall(cudaMemset((void *)h_result, 0,    sizeof(h_result)));
+  CudaSafeCall(cudaMalloc((void **)&g_out1,        npol_out * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&g_out2,        npol_out * sizeof(float)));
+  
+  CudaSafeCall(cudaMemset((void *)g_out1,  0,      sizeof(g_out1)));
+  CudaSafeCall(cudaMemset((void *)g_out2,  0,      sizeof(g_out1)));
+  CudaSafeCall(cudaMemset((void *)h_result1, 0,    sizeof(h_result1)));
+  CudaSafeCall(cudaMemset((void *)h_result2, 0,    sizeof(h_result1)));
   
   /* Prepare the data */
   srand(time(NULL));
@@ -125,12 +132,19 @@ int main(int argc, char *argv[])
 	      u = 2 * (data[idx_in].x * data[idx_in+nsamp_in].x + data[idx_in].y * data[idx_in+nsamp_in].y);
 	      v = 2 * (data[idx_in].x * data[idx_in+nsamp_in].y - data[idx_in].y * data[idx_in+nsamp_in].x);
 	      	      
-	      h_result[idx_out] += (aa + bb);
-	      h_result[idx_out + nsamp_out] += (aa - bb);
-	      h_result[idx_out + nsamp_out*2] += u;
-	      h_result[idx_out + nsamp_out*3] += v;
-	      h_result[idx_out + nsamp_out*4] += aa;
-	      h_result[idx_out + nsamp_out*5] += bb;
+	      h_result1[idx_out] += (aa + bb);
+	      h_result1[idx_out + nsamp_out] += (aa - bb);
+	      h_result1[idx_out + nsamp_out*2] += u;
+	      h_result1[idx_out + nsamp_out*3] += v;
+	      h_result1[idx_out + nsamp_out*4] += aa;
+	      h_result1[idx_out + nsamp_out*5] += bb;
+	      
+	      h_result2[idx_out] += (aa + bb);
+	      h_result2[idx_out + nsamp_out] += (aa - bb);
+	      h_result2[idx_out + nsamp_out*2] += u;
+	      h_result2[idx_out + nsamp_out*3] += v;
+	      h_result2[idx_out + nsamp_out*4] += aa;
+	      h_result2[idx_out + nsamp_out*5] += bb;
 	    }
 	}
     }
@@ -141,70 +155,77 @@ int main(int argc, char *argv[])
   switch (block_size.x)
     {
     case 1024:
-      spectral_taccumulate_kernel<1024><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<1024><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 512:
-      spectral_taccumulate_kernel< 512><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel< 512><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 256:
-      spectral_taccumulate_kernel< 256><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel< 256><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 128:
-      spectral_taccumulate_kernel< 128><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel< 128><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 64:
-      spectral_taccumulate_kernel<  64><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<  64><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 32:
-      spectral_taccumulate_kernel<  32><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<  32><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 16:
-      spectral_taccumulate_kernel<  16><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<  16><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 8:
-      spectral_taccumulate_kernel<   8><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<   8><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 4:
-      spectral_taccumulate_kernel<   4><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<   4><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 2:
-      spectral_taccumulate_kernel<   2><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<   2><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
       
     case 1:
-      spectral_taccumulate_kernel<   1><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out, nsamp_in, nsamp_out, naccumulate);
+      spectral_taccumulate_dual_kernel<   1><<<grid_size, block_size, ndim * block_size.x * NBYTE_FLOAT>>>(g_in, g_out1, g_out2, nsamp_in, nsamp_out, naccumulate);
       break;
     }
   CudaSafeKernelLaunch();
-  CudaSafeCall(cudaMemcpy(g_result, g_out, npol_out * sizeof(float), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result1, g_out1, npol_out * sizeof(float), cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(g_result2, g_out2, npol_out * sizeof(float), cudaMemcpyDeviceToHost));
 
   /* Check the result */
-  for(i = 0; i < nsamp_out; i++)
+  for(i = 0; i < npol_out; i++)
     {
-      for(j = 0; j < ndim; j++)
-	if(fabs((h_result[i*ndim + j] - g_result[i*ndim + j])/g_result[i*ndim + j])>1E-3)
-	  {
-	    fprintf(stdout, "%d\t%d\t%f\t%f\t%E\t", i, j, h_result[i*ndim + j], g_result[i*ndim + j], (h_result[i*ndim + j] - g_result[i*ndim + j])/g_result[i*ndim + j]);
-	    fprintf(stdout, "\n");
-	  }
-      //fprintf(stdout, "\n");
+      if(fabs((h_result1[i] - g_result1[i])/g_result1[i])>1E-3)
+	{
+	  fprintf(stdout, "%d\t%d\t%f\t%f\t%E\t", i, j, h_result1[i], g_result1[i], (h_result1[i] - g_result1[i])/g_result1[i]);
+	  fprintf(stdout, "\n");
+	}
+      if(fabs((h_result2[i] - g_result2[i])/g_result2[i])>1E-3)
+     	{
+     	  fprintf(stdout, "%d\t%d\t%f\t%f\t%E\t", i, j, h_result2[i], g_result2[i], (h_result2[i] - g_result2[i])/g_result2[i]);
+     	  fprintf(stdout, "\n");
+     	}
     }
 
   /* Free buffer */
   CudaSafeCall(cudaFreeHost(data));
-  CudaSafeCall(cudaFreeHost(h_result));
-  CudaSafeCall(cudaFreeHost(g_result));
+  CudaSafeCall(cudaFreeHost(h_result1));
+  CudaSafeCall(cudaFreeHost(g_result1));
+  CudaSafeCall(cudaFreeHost(h_result2));
+  CudaSafeCall(cudaFreeHost(g_result2));
   CudaSafeCall(cudaFree(g_in));
-  CudaSafeCall(cudaFree(g_out));
+  CudaSafeCall(cudaFree(g_out1));
+  CudaSafeCall(cudaFree(g_out2));
   
   return EXIT_SUCCESS;
 }

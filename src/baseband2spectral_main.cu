@@ -23,7 +23,7 @@ pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 void usage ()
 {
   fprintf (stdout,
-	   "baseband2spectral_main - Convert BMF 16bits baseband data into 32bits float spectral data \n"
+	   "baseband2spectral_main - Convert BMF 16bits baseband data into 32bits float spectral data and remove the oversampling \n"
 	   "\n"
 	   "Usage: baseband2spectral_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
@@ -37,6 +37,7 @@ void usage ()
 	   " -i  FFT length\n"
 	   " -j  Pol type, 1 for Stokes I, 2 for AABB and 4 for IQUV\n"
 	   " -k  The number of buffer blocks to accumulate\n"
+	   " -l  Monitor, Y_ip_port_ptype or N\n"
 	   );
 }
 
@@ -53,7 +54,7 @@ int main(int argc, char *argv[])
   default_arguments(&conf);
   
   /* Initializeial part */  
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:hg:i:j:k:l:")) != -1)
     {
       switch(arg)
 	{
@@ -147,6 +148,15 @@ int main(int argc, char *argv[])
 	case 'k':
 	  sscanf(optarg, "%d", &conf.nblk_accumulate);
 	  break;
+	  
+	case 'l':
+	  if(optarg[0] == 'Y')
+	    {
+	      conf.monitor = 1;
+	      sscanf(optarg, "%*[^_]_%[^_]_%d_%d", conf.ip_monitor, &conf.port_monitor, &conf.ptype_monitor);
+	    }
+	  break;
+	  
 	}      
     }
   
@@ -176,7 +186,7 @@ int main(int argc, char *argv[])
   initialize_baseband2spectral(&conf);
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "elapse_time for spectral for initialize is %f\n", elapsed_time);
+  fprintf(stdout, "elapse_time for baeband2spectral initialization is %f\n", elapsed_time);
   fflush(stdout);
   
   /* Play with data */  
@@ -189,11 +199,12 @@ int main(int argc, char *argv[])
   log_add(conf.log_file, "INFO", 1, log_mutex, "BEFORE destroy");  
   destroy_baseband2spectral(conf);
   log_add(conf.log_file, "INFO", 1, log_mutex, "END destroy");
-  
-  /* Destory log interface */  
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL END");  
-  log_close(conf.log_file);
 
-  CudaSafeCall(cudaProfilerStop());
+  /* Destory log interface */  
+  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL END");    
+  log_close(conf.log_file);
+  fprintf(stdout, "Finally after log_close!!!\n");
+  fflush(stdout);
+  
   return EXIT_SUCCESS;
 }

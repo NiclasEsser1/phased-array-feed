@@ -305,7 +305,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
@@ -318,7 +317,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   struct timespec start, stop;
@@ -336,7 +334,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   if(dada_hdu_lock_read(conf->hdu_in) < 0) // make ourselves the read client 
@@ -344,7 +341,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 
@@ -356,7 +352,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
@@ -370,7 +365,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }  
   hdrsz = ipcbuf_get_bufsz(conf->hdu_out->header_block);  
@@ -379,7 +373,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);    
     }  
   if(dada_hdu_lock_write(conf->hdu_out) < 0)   // make ourselves the write client 
@@ -387,7 +380,6 @@ int initialize_baseband2baseband(conf_t *conf)
       log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(*conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   clock_gettime(CLOCK_REALTIME, &start);
@@ -406,7 +398,6 @@ int initialize_baseband2baseband(conf_t *conf)
 	  
 	  destroy_baseband2baseband(*conf);
 	  fclose(conf->log_file);
-	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
     }
@@ -478,7 +469,6 @@ int baseband2baseband(conf_t conf)
 	  
 	  destroy_baseband2baseband(conf);
 	  fclose(conf.log_file);
-	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       memset((char *) &sa_udp, 0, sizeof(sa_udp));
@@ -761,16 +751,15 @@ int baseband2baseband(conf_t conf)
 		  
 		  destroy_baseband2baseband(conf);
 		  fclose(conf.log_file);
-		  CudaSafeCall(cudaProfilerStop());
 		  exit(EXIT_FAILURE);
 		}
 	    }
 	}
       
       /* Close current buffer */
-      //ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
+      ipcbuf_mark_filled(conf.db_out, (uint64_t)(cbufsz * conf.scale_dtsz));
       //ipcbuf_mark_filled(conf.db_out, conf.bufout_size * conf.nrepeat_per_blk);
-      ipcbuf_mark_filled(conf.db_out, conf.rbufout_size);
+      //ipcbuf_mark_filled(conf.db_out, conf.rbufout_size);
       fprintf(stdout, "%"PRIu64"\n", conf.rbufout_size);
       fflush(stdout);
       ipcbuf_mark_cleared(conf.db_in);
@@ -789,13 +778,16 @@ int destroy_baseband2baseband(conf_t conf)
   
   for (i = 0; i < conf.nstream; i++)
     {
-      if(conf.streams[i])
-	CudaSafeCall(cudaStreamDestroy(conf.streams[i]));
       if(conf.fft_plans_forward[i])
 	CufftSafeCall(cufftDestroy(conf.fft_plans_forward[i]));
       if(conf.fft_plans_backward[i])
 	CufftSafeCall(cufftDestroy(conf.fft_plans_backward[i]));
     }
+
+  if(conf.fft_plans_forward)
+    free(conf.fft_plans_forward);
+  if(conf.fft_plans_backward)
+    free(conf.fft_plans_backward);
 
   if(conf.dbuf_in)
     cudaFree(conf.dbuf_in);
@@ -827,12 +819,16 @@ int destroy_baseband2baseband(conf_t conf)
       dada_hdu_destroy(conf.hdu_in);
     }
   
+  for(i = 0; i < conf.nstream; i++)
+    {
+      if(conf.streams[i])
+	CudaSafeCall(cudaStreamDestroy(conf.streams[i]));
+    }
   if(conf.streams)
-    free(conf.streams);
-  if(conf.fft_plans_forward)
-    free(conf.fft_plans_forward);
-  if(conf.fft_plans_backward)
-    free(conf.fft_plans_backward);
+    free(conf.streams);    
+
+  CudaSafeCall(cudaProfilerStop());
+  CudaSafeCall(cudaDeviceReset());
   
   return EXIT_SUCCESS;
 }
@@ -972,7 +968,6 @@ int offset_scale(conf_t conf)
       log_add(conf.log_file, "ERR", 1, log_mutex, "Can not open scale file, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Can not open scale file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       destroy_baseband2baseband(conf);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   for (i = 0; i< conf.nchan; i++)
@@ -1005,7 +1000,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
       
       log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
@@ -1016,7 +1010,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
@@ -1027,7 +1020,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
@@ -1039,7 +1031,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_FULL_BEAM, conf.nchunk, __FILE__, __LINE__);
       
       log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }  
   log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk);
@@ -1050,7 +1041,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
       
       log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
@@ -1065,7 +1055,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       log_add(conf.log_file, "ERR", 1, log_mutex, "The SOD is not set, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
       log_close(conf.log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   
@@ -1077,7 +1066,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.pol_type, __FILE__, __LINE__);
       
 	  log_close(conf.log_file);
-	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       else
@@ -1089,7 +1077,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port, __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
-	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       
@@ -1099,7 +1086,6 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
-	  CudaSafeCall(cudaProfilerStop());
 	  exit(EXIT_FAILURE);
 	}
       log_add(conf.log_file, "INFO", 1, log_mutex, "We will send data to %s:%d", conf.ip, conf.port); 
@@ -1122,7 +1108,6 @@ int read_dada_header(conf_t *conf)
       
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   if(hdrsz != DADA_HDRSZ)
@@ -1132,7 +1117,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   
@@ -1143,7 +1127,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }   
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", conf->file_size_in);
@@ -1155,7 +1138,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", conf->bytes_per_second_in);
@@ -1167,7 +1149,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp);
@@ -1179,7 +1160,6 @@ int read_dada_header(conf_t *conf)
       fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
@@ -1191,7 +1171,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       log_close(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
@@ -1203,7 +1182,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "RECEIVER from DADA header is %d", conf->beam_index);
@@ -1215,7 +1193,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       log_close(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "FREQ from DADA header is %f", conf->center_freq);
@@ -1227,7 +1204,6 @@ int read_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   return EXIT_SUCCESS;
@@ -1246,7 +1222,6 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }  
   memcpy(hdrbuf_out, conf->hdrbuf_in, DADA_HDRSZ); // Pass the header
@@ -1261,7 +1236,6 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f", conf->tsamp * OVER_SAMP_RATE);
@@ -1273,7 +1247,6 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_BASEBAND);
@@ -1285,7 +1258,6 @@ int register_dada_header(conf_t *conf)
   //    
   //    destroy_baseband2baseband(*conf);
   //    fclose(conf->log_file);
-  //    CudaSafeCall(cudaProfilerStop());
   //    exit(EXIT_FAILURE);
   //  }
   //log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", NDIM_BASEBAND);
@@ -1297,7 +1269,6 @@ int register_dada_header(conf_t *conf)
   //    
   //    destroy_baseband2baseband(*conf);
   //    fclose(conf->log_file);
-  //    CudaSafeCall(cudaProfilerStop());
   //    exit(EXIT_FAILURE);
   //  }
   //log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", NPOL_BASEBAND);
@@ -1309,7 +1280,6 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
@@ -1321,7 +1291,6 @@ int register_dada_header(conf_t *conf)
       
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
@@ -1334,7 +1303,6 @@ int register_dada_header(conf_t *conf)
 
       destroy_baseband2baseband(*conf);
       fclose(conf->log_file);
-      CudaSafeCall(cudaProfilerStop());
       exit(EXIT_FAILURE);
     }
 

@@ -167,7 +167,7 @@ void *do_capture(void *conf)
 	    }
 	  else
 	    {
-	      log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Cross the boundary");
+	      //log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Cross the boundary");
 
 	      transit[thread_index] = 1; // tell buffer control thread that current capture thread is crossing the boundary
 	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf)
@@ -193,7 +193,8 @@ void *do_capture(void *conf)
   log_add(capture_conf->log_file, "INFO", 1, log_mutex, "DONE the capture thread, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
   
   /* Exit */
-  quit = 1;
+  if (quit == 0)
+    quit = 1;
   
   free(dbuf);
   close(sock);
@@ -282,6 +283,15 @@ int initialize_capture(conf_t *conf)
       log_close(conf->log_file);
       exit(EXIT_FAILURE);    
     }
+  
+  struct timespec start, stop;
+  double elapsed_time;
+  clock_gettime(CLOCK_REALTIME, &start);
+  dada_cuda_dbregister(conf->hdu);  // registers the existing host memory range for use by CUDA
+  clock_gettime(CLOCK_REALTIME, &stop);
+  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+  fprintf(stdout, "elapsed_time for dbregister of input ring buffer is %f\n", elapsed_time);
+  fflush(stdout);
   
   if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client
     {
@@ -828,8 +838,8 @@ void *buf_control(void *conf)
 	}
       if(quit == 2)
 	{
-	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after the buffer transit state change, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the buffer transit state change, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after the buffer transit state change with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the buffer transit state change with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  
 	  pthread_exit(NULL);
 	}
@@ -935,8 +945,8 @@ void *buf_control(void *conf)
 	}    
       if(quit == 2)
 	{
-	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after the second transit state change, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the second transit state change, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after the second transit state change with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the second transit state change with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  pthread_exit(NULL);
 	}
 
@@ -972,6 +982,9 @@ void *buf_control(void *conf)
       quit = 2;
       pthread_exit(NULL);
     }
+
+  if (quit == 0)
+    quit = 1;
   
   log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Normale quit of buffer control thread");
   pthread_exit(NULL);
@@ -998,7 +1011,7 @@ void *capture_control(void *conf)
       log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Can not create socket, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "CAPTURE_ERROR: Can not create socket, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       
-      quit = 1;
+      quit = 2;
       pthread_exit(NULL);
     }
 
@@ -1015,7 +1028,7 @@ void *capture_control(void *conf)
     {
       log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Can not bind to file socket, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
        
-      quit = 1;
+      quit = 2;
       close(sock);
       pthread_exit(NULL);
  
@@ -1041,8 +1054,8 @@ void *capture_control(void *conf)
 	}
       if(quit == 2)
 	{
-	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after checking the unix socket, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after checking the unix socket, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Quit just after checking the unix socket with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after checking the unix socket with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  close(sock);
 	  pthread_exit(NULL);
 	}
@@ -1066,9 +1079,22 @@ void *capture_control(void *conf)
 	  fprintf(stdout, "GET END-OF-DATA\n");
 	  fflush(stdout);
 	  
-	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got END-OF-DATA signal, has to enable eod");
-	  ipcbuf_enable_eod(capture_conf->data_block);
-	  memset(capture_control_command, 0, sizeof(capture_control_command));
+	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "Got END-OF-DATA signal, current states is IPCBUF_WRITING %d", (capture_conf->data_block->state == 3));
+	  if(ipcbuf_enable_eod(capture_conf->data_block))
+	    {
+	      quit = 2;
+
+	      log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Can not enable eod, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: Can not enable eod, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      
+	      close(sock);
+	      pthread_exit(NULL);
+	    }
+	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "enable eod DONE, current states is IPCBUF_WRITING %d", (capture_conf->data_block->state == 3));
+	  memset(capture_control_command, 0, sizeof(capture_control_command));	      
+	  log_add(capture_conf->log_file, "INFO", 1, log_mutex, "enable eod DONE");
+	  fprintf(stdout, "END-OF-DATA DONE\n");
+	  fflush(stdout);
 	}
 	  
       if(strstr(capture_control_command, "START-OF-DATA") != NULL)
@@ -1123,7 +1149,7 @@ void *capture_control(void *conf)
 	  /* setup dada header here */
 	  if(register_dada_header(*capture_conf))
 	    {		  
-	      quit = 1;
+	      quit = 2;
 	      close(sock);
 	      pthread_exit(NULL);
 	    }
@@ -1131,7 +1157,9 @@ void *capture_control(void *conf)
 	}
     }
   
-  quit = 1;
+  if (quit == 0)
+    quit = 1;
+  
   close(sock);
   pthread_exit(NULL);
 }

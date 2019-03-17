@@ -15,13 +15,14 @@ hdrsize    = 4096
 dsize      = 4
 ndata_samp = 4
 
-#bw         = 336.0
+bw         = 336.0
 #bw         = 14.0
 #bw         = 231
-bw         = 35
+#bw         = 35
 nchan_chan = 864
-#c_freq     = 1340.5
-c_freq     = 1421.
+c_freq     = 1340.5
+#c_freq     = 1337
+#c_freq     = 1421.
 
 nchan_band = int(bw * nchan_chan)
 ndata      = ndata_samp * nsamp * nchan_band
@@ -30,8 +31,8 @@ freq       = freq0 + np.arange(int(nchan_band))/float(nchan_chan)
 
 #fdir  = "/beegfs/DENG/pacifix8_numa0_process1/"
 #fdir  = "/beegfs/DENG/pacifix8_numa0_process0/"
-#fdir  = "/beegfs/DENG/pacifix7_numa0_process0/"
-fdir  = "/beegfs/DENG/pacifix0_numa0_process1/"
+fdir  = "/beegfs/DENG/pacifix7_numa0_process0/"
+#fdir  = "/beegfs/DENG/pacifix0_numa0_process1/"
 fname = "2018-08-30-19:37:27_0000000000000000.000000.dada"
 #fname = "2018-08-31-01:11:19_0000000000000000.000000.dada"
 #fname = "2018-08-30-20:11:41_0000000000000000.000000.dada"

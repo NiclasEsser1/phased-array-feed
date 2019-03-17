@@ -27,6 +27,10 @@ typedef struct conf_t
   int output_network;
   char ip[MSTR_LEN];
   int port;
+  char ip_monitor[MSTR_LEN];
+  int port_monitor;
+  int monitor, ptype_monitor;
+  
   int nrepeat_per_blk;
   int nchunk_in, nchan_in, nchan_out;
   int cufft_nx, cufft_mod;
@@ -41,12 +45,18 @@ typedef struct conf_t
 
   uint64_t file_size_in;
   uint64_t bytes_per_second_in;
+
+  fits_t *fits_monitor;
   
   int nchunk_network;
   int nchan_per_chunk_network;
-  int dtsz_network;
-  int pktsz_network;
-  
+  int dtsz_network, dtsz_network_monitor;
+  int pktsz_network, pktsz_network_monitor;
+
+  int nseg_per_blk, neth_per_blk;
+  float *dbuf_out_monitor1, *dbuf_out_monitor2;
+  uint64_t sbufout_size_monitor1, bufout_size_monitor1, dbufout_offset_monitor1;
+  uint64_t sbufout_size_monitor2, bufout_size_monitor2, dbufout_offset_monitor2;
   char dir[MSTR_LEN];
   char utc_start[MSTR_LEN];
   
@@ -80,6 +90,8 @@ typedef struct conf_t
   cufftHandle *fft_plans;
   
   dim3 gridsize_unpack, blocksize_unpack;
+  dim3 gridsize_faccumulate, blocksize_faccumulate;
+  
   dim3 gridsize_swap_select_transpose_pft1, blocksize_swap_select_transpose_pft1;
   dim3 gridsize_spectral_taccumulate, blocksize_spectral_taccumulate;
   dim3 gridsize_saccumulate, blocksize_saccumulate;

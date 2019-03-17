@@ -172,6 +172,7 @@ int main(int argc, char **argv)
 
   /* termine it */
   if(quit > 1)
-    exit(EXIT_FAILURE);  
+    exit(EXIT_FAILURE);
+
   return EXIT_SUCCESS;
 }

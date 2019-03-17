@@ -41,7 +41,9 @@ int main(int argc, char *argv[])
   int arg;
   conf_t conf;
   char log_fname[MSTR_LEN] = {'\0'};
-
+  struct timespec start, stop;
+  double elapsed_time;
+  
   /* Default arguments */
   default_arguments(&conf);
     
@@ -131,8 +133,13 @@ int main(int argc, char *argv[])
   examine_record_arguments(conf, argv, argc);
   
   /* Initialize */
+  clock_gettime(CLOCK_REALTIME, &start);
   initialize_baseband2baseband(&conf);
-
+  clock_gettime(CLOCK_REALTIME, &stop);
+  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
+  fprintf(stdout, "elapsed_time for baseband2baseband initialization is %f\n", elapsed_time);
+  fflush(stdout);
+  
   /* Play with the data */  
   fprintf(stdout, "BASEBAND2BASEBAND_READY\n");  // Ready to take data from ring buffer, just before the header thing
   fflush(stdout);
@@ -150,6 +157,5 @@ int main(int argc, char *argv[])
   fprintf(stdout, "HERE AFTER LOG CLOSE\n");
   fflush(stdout);
 
-  CudaSafeCall(cudaProfilerStop());
   return EXIT_SUCCESS;
 }

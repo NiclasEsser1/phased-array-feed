@@ -31,8 +31,8 @@ typedef struct conf_t
   int monitor, spectral2disk, spectral2network;
   fits_t *fits_monitor;
   fits_t fits_spectral;
-  int neth_per_blk, neth_per_blk_spectral;
-  int nseg_per_blk, nseg_per_blk_spectral;
+  int neth_per_blk;
+  int nseg_per_blk;
   
   int nrepeat_per_blk;
   int start_chunk;

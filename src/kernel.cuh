@@ -851,7 +851,7 @@ __global__ void detect_faccumulate_scale2_spectral_faccumulate_kernel(cufftCompl
 }
 
 template <unsigned int blockSize>
-__global__ void taccumulate_float_kernel(float *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, uint64_t naccumulate)
+__global__ void accumulate_float_kernel(float *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, uint64_t naccumulate)
 {  
   extern volatile __shared__ float float_sdata[];
   int j;
@@ -1202,10 +1202,150 @@ __global__ void spectral_taccumulate_kernel(cufftComplex *dbuf_in, float *dbuf_o
 }
 
 /*
+  This kernel is taken from spectral_taccumulate_kernel;
+  this one has two output, one is accumulation along the same stream, the same as the orignal kernel;
+  the second is accumulation inside current kernel, will be used for monitor;
+*/
+template <unsigned int blockSize>
+__global__ void spectral_taccumulate_dual_kernel(cufftComplex *dbuf_in, float *dbuf_out1, float *dbuf_out2, uint64_t offset_in, uint64_t offset_out, uint64_t naccumulate)
+{
+  extern volatile __shared__ float spectral_sdata[];
+  uint64_t i = threadIdx.x, j;
+  uint64_t tid = i;
+  uint64_t loc;
+  float aa, bb, u, v;
+  
+  for(j = 0 ; j < NDATA_PER_SAMP_RT; j ++)
+    spectral_sdata[tid + j*blockDim.x] = 0;
+
+  while (i < naccumulate)
+    {
+      loc = blockIdx.x*gridDim.y*naccumulate + blockIdx.y*naccumulate + i;
+      aa = dbuf_in[loc].x*dbuf_in[loc].x + dbuf_in[loc].y*dbuf_in[loc].y;
+      bb = dbuf_in[loc + offset_in].x*dbuf_in[loc + offset_in].x + dbuf_in[loc + offset_in].y*dbuf_in[loc + offset_in].y;
+      
+      u = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].x + dbuf_in[loc].y * dbuf_in[loc + offset_in].y);
+      v = 2 * (dbuf_in[loc].x * dbuf_in[loc + offset_in].y - dbuf_in[loc + offset_in].x * dbuf_in[loc].y);
+      // v = 2 * (dbuf_in[loc + offset_in].x * dbuf_in[loc].y - dbuf_in[loc].x * dbuf_in[loc + offset_in].y);
+      
+      spectral_sdata[tid] += (aa + bb);
+      spectral_sdata[tid + blockDim.x] += (aa - bb);
+      spectral_sdata[tid + blockDim.x*2] += u;
+      spectral_sdata[tid + blockDim.x*3] += v;
+      spectral_sdata[tid + blockDim.x*4] += aa;
+      spectral_sdata[tid + blockDim.x*5] += bb;
+  
+      i += blockSize;
+    }  
+  __syncthreads();
+  
+  if (blockSize >= 1024)
+    {
+      if (tid < 512)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 512];
+	}
+    }
+  __syncthreads();
+  
+  if (blockSize >= 512)
+    {
+      if (tid < 256)
+	{	  
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 256];
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 256)
+    {
+      if (tid < 128)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 128];
+	}
+    }
+  __syncthreads();
+
+  if (blockSize >= 128)
+    {
+      if (tid < 64)
+	{
+	  for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	    spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 64];
+	}
+    }
+  __syncthreads();
+    
+  if (tid < 32)
+    {
+      if (blockSize >= 64)
+	{
+	  if (tid < 32)
+	    {	      
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 32];
+	    }
+	}
+      if (blockSize >= 32)
+	{
+	  if (tid < 16)
+	    {	      
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 16];
+	    }
+	}
+      if (blockSize >= 16)
+	{
+	  if (tid < 8)
+	    {	      
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 8];
+	    }
+	}
+      if (blockSize >= 8)
+	{
+	  if (tid < 4)
+	    {     
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 4];
+	    }
+	}
+      if (blockSize >= 4)
+	{
+	  if (tid < 2)
+	    {	      
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 2];
+	    }
+	}
+      if (blockSize >= 2)
+	{
+	  if (tid < 1)
+	    {  
+	      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+		spectral_sdata[tid + j*blockDim.x] += spectral_sdata[tid + j*blockDim.x + 1];
+	    }
+	}
+    }
+  
+  if (tid == 0)
+    {
+      for(j = 0; j < NDATA_PER_SAMP_RT; j++)
+	{
+	  dbuf_out1[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] += spectral_sdata[j*blockDim.x];
+	  dbuf_out2[blockIdx.x * gridDim.y + blockIdx.y + j*offset_out] = spectral_sdata[j*blockDim.x];
+	}
+    }
+}
+
+/*
   This kernel take PFT order data with cufftComplex,
   calculate the spctrum according of all types;
   accumulate it in T and the final output will be PFT;
-the same as spectral_taccumulate_kernel, but it only accumulate with current execution
+  the same as spectral_taccumulate_kernel, but it only accumulate with current execution
 */
 template <unsigned int blockSize>
 __global__ void spectral_taccumulate_fold_kernel(cufftComplex *dbuf_in, float *dbuf_out, uint64_t offset_in, uint64_t offset_out, uint64_t naccumulate)

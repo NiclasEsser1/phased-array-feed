@@ -15,6 +15,8 @@ import argparse
 import threading
 import inspect
 import os
+from fcntl import fcntl, F_GETFL, F_SETFL
+from os import O_NONBLOCK
 
 # Spectrometer output currently can only be network output or disk output;
 # Monitor output currently can only be network output
@@ -79,7 +81,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "search_heimdall":     0,
                    "search_dbdisk":       0,
                    "search_monitor":      1,
-                   "search_spectrometer": 1,
+                   "search_spectrometer": 0,
                    "search_detect_thresh":10,
                    "search_dm":           [1, 3000],
                    "search_zap_chans":    [],
@@ -93,7 +95,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "spectrometer_ndata_per_samp": 4,
                    "spectrometer_ptype":          1,
                    "spectrometer_ip":    	  '134.104.70.90',
-                   "spectrometer_port":    	  17108,
+                   "spectrometer_port":    	  17109,
                    "spectrometer_dbdisk":         1,
                    "spectrometer_monitor":        1,
                    "spectrometer_accumulate_nblk": 1,
@@ -101,7 +103,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    
                    # Spectral parameters for the simultaneous spectral output from fold and search mode
                    # The rest configuration of this output is the same as the normal spectrometer mode
-                   "simultaneous_spectrometer_start_chunk":    33,
+                   "simultaneous_spectrometer_start_chunk":    26,
                    "simultaneous_spectrometer_nchunk":         5,
                    
                    "fold_keys":           ["ddda", "dddc"], # To put processed baseband data 
@@ -119,7 +121,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    
                    "monitor_keys":            ["deda", "dedc"], # To put monitor data
                    "monitor_ip":      	      '134.104.70.90',
-                   "monitor_port":     	      17109,
+                   "monitor_port":     	      17110,
                    "monitor_ptype":           1,
 }
 
@@ -135,19 +137,18 @@ def register_pipeline(name):
     return _register
 
 class ExecuteCommand(object):
+
     def __init__(self, command, execution = True, process_index = None):
         self._command = command
+        self._process_index = process_index
         self._execution = execution
         self.stdout_callbacks = set()
-        self.stderr_callbacks = set()
         self.returncode_callbacks = set()
         self._monitor_threads = []
         self._process = None
         self._executable_command = None
         self._stdout = None
-        self._stderr = None
         self._returncode = None
-        self._process_index = process_index
         
         log.debug(self._command)
         self._executable_command = shlex.split(self._command)
@@ -159,20 +160,25 @@ class ExecuteCommand(object):
                                       stderr=PIPE,
                                       bufsize=1,
                                       universal_newlines=True)
+                flags = fcntl(self._process.stdout, F_GETFL)  # Noblock 
+                fcntl(self._process.stdout, F_SETFL, flags | O_NONBLOCK)
+                flags = fcntl(self._process.stderr, F_GETFL) 
+                fcntl(self._process.stderr, F_SETFL, flags | O_NONBLOCK)
+                
             except Exception as error:
-                log.exception(error)
+                log.exception("Error while launching command: {} with error {}".format(
+                    self._command, error))
                 self.returncode = self._command + "; RETURNCODE is: ' 1'"
             if self._process == None:
                 self.returncode = self._command + "; RETURNCODE is: ' 1'"
 
             # Start monitors
-            self._monitor_threads.append(threading.Thread(target=self._stdout_monitor))
-            self._monitor_threads.append(threading.Thread(target=self._stderr_monitor))
+            self._monitor_threads.append(
+                threading.Thread(target=self._process_monitor))
             
             for thread in self._monitor_threads:
-                thread.daemon = True
                 thread.start()
-                                    
+
     def __del__(self):
         class_name = self.__class__.__name__
 
@@ -207,45 +213,32 @@ class ExecuteCommand(object):
         self._returncode = value
         self.returncode_notify()
 
-    def stderr_notify(self):
-        for callback in self.stderr_callbacks:
-            callback(self._stderr, self)
-
-    @property
-    def stderr(self):
-        return self._stderr
-
-    @stderr.setter
-    def stderr(self, value):
-        self._stderr = value
-        self.stderr_notify()
-
-    
-    def _stdout_monitor(self):
+    def _process_monitor(self):
         if self._execution:
             while self._process.poll() == None:
-                stdout = self._process.stdout.readline().rstrip("\n\r")
-                if stdout != b"":
-                    if self._process_index != None:
-                        self.stdout = stdout + "; PROCESS_INDEX is " + str(self._process_index)
-                    else:
-                        self.stdout = stdout
-                    #log.debug(self._command + " " + self.stdout)
-                    #log.debug(stdout)
-            if self._process.returncode and self._process.stderr.readline().rstrip("\n\r") == b"":
-                self.returncode = self._command + "; RETURNCODE is: " + str(self._process.returncode)
+                try:
+                    stdout = self._process.stdout.readline().rstrip("\n\r")
+                    if stdout != b"":
+                        if self._process_index != None:
+                            self.stdout = stdout + \
+                                          "; PROCESS_INDEX is " + \
+                                          str(self._process_index)
+                        else:
+                            self.stdout = stdout
+                except:
+                    pass
+                
+                try:
+                    stderr = self._process.stderr.readline().rstrip("\n\r")
+                except:
+                    pass
+
+            if self._process.returncode:
+                self.returncode = self._command + \
+                                  "; RETURNCODE is: " +\
+                                  str(self._process.returncode)
+            log.error("Successful finish execution")
             
-    def _stderr_monitor(self):
-        if self._execution:
-            while self._process.poll() == None:
-                stderr = self._process.stderr.readline().rstrip("\n\r")
-                if stderr != b"":
-                    if self._process_index != None:
-                        self.stderr = self._command + "; STDERR is: " + stderr + "; PROCESS_INDEX is " + str(self._process_index)
-                    else:
-                        self.stderr = self._command + "; STDERR is: " + stderr
-                    log.debug(stderr)
-                    
 class Pipeline(object):
     def __init__(self):
         self._paf_period                     	 = SYSTEM_CONFIG["paf_period"]
@@ -429,15 +422,10 @@ class Pipeline(object):
             log.debug(stdout)
 
     def _handle_execution_returncode(self, returncode, callback):
-        if self._execution:
+        if self._execution and returncode:
             log.debug(returncode)
-            if returncode:
-                raise PipelineError(returncode)
-
-    def _handle_execution_stderr(self, stderr, callback):
-        if self._execution:
-            log.error(stderr)
-            #raise PipelineError(stderr)
+            self._cleanup(self._cleanup_commands_at_config)
+            raise PipelineError(returncode)
 
     def _cleanup(self, cleanup_commands):
         # Kill existing process and free shared memory if there is any
@@ -452,9 +440,10 @@ class Fold(Pipeline):
     def __init__(self):
         super(Fold, self).__init__()
 
-    def configure(self, input_ip, input_source, length):
+    def configure(self, input_ip, input_source, length, input_freq):
         # Setup parameters of the pipeline
         self._input_ip     = input_ip
+        self._input_freq   = input_freq
         self._input_source = input_source
         self._numa         = int(self._input_ip.split(".")[3]) - 1
         self._server       = int(self._input_ip.split(".")[2])
@@ -599,12 +588,27 @@ class Fold(Pipeline):
     def start(self):
         self._cleanup(self._cleanup_commands_at_start)
         
-        # Update file size
+        # Update FILE_SIZE
         command = "dada_install_header -p FILE_SIZE={} {}".format(self._input_file_size,
                                                                   self._input_dada_fname)
         execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
-        
+        # Update NCHAN
+        command = "dada_install_header -p NCHAN={} {}".format(self._input_nchan,
+                                                              self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
+        # Update BW
+        command = "dada_install_header -p BW={} {}".format(self._input_nchan,
+                                                           self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()        
+        # Update FREQ
+        command = "dada_install_header -p FREQ={} {}".format(self._input_freq,
+                                                             self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
+
         # Create input ring buffer
         process_index = 0
         execution_instances = []
@@ -641,9 +645,8 @@ class Fold(Pipeline):
             self._fold_dspsr_execution_instances = []
             for command in self._fold_dspsr_commands:
                 execution_instance = ExecuteCommand(command, self._execution, process_index)
-                #execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
-                #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
-                #execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
+                execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
+                execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
                 self._fold_dspsr_execution_instances.append(execution_instance)
                 process_index += 1 
 
@@ -653,7 +656,6 @@ class Fold(Pipeline):
             self._fold_dbdisk_execution_instances = []
             for command in self._fold_dbdisk_commands:
                 execution_instance = ExecuteCommand(command, self._execution, process_index)
-                execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
                 execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
                 execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
                 self._fold_dbdisk_execution_instances.append(execution_instance)
@@ -664,8 +666,7 @@ class Fold(Pipeline):
         self._fold_execution_instances = []
         for command in self._fold_commands:
             execution_instance = ExecuteCommand(command, self._execution, process_index)
-            #execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
-            #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
+            execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._fold_execution_instances.append(execution_instance)
             process_index += 1
@@ -714,10 +715,11 @@ class Fold2Beams(Fold):
     def __init__(self):
         super(Fold2Beams, self).__init__()
 
-    def configure(self, input_ip, length):
+    def configure(self, input_ip, length, input_freq):
         super(Fold2Beams, self).configure(input_ip,
                                           INPUT_2BEAMS,
-                                          length)
+                                          length,
+                                          input_freq)
 
     def start(self):
         super(Fold2Beams, self).start()
@@ -734,10 +736,11 @@ class Fold1Beam(Fold):
     def __init__(self):
         super(Fold1Beam, self).__init__()
 
-    def configure(self, input_ip, length):
+    def configure(self, input_ip, length, input_freq):
         super(Fold1Beam, self).configure(input_ip,
                                          INPUT_1BEAM,
-                                         length)
+                                         length,
+                                         input_freq)
 
     def start(self):
         super(Fold1Beam, self).start()
@@ -753,9 +756,10 @@ class Search(Pipeline):
     def __init__(self):
         super(Search, self).__init__()
         
-    def configure(self, input_ip, input_source, length):
+    def configure(self, input_ip, input_source, length, input_freq):
         # Setup parameters of the pipeline
         self._input_ip = input_ip
+        self._input_freq   = input_freq
         self._input_source = input_source
         self._numa = int(ip.split(".")[3]) - 1
         self._server = int(ip.split(".")[2])
@@ -944,9 +948,24 @@ class Search(Pipeline):
     def start(self):
         self._cleanup(self._cleanup_commands_at_start)
         
-        # Update file size
+        # Update FILE_SIZE
         command = "dada_install_header -p FILE_SIZE={} {}".format(self._input_file_size,
                                                                   self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
+        # Update NCHAN
+        command = "dada_install_header -p NCHAN={} {}".format(self._input_nchan,
+                                                              self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
+        # Update BW
+        command = "dada_install_header -p BW={} {}".format(self._input_nchan,
+                                                           self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()        
+        # Update FREQ
+        command = "dada_install_header -p FREQ={} {}".format(self._input_freq,
+                                                             self._input_dada_fname)
         execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
         
@@ -997,7 +1016,6 @@ class Search(Pipeline):
         self._search_execution_instances = []
         for command in self._search_commands:
             execution_instance = ExecuteCommand(command, self._execution, process_index)
-            execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
             execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._search_execution_instances.append(execution_instance)
@@ -1098,10 +1116,11 @@ class Search2Beams(Search):
     def __init__(self):
         super(Search2Beams, self).__init__()
 
-    def configure(self, input_ip, length):
+    def configure(self, input_ip, length, input_freq):
         super(Search2Beams, self).configure(input_ip,
                                             INPUT_2BEAMS,
-                                            length)
+                                            length,
+                                            input_freq)
 
     def start(self):
         super(Search2Beams, self).start()
@@ -1119,10 +1138,11 @@ class Search1Beam(Search):
     def __init__(self):
         super(Search1Beam, self).__init__()
 
-    def configure(self, input_ip, length):
+    def configure(self, input_ip, length, input_freq):
         super(Search1Beam, self).configure(input_ip,
                                            INPUT_1BEAM,
-                                           length)
+                                           length,
+                                           input_freq)
 
     def start(self):
         super(Search1Beam, self).start()
@@ -1138,9 +1158,10 @@ class Spectrometer(Pipeline):
     def __init__(self):
         super(Spectrometer, self).__init__()
         
-    def configure(self, input_ip, input_source, length):
+    def configure(self, input_ip, input_source, length, input_freq):
         # Setup parameters of the pipeline
         self._input_ip = input_ip
+        self._input_freq   = input_freq
         self._input_source = input_source
         self._numa = int(ip.split(".")[3]) - 1
         self._server = int(ip.split(".")[2])
@@ -1212,9 +1233,16 @@ class Spectrometer(Pipeline):
                 self._pipeline_runtime_directory[i], self._input_nchunk,
                 self._spectrometer_cufft_nx, self._spectrometer_ptype, self._spectrometer_accumulate_nblk)
             if self._spectrometer_dbdisk:
-                command += "-b k_{}_{}".format(self._spectrometer_keys[i], self._spectrometer_sod)
+                command += "-b k_{}_{} ".format(self._spectrometer_keys[i], self._spectrometer_sod)
             else:
-                command += "-b n_{}_{}".format(self._spectrometer_ip, self._spectrometer_port)
+                command += "-b n_{}_{} ".format(self._spectrometer_ip, self._spectrometer_port)
+            
+            if self._spectrometer_monitor:
+                command += "-l Y_{}_{}_{} ".format(self._monitor_ip,
+                                                   self._monitor_port,
+                                                   self._monitor_ptype)
+            else:
+                command += "-l N "    
             self._spectrometer_commands.append(command)
 
             # Command to create spectral ring buffer
@@ -1253,12 +1281,27 @@ class Spectrometer(Pipeline):
     def start(self):
         self._cleanup(self._cleanup_commands_at_start)
         
-        # To update file size
+        # Update FILE_SIZE
         command = "dada_install_header -p FILE_SIZE={} {}".format(self._input_file_size,
                                                                   self._input_dada_fname)
         execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
-
+        # Update NCHAN
+        command = "dada_install_header -p NCHAN={} {}".format(self._input_nchan,
+                                                              self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
+        # Update BW
+        command = "dada_install_header -p BW={} {}".format(self._input_nchan,
+                                                           self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()        
+        # Update FREQ
+        command = "dada_install_header -p FREQ={} {}".format(self._input_freq,
+                                                             self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
+        
         # Create baseband ring buffer
         process_index = 0
         execution_instances = []
@@ -1293,8 +1336,7 @@ class Spectrometer(Pipeline):
         self._spectrometer_execution_instances = []
         for command in self._spectrometer_commands:
             execution_instance = ExecuteCommand(command, self._execution,  process_index)
-            execution_instance.stderr_callbacks.add(self._handle_execution_stderr)
-            #execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
+            execution_instance.returncode_callbacks.add(self._handle_execution_returncode)
             execution_instance.stdout_callbacks.add(self._handle_execution_stdout)
             self._spectrometer_execution_instances.append(execution_instance)
             process_index += 1 
@@ -1345,13 +1387,13 @@ class Spectrometer(Pipeline):
 
 @register_pipeline("Spectrometer1Beam")
 class Spectrometer1Beam(Spectrometer):
-    def configure(self, input_ip, length):
-        super(Spectrometer1Beam, self).configure(input_ip, INPUT_1BEAM, length)
+    def configure(self, input_ip, length, input_freq):
+        super(Spectrometer1Beam, self).configure(input_ip, INPUT_1BEAM, length, input_freq)
 
 @register_pipeline("Spectrometer2Beams")
 class Spectrometer2Beams(Spectrometer):
-    def configure(self, input_ip, length):
-        super(Spectrometer2Beams, self).configure(input_ip, INPUT_2BEAMS, length)
+    def configure(self, input_ip, length, input_freq):
+        super(Spectrometer2Beams, self).configure(input_ip, INPUT_2BEAMS, length, input_freq)
 
 # nvprof -f --profile-child-processes -o profile.nvprof%p ./pipeline.py -a 0 -b 2 -c search -d 1 -e 10
 # cuda-memcheck ./pipeline.py -a 0 -b 2 -c search -d 1 -e 10
@@ -1401,7 +1443,7 @@ if __name__ == "__main__":
                 fold_mode = Fold2Beams()
 
             log.info("Configure it ...")
-            fold_mode.configure(ip, length)
+            fold_mode.configure(ip, length, freq)
         
             log.info("Start it ...")
             fold_mode.start()
@@ -1421,7 +1463,7 @@ if __name__ == "__main__":
                 search_mode = Search2Beams()
 
             log.info("Configure it ...")
-            search_mode.configure(ip, length)
+            search_mode.configure(ip, length, freq)
         
             log.info("Start it ...")
             search_mode.start()
@@ -1441,7 +1483,7 @@ if __name__ == "__main__":
                 spectrometer_mode = Spectrometer2Beams()
     
             log.info("Configure it ...")
-            spectrometer_mode.configure(ip, length)
+            spectrometer_mode.configure(ip, length, freq)
         
             log.info("Start it ...")
             spectrometer_mode.start()
