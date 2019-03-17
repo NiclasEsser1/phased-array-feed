@@ -287,7 +287,7 @@ int initialize_capture(conf_t *conf)
   struct timespec start, stop;
   double elapsed_time;
   clock_gettime(CLOCK_REALTIME, &start);
-  dada_cuda_dbregister(conf->hdu);  // registers the existing host memory range for use by CUDA
+  //dada_cuda_dbregister(conf->hdu);  // registers the existing host memory range for use by CUDA
   clock_gettime(CLOCK_REALTIME, &stop);
   elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
   fprintf(stdout, "elapsed_time for dbregister of input ring buffer is %f\n", elapsed_time);

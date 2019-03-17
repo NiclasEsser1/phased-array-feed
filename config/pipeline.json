@@ -1,0 +1,47 @@
+"paf_parameters":{"nchan_per_chunk":          7, 
+                  "over_samp_rate":           (32.0/27.0),
+                  "period":                   27,
+                  "df_res":                   1.08E-4,
+                  "ndf_per_chunk_per_period": 250000,
+                  
+                  "df_dtsz":      	     7168,  
+                  "df_pktsz":     	     7232,
+                  "df_hdrsz":     	     64,
+                  
+                  "nbyte_baseband":           2,
+                  "npol_baseband":            2,
+                  "ndim_baseband":            2,
+		 }
+
+PACIFIX_PARAMETER = {"ncpu_per_numa_node":          10,  
+                     "memory_limit_per_numa_node":  60791751475, 
+}
+
+FITSWRITER_INTERFACE_CONFIG = {"spectral_ip":    '134.104.70.90',
+                               "spectral_port":  17107,
+                               "monitor_ip":,    '134.104.70.90',
+                               "monitor_port":   17108,
+}
+
+RING_BUFFER_CONFIG ={"capture_keys":                 ["dada", "dadc"], 
+                     "filterbank_keys":              ["dade", "dadg"], 
+                     "spectral_keys":                ["dadi", "dadk"], 
+                     "baseband_keys":                ["dadm", "dado"], 
+                     "monitor_keys":                 ["dadq", "dads"], 
+                     
+                     "ndf_per_chunk":                16384,# For all ring buffer
+                     
+                     "capture_nblk":                 5,
+                     "capture_nreader":              1,
+                     "transit_buffer_ndf_per_chunk": 128,  # transit buffer for capture  
+
+                     "filterbank_nblk":              2,
+                     "filterbank_nreader":           (HEIMDALL + DBDISK) if (HEIMDALL + DBDISK) else 1,
+
+                     "spectral_nblk":                2,
+                     "spectral_nreader":             1,
+
+                     "baseband_nblk":                2,
+                     "baseband_nreader":             1,
+}
+

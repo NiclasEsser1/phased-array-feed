@@ -462,15 +462,16 @@ int baseband2baseband(conf_t conf)
   /* Create socket */
   if(conf.fits_flag == 1)
     {
+      /* For both multicast and unicast */
       if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-	{
-	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  
-	  destroy_baseband2baseband(conf);
-	  fclose(conf.log_file);
-	  exit(EXIT_FAILURE);
-	}
+      	{
+      	  fprintf(stderr, "BASEBAND2BASEBAND_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      	  log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      	  
+      	  destroy_baseband2baseband(conf);
+      	  fclose(conf.log_file);
+      	  exit(EXIT_FAILURE);
+      	}
       memset((char *) &sa_udp, 0, sizeof(sa_udp));
       sa_udp.sin_family      = AF_INET;
       sa_udp.sin_port        = htons(conf.port);

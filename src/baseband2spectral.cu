@@ -1593,6 +1593,40 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
   log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in);
 
+  if(conf.monitor == 1)
+    {   
+      if(!((conf.ptype_monitor == 1) || (conf.ptype_monitor == 2) || (conf.ptype_monitor == 4)))
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ptype_monitor, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ptype_monitor, __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  exit(EXIT_FAILURE);
+	}
+      else
+	log_add(conf.log_file, "INFO", 1, log_mutex, "ptype_monitor is %d", conf.ptype_monitor);
+            
+      if(conf.port_monitor == -1)
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port_monitor, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port_monitor, __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  exit(EXIT_FAILURE);
+	}
+      if(strstr(conf.ip_monitor, "unset"))
+	{
+	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: monitor ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1, log_mutex, "monitor ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  
+	  log_close(conf.log_file);
+	  exit(EXIT_FAILURE);
+	}
+      log_add(conf.log_file, "INFO", 1, log_mutex, "We will send monitor data to %s:%d", conf.ip_monitor, conf.port_monitor); 
+    }  
+  else
+    log_add(conf.log_file, "INFO", 1, log_mutex, "We will not send monitor data to FITSwriter interface");
+  
   if(conf.ndf_per_chunk_rbufin == 0)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);

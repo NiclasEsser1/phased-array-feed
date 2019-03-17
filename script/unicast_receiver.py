@@ -7,14 +7,12 @@ import matplotlib.pyplot as plt
 import struct
 
 FITS_TIME_STAMP_LEN = 28
-NCHAN  = 199584
-NCHUNK = 231
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-server_address = ('134.104.70.90', 17110)
+server_address = ('134.104.70.90', 17109)
 sock.bind(server_address)
 data, server = sock.recvfrom(1<<16)
 nchan      = np.fromstring(data[8 + FITS_TIME_STAMP_LEN : 12 +FITS_TIME_STAMP_LEN], dtype='int32')[0]
@@ -40,5 +38,3 @@ while (1):
     plt.figure()
     plt.plot(spectral)
     plt.show()
-    
-    

@@ -120,8 +120,10 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "fold_software_name":  "baseband2baseband_main",
                    
                    "monitor_keys":            ["deda", "dedc"], # To put monitor data
-                   "monitor_ip":      	      '134.104.70.90',
-                   "monitor_port":     	      17110,
+                   #"monitor_ip":      	      '134.104.70.90',
+                   #"monitor_port":     	      17110,
+                   "monitor_ip":      	      '239.255.255.250',
+                   "monitor_port":     	      1901,
                    "monitor_ptype":           1,
 }
 
@@ -593,6 +595,10 @@ class Fold(Pipeline):
                                                                   self._input_dada_fname)
         execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
+        # Update RECEIVER
+        command = "dada_install_header -p RECEIVER=0 {}".format(self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
         # Update NCHAN
         command = "dada_install_header -p NCHAN={} {}".format(self._input_nchan,
                                                               self._input_dada_fname)
@@ -953,6 +959,10 @@ class Search(Pipeline):
                                                                   self._input_dada_fname)
         execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
+        # Update RECEIVER
+        command = "dada_install_header -p RECEIVER=0 {}".format(self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
         # Update NCHAN
         command = "dada_install_header -p NCHAN={} {}".format(self._input_nchan,
                                                               self._input_dada_fname)
@@ -1286,6 +1296,10 @@ class Spectrometer(Pipeline):
                                                                   self._input_dada_fname)
         execution_instance = ExecuteCommand(command, self._execution)
         execution_instance.finish()
+        # Update RECEIVER
+        command = "dada_install_header -p RECEIVER=0 {}".format(self._input_dada_fname)
+        execution_instance = ExecuteCommand(command, self._execution)
+        execution_instance.finish()
         # Update NCHAN
         command = "dada_install_header -p NCHAN={} {}".format(self._input_nchan,
                                                               self._input_dada_fname)
@@ -1399,10 +1413,10 @@ class Spectrometer2Beams(Spectrometer):
 # cuda-memcheck ./pipeline.py -a 0 -b 2 -c search -d 1 -e 10
 if __name__ == "__main__":
     logging.getLogger().addHandler(logging.NullHandler())
-    log = logging.getLogger('mpikat')
+    log = logging.getLogger("mpikat")
     coloredlogs.install(
         fmt="[ %(levelname)s - %(asctime)s - %(name)s - %(filename)s:%(lineno)s] %(message)s",
-        level='DEBUG',
+        level="DEBUG",
         logger=log)
 
     host_id = check_output("hostname").strip()[-1]

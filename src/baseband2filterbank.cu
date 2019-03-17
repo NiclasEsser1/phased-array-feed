@@ -736,24 +736,6 @@ int baseband2filterbank(conf_t conf)
 	}
       log_add(conf.log_file, "INFO", 1, log_mutex, "register_dada_header done");
     }
-  ///* Create socket */
-  //if(conf.monitor == 1)
-  //  {
-  //    if((sock_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-  //	{
-  //	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  log_add(conf.log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  
-  //	  destroy_baseband2filterbank(conf);
-  //	  fclose(conf.log_file);
-  //	  exit(EXIT_FAILURE);
-  //	}
-  //    memset((char *) &sa_udp, 0, sizeof(sa_udp));
-  //    sa_udp.sin_family      = AF_INET;
-  //    sa_udp.sin_port        = htons(conf.port_monitor);
-  //    sa_udp.sin_addr.s_addr = inet_addr(conf.ip_monitor);
-  //    setsockopt(sock_udp, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-  //  }
 
   if((conf.spectral2disk == 1) || (conf.spectral2network == 1))
     {
@@ -1920,7 +1902,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	  exit(EXIT_FAILURE);
 	}
       else
-	log_add(conf.log_file, "INFO", 1, log_mutex, "ptype_monitor is %d", conf.ptype_spectral);
+	log_add(conf.log_file, "INFO", 1, log_mutex, "ptype_spectral is %d", conf.ptype_spectral);
       
       if(conf.nblk_accumulate == -1)
 	{
