@@ -8,8 +8,9 @@ import struct
 
 FITS_TIME_STAMP_LEN = 28
 
-mcast_group = '239.255.255.250'
-server_address = ('', 1901) 
+mcast_group = '239.3.1.1'
+#server_address = ('', 5556)
+server_address = ('', 2)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(server_address)
@@ -35,9 +36,10 @@ plt.show()
 
 while (1):
     data, server = sock.recvfrom(1<<16)
+    print len(data)
     unpack_data = struct.unpack("i28cfiffiiii{}f".format(nchan_per_chunk), data)
     print unpack_data[0:37]
-    spectral = unpack_data[37:-1]
-    plt.figure()
-    plt.plot(spectral)
-    plt.show()
+    #spectral = unpack_data[37:-1]
+    #plt.figure()
+    #plt.plot(spectral)
+    #plt.show()

@@ -486,6 +486,7 @@ int destroy_capture(conf_t conf)
 
   if(conf.data_block)
     {
+      //dada_cuda_dbunregister(conf.hdu);
       dada_hdu_unlock_write(conf.hdu);
       dada_hdu_destroy(conf.hdu); // it has disconnect
     }
