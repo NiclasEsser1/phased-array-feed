@@ -1502,11 +1502,11 @@ int baseband2filterbank(conf_t conf)
 					&conf.dbuf_out_spectral[conf.nsamp_out_spectral  * NDATA_PER_SAMP_FULL],
 					2 * conf.nsamp_out_spectral * NBYTE_SPECTRAL,
 					cudaMemcpyDeviceToHost));
-          else
-	    CudaSafeCall(cudaMemcpy(conf.cbuf_out_spectral,
-				    conf.dbuf_out_spectral,
-				    conf.nsamp_out_spectral  * conf.ptype_spectral * NBYTE_SPECTRAL,
-				    cudaMemcpyDeviceToHost));
+	      else
+		CudaSafeCall(cudaMemcpy(conf.cbuf_out_spectral,
+					conf.dbuf_out_spectral,
+					conf.nsamp_out_spectral  * conf.ptype_spectral * NBYTE_SPECTRAL,
+					cudaMemcpyDeviceToHost));
 	    }
 	  if(conf.spectral2network == 1)
 	    {
@@ -1525,6 +1525,7 @@ int baseband2filterbank(conf_t conf)
 		  conf.fits_spectral.pol_index = i;
 		  for(j = 0; j < conf.nchunk_network_spectral; j++)
 		    {
+		      memset(conf.fits_spectral.data, 0x00, sizeof(conf.fits_spectral.data));
 		      memcpy_offset = i * conf.nchan_out_spectral +
 			j * conf.nchan_per_chunk_network_spectral;
 		      conf.fits_spectral.chunk_index = j;
@@ -1540,7 +1541,7 @@ int baseband2filterbank(conf_t conf)
 						    &conf.dbuf_out_spectral[memcpy_offset],
 						    conf.dtsz_network_spectral,
 						    cudaMemcpyDeviceToHost));
-      		}
+			}
 		      if(sendto(sock_udp_spectral,
 				(void *)&conf.fits_spectral,
 				conf.pktsz_network_spectral,

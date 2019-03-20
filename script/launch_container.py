@@ -35,7 +35,8 @@ container_name = "{}.{}".format(image, numa)
 image       = "xinpingdeng/{}".format(image)
 xauth       = "/home/pulsar/.Xauthority"
 sshauth     = "/home/pulsar/.ssh"
-dev_dir     = "/home/pulsar/xinping/"
+#dev_dir     = "/home/pulsar/xinping/"
+dev_dir     = "/home/pulsar/"
 data_dir    = "/beegfs/"
 
 data_mount  = "{}:{}".format(data_dir, data_dir)

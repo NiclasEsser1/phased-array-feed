@@ -1212,6 +1212,7 @@ int baseband2spectral(conf_t conf)
 		  fits.pol_index = i;
 		  for(j = 0; j < conf.nchunk_network; j++)
 		    {
+		      memset(fits.data, 0x00, sizeof(fits.data));
 		      memcpy_offset = i * fits.nchan +
 			j * conf.nchan_per_chunk_network;
 		      fits.chunk_index = j;

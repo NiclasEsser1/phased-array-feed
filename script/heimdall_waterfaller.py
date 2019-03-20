@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import os
 
-ddir  = "/beegfs/DENG/AUG"
+ddir  = "/beegfs/DENG/pacifix7_numa1_process0"
 #ddir  = "./"
 
 #cand_fname = "cand-J1819-1458-zap0511-snr10.txt"
@@ -27,6 +27,9 @@ mask_fname = "J1819-1458-1024chan-64scl-swap_rfifind.mask"
 #cand_fname = "cand.txt"
 #fil_fname  = "J1819-1458-1024chan-64scl.fil"
 
+cand_fname = "cand.txt"
+fil_fname  = "J1819-1458.fil"
+
 fil_fname  = os.path.join(ddir, fil_fname)
 cand_fname = os.path.join(ddir, cand_fname)
 mask_fname = os.path.join(ddir, mask_fname)
@@ -39,8 +42,8 @@ for i in range(ncand):
     tstart   = cand[i,2] - 0.2
     duration = 0.4
 
-    command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec --bandpass --maskfile=\"{:s}\"".format(fil_fname, tstart, duration, dm, mask_fname)
-    #command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
+    #command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec --bandpass --maskfile=\"{:s}\"".format(fil_fname, tstart, duration, dm, mask_fname)
+    command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
     print command, ", SNR:", cand[i,0]
     os.system(command)
     exit(1)
