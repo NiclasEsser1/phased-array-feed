@@ -13,7 +13,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--header_fname', type=str, nargs='+',
                         help='The filterbank header file name')   
 
-    ddir             = "/beegfs/DENG/AUG/"
+    ddir             = "/beegfs/DENG/pacifix7_numa1_process0"
     args             = parser.parse_args()
     dada_fname       = args.dada_fname[0]
     filterbank_fname = args.filterbank_fname[0]
