@@ -1467,7 +1467,7 @@ int baseband2filterbank(conf_t conf)
 		  fclose(conf.log_file);
 		  exit(EXIT_FAILURE);
 		}
-	      usleep(100);
+	      usleep(1000);
 	    }
 	}
 
