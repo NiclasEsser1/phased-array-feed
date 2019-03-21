@@ -1467,6 +1467,7 @@ int baseband2filterbank(conf_t conf)
 		  fclose(conf.log_file);
 		  exit(EXIT_FAILURE);
 		}
+	      usleep(1);
 	    }
 	}
 
@@ -1556,6 +1557,7 @@ int baseband2filterbank(conf_t conf)
 			  fclose(conf.log_file);
 			  exit(EXIT_FAILURE);
 			}
+		      usleep(1);
 		    }
 		}
 	      time_stamp_spectral_f += conf.fits_spectral.tsamp;

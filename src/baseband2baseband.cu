@@ -754,6 +754,7 @@ int baseband2baseband(conf_t conf)
 		  fclose(conf.log_file);
 		  exit(EXIT_FAILURE);
 		}
+	      usleep(1);
 	    }
 	}
       

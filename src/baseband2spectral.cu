@@ -1176,6 +1176,7 @@ int baseband2spectral(conf_t conf)
 		  fclose(conf.log_file);
 		  exit(EXIT_FAILURE);
 		}
+	      usleep(1);
 	    }
 	  log_add(conf.log_file, "INFO", 1, log_mutex, "monitor data sending done");
 	}
@@ -1243,6 +1244,7 @@ int baseband2spectral(conf_t conf)
 			  fclose(conf.log_file);
 			  exit(EXIT_FAILURE);
 			}
+		      usleep(1);
 		    }
 		}
 	      time_stamp_f += fits.tsamp;
