@@ -20,7 +20,7 @@ int filterbank_header(conf_t conf)
 
   conf.telescope_id = 8;
   conf.data_type = 1;
-  conf.machine_id = 0;
+  conf.machine_id = 2;
     
   /* Write filterbank header */
   length = 12;
@@ -51,7 +51,16 @@ int filterbank_header(conf_t conf)
   fwrite((char*)&conf.data_type, NBYTE_INT, 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.data_type);
   fflush(stdout);
-  
+    
+  //length = 5;
+  //double refdm = 196.0;
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  //strcpy(field, "refdm");
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&refdm, NBYTE_INT, 1, conf.f_fp);
+  //fprintf(stdout, "%f\n", refdm);
+  //fflush(stdout);
+	
   length = 5;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "tsamp");
@@ -109,6 +118,24 @@ int filterbank_header(conf_t conf)
   fprintf(stdout, "%d\n", conf.nchans);
   fflush(stdout);
   
+  //length = 6;
+  //int nbeams = 1;
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  //strcpy(field, "nbeams");
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&nbeams, NBYTE_INT, 1, conf.f_fp);
+  //fprintf(stdout, "%d\n", nbeams);
+  //fflush(stdout);
+  //
+  //length = 5;
+  //int ibeam = 1;
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  //strcpy(field, "ibeam");
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&ibeam, NBYTE_INT, 1, conf.f_fp);
+  //fprintf(stdout, "%d\n", ibeam);
+  //fflush(stdout);
+  
   length = 11;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
   strcpy(field, "source_name");
@@ -120,21 +147,23 @@ int filterbank_header(conf_t conf)
   fprintf(stdout, "%s\n", conf.source_name);
   fflush(stdout);
   
-  length = 7;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  strcpy(field, "src_raj");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.raj, sizeof(double), 1, conf.f_fp);
-  fprintf(stdout, "%f\n", conf.raj);
-  fflush(stdout);
-  
-  length = 7;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  strcpy(field, "src_dej");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.decj, sizeof(double), 1, conf.f_fp); 
-  fprintf(stdout, "%f\n", conf.decj);
-  fflush(stdout);
+  //length = 7;
+  //conf.raj = 30;
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  //strcpy(field, "src_raj");
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&conf.raj, sizeof(double), 1, conf.f_fp);
+  //fprintf(stdout, "%f\n", conf.raj);
+  //fflush(stdout);
+  //
+  //length = 7;
+  //conf.decj = 10;
+  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  //strcpy(field, "src_dej");
+  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  //fwrite((char*)&conf.decj, sizeof(double), 1, conf.f_fp); 
+  //fprintf(stdout, "%f\n", conf.decj);
+  //fflush(stdout);
   
   length = 10;
   fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
