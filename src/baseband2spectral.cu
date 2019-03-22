@@ -19,6 +19,10 @@
 #include "kernel.cuh"
 #include "log.h"
 #include "constants.h"
+//#include "queue.h"
+
+//queue_t *queue_fits_monitor;
+//queue_t *queue_fits_spectral;
 
 extern pthread_mutex_t log_mutex;
 
@@ -92,7 +96,8 @@ int initialize_baseband2spectral(conf_t *conf)
       conf->dtsz_network_monitor  = NBYTE_FLOAT * conf->nchan_in;
       conf->pktsz_network_monitor = conf->dtsz_network_monitor + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
       log_add(conf->log_file, "INFO", 1, log_mutex, "Network data size for monitor is %d", conf->dtsz_network_monitor);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size for monitor is %d", conf->pktsz_network_monitor); 
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size for monitor is %d", conf->pktsz_network_monitor);
+      //queue_fits_monitor = create_queue(2* conf->neth_per_blk);
     }
   
   /* Prepare buffer, stream and fft plan for process */
@@ -383,6 +388,8 @@ int initialize_baseband2spectral(conf_t *conf)
       log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network);
+
+      //queue_fits_spectral = create_queue(2* conf->nchunk_network * NDATA_PER_SAMP_FULL);
     }
   
   return EXIT_SUCCESS;
@@ -1223,6 +1230,8 @@ int baseband2spectral(conf_t conf)
 			  exit(EXIT_FAILURE);
 			}
 		      usleep(2000);
+		      
+		      //enqueue(queue_fits_spectral, fits); // Put the FITS into the queue
 		    }
 		}
 	      time_stamp_f += fits.tsamp;
@@ -1280,6 +1289,8 @@ int destroy_baseband2spectral(conf_t conf)
 	cudaFree(conf.dbuf_out_monitor1);
       if(conf.dbuf_out_monitor2)
 	cudaFree(conf.dbuf_out_monitor2);
+
+      //destroy_queue(*queue_fits_monitor);
     }
     
   if(conf.dbuf_in)
@@ -1297,7 +1308,10 @@ int destroy_baseband2spectral(conf_t conf)
       dada_cuda_dbunregister(conf.hdu_in);
       dada_hdu_unlock_read(conf.hdu_in);
       dada_hdu_destroy(conf.hdu_in);
-    }  
+    }
+  //if(conf.output_network)
+  //  destroy_queue(*queue_fits_spectral);
+  
   if(conf.db_out && (!conf.output_network))
     {
       dada_cuda_dbunregister(conf.hdu_out);

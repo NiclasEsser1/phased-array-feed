@@ -11,16 +11,17 @@ extern "C" {
   { 
     int front, rear, size; 
     unsigned capacity; 
-    int* array; 
+    fits_t* fits; 
   }queue_t; 
   
   queue_t* create_queue(unsigned capacity);
   int is_full(queue_t* queue);
   int is_empty(queue_t* queue);
-  void enqueue(queue_t* queue, int item);
-  int dequeue(queue_t* queue);
-  int front(queue_t* queue);
-  int rear(queue_t* queue);
+  void enqueue(queue_t* queue, fits_t fits);
+  fits_t dequeue(queue_t* queue);
+  fits_t front(queue_t* queue);
+  fits_t rear(queue_t* queue);
+  int destroy_queue(queue_t queue) ;
   
 #endif
 
