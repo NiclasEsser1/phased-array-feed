@@ -584,7 +584,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-		      //(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -600,7 +599,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -616,7 +614,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -632,7 +629,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -648,7 +644,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -664,7 +659,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -680,7 +674,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -696,7 +689,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -712,7 +704,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -728,7 +719,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -744,7 +734,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 &conf.dbuf_out_monitor1[dbufout_offset_monitor1],
@@ -985,7 +974,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-		      //(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1000,7 +988,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1015,7 +1002,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1030,7 +1016,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1045,7 +1030,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1060,7 +1044,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1075,7 +1058,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1090,7 +1072,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1105,7 +1086,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1120,7 +1100,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1135,7 +1114,6 @@ int baseband2spectral(conf_t conf)
 			blocksize_spectral_taccumulate,
 			blocksize_spectral_taccumulate.x * NDATA_PER_SAMP_RT * NBYTE_SPECTRAL,
 			conf.streams[j]>>>
-			//(&conf.buf_rt2[conf.bufrt2_offset],
 			(&conf.buf_rt2[bufrt2_offset],
 			 &conf.dbuf_out[dbufout_offset],
 			 conf.nsamp_keep,
@@ -1176,7 +1154,7 @@ int baseband2spectral(conf_t conf)
 		  fclose(conf.log_file);
 		  exit(EXIT_FAILURE);
 		}
-	      usleep(1);
+	      usleep(2000);
 	    }
 	  log_add(conf.log_file, "INFO", 1, log_mutex, "monitor data sending done");
 	}
@@ -1244,7 +1222,7 @@ int baseband2spectral(conf_t conf)
 			  fclose(conf.log_file);
 			  exit(EXIT_FAILURE);
 			}
-		      usleep(1);
+		      usleep(2000);
 		    }
 		}
 	      time_stamp_f += fits.tsamp;
