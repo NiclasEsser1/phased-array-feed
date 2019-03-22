@@ -5,6 +5,8 @@
 #include <limits.h>
 #include "queue.h"
 
+extern int quit;
+
 // function to create a queue of given capacity.  
 // It initializes size of queue as 0 
 queue_t* create_queue(unsigned capacity) 
@@ -41,10 +43,11 @@ int is_empty(queue_t* queue)
 
 // Function to add an fits to the queue.   
 // It changes rear and size 
-void enqueue(queue_t* queue, fits_t fits) 
+int enqueue(queue_t* queue, fits_t fits) 
 { 
-  if (is_full(queue)) 
-    return; 
+  if (is_full(queue))
+    exit(EXIT_FAILURE);
+  
   queue->rear = (queue->rear + 1)%queue->capacity; 
   queue->fits[queue->rear] = fits; 
   queue->size = queue->size + 1; 
@@ -52,37 +55,41 @@ void enqueue(queue_t* queue, fits_t fits)
 
 // Function to remove an fits from queue.  
 // It changes front and size 
-fits_t dequeue(queue_t* queue) 
+int dequeue(queue_t* queue, fits_t *fits) 
 { 
   if (is_empty(queue))
     {
       fprintf(stdout, "The queue is EMPTY!\n");
       exit(EXIT_FAILURE);
     }
-  fits_t fits = queue->fits[queue->front]; 
+  *fits = queue->fits[queue->front]; 
   queue->front = (queue->front + 1)%queue->capacity; 
-  queue->size = queue->size - 1; 
-  return fits; 
+  queue->size = queue->size - 1;
+  
+  return EXIT_SUCCESS;
 } 
 
 // Function to get front of queue 
-fits_t front(queue_t* queue) 
+int front(queue_t* queue, fits_t *fits) 
 { 
   if (is_empty(queue))
     {
       fprintf(stdout, "The queue is EMPTY!\n");
       exit(EXIT_FAILURE);
     }
-  return queue->fits[queue->front]; 
+  *fits = queue->fits[queue->front];
+  return EXIT_SUCCESS;
 } 
   
 // Function to get rear of queue 
-fits_t rear(queue_t* queue) 
+int rear(queue_t* queue, fits_t *fits) 
 { 
   if (is_empty(queue))
     {
       fprintf(stdout, "The queue is EMPTY!\n");
       exit(EXIT_FAILURE);
     }
-  return queue->fits[queue->rear]; 
+  *fits = queue->fits[queue->rear];
+  
+  return EXIT_SUCCESS;
 } 

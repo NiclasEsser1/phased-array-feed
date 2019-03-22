@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <cuda_profiler_api.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "baseband2baseband.cuh"

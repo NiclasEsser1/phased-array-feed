@@ -107,4 +107,9 @@ int destroy_baseband2spectral(conf_t conf);
 int default_arguments(conf_t *conf);
 int examine_record_arguments(conf_t conf, char **argv, int argc);
 
+void *spectral_sendto(conf_t *conf);
+void *monitor_sendto(conf_t *conf);
+void *do_baseband2spectral(conf_t *conf);
+
+int threads(conf_t conf);
 #endif

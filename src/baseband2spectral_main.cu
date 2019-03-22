@@ -190,11 +190,10 @@ int main(int argc, char *argv[])
   fflush(stdout);
   
   /* Play with data */  
-  fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
-  fflush(stdout);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL_READY");
-  baseband2spectral(conf);
-
+  //baseband2spectral(conf);
+  fprintf(stdout, "%f\n", conf.tsamp_in);
+  threads(conf);
+  
   /* Destroy */
   log_add(conf.log_file, "INFO", 1, log_mutex, "BEFORE destroy");  
   destroy_baseband2spectral(conf);

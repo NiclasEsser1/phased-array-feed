@@ -24,13 +24,13 @@ int main()
   fits.nchan = 10000;
   enqueue(queue, fits); 
   
-  fits = dequeue(queue);
+  dequeue(queue, &fits);
   printf("%d \n", fits.nchan); 
   
-  fits = front(queue);
+  front(queue, &fits);
   printf("%d\n", fits.nchan);
   
-  fits = rear(queue);
+  rear(queue, &fits);
   printf("%d\n", fits.nchan);
   
   destroy_queue(*queue);
