@@ -120,7 +120,8 @@ int initialize_baseband2filterbank(conf_t *conf)
       conf->dtsz_network    = NBYTE_FLOAT * conf->nchan_out;
       conf->pktsz_network   = conf->dtsz_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
       log_add(conf->log_file, "INFO", 1, log_mutex, "Network data size for monitor is %d", conf->dtsz_network);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size for monitor is %d", conf->pktsz_network); 
+      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size for monitor is %d", conf->pktsz_network);
+      queue_fits_monitor = create_queue(10 * conf->neth_per_blk);
     }
   
   /* Prepare buffer, stream and fft plan for process */
@@ -617,6 +618,8 @@ int initialize_baseband2filterbank(conf_t *conf)
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network_spectral);
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network_spectral);
 	  log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network_spectral);
+	  
+	  queue_fits_spectral = create_queue(10 * conf->nchunk_network_spectral * NDATA_PER_SAMP_FULL);
 	}
     }
 
@@ -835,9 +838,13 @@ int destroy_baseband2filterbank(conf_t conf)
 	}
       if(conf.fft_plans_spectral)
 	free(conf.fft_plans_spectral);
+
+      if(conf.spectral2network == 1)
+	destroy_queue(*queue_fits_spectral);
     }
   if(conf.monitor)
     {
+      destroy_queue(*queue_fits_monitor);
       if(conf.dbuf_out_monitor1)
 	cudaFree(conf.dbuf_out_monitor1);
       if(conf.dbuf_out_monitor2)
@@ -1676,7 +1683,7 @@ int threads(conf_t conf)
     pthread_join(thread[i], NULL);
   
   log_add(conf.log_file, "INFO", 1, log_mutex, "Join threads? The last quit is %d", quit);
-    
+  
   return EXIT_SUCCESS;
 }
 

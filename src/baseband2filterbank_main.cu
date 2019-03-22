@@ -19,6 +19,7 @@
 // Clean up testers also
 
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+extern int quit;
 
 void usage ()
 {
@@ -194,11 +195,9 @@ int main(int argc, char *argv[])
   //exit(EXIT_FAILURE);
   
   /* Play with data */  
-  fprintf(stdout, "BASEBAND2FILTERBANK_READY\n");  // Ready to take data from ring buffer, just before the header thing
-  fflush(stdout);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK_READY");
-  baseband2filterbank(conf);
-
+  //baseband2filterbank(conf);
+  threads(conf);
+  
   /* Destroy */
   log_add(conf.log_file, "INFO", 1, log_mutex, "BEFORE destroy");  
   destroy_baseband2filterbank(conf);
@@ -210,5 +209,8 @@ int main(int argc, char *argv[])
   fprintf(stdout, "HERE AFTER LOG CLOSE\n");
   fflush(stdout);
   
-  return EXIT_SUCCESS;
+  if(quit == 2)
+    exit(EXIT_FAILURE);
+  else
+    return EXIT_SUCCESS;
 }

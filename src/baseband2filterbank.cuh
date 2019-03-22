@@ -15,6 +15,7 @@
 #include "futils.h"
 #include "constants.h"
 #include "fits.h"
+#include "queue.h"
 
 typedef struct conf_t
 {
@@ -29,8 +30,6 @@ typedef struct conf_t
   int beam_index;
 
   int monitor, spectral2disk, spectral2network;
-  fits_t *fits_monitor;
-  fits_t fits_spectral;
   int neth_per_blk;
   int nseg_per_blk;
   
@@ -125,4 +124,9 @@ int destroy_baseband2filterbank(conf_t conf);
 int default_arguments(conf_t *conf);
 int examine_record_arguments(conf_t conf, char **argv, int argc);
 
+void *spectral_sendto(conf_t *conf);
+void *monitor_sendto(conf_t *conf);
+void *do_baseband2filterbank(void *conf);
+
+int threads(conf_t conf);
 #endif
