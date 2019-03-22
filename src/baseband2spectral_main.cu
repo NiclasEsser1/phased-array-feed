@@ -15,6 +15,7 @@
 #include "cudautil.cuh"
 #include "log.h"
 
+extern int quit;
 // Clean up unused kernels and parameters
 // Clean up testers also
 
@@ -204,6 +205,9 @@ int main(int argc, char *argv[])
   log_close(conf.log_file);
   fprintf(stdout, "Finally after log_close!!!\n");
   fflush(stdout);
-  
-  return EXIT_SUCCESS;
+
+  if(quit == 2)
+    exit(EXIT_FAILURE);
+  else
+    return EXIT_SUCCESS;
 }

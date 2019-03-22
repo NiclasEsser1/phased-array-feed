@@ -81,24 +81,17 @@ int initialize_baseband2spectral(conf_t *conf)
   log_add(conf->log_file, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrepeat_per_blk);
 
   /* Prepare monitor */
-  conf->fits_monitor = NULL;
   if(conf->monitor == 1)
     {
       conf->nseg_per_blk = conf->nstream * conf->nrepeat_per_blk;
       conf->neth_per_blk = conf->nseg_per_blk * NDATA_PER_SAMP_FULL;
-      conf->fits_monitor = (fits_t *)malloc(conf->neth_per_blk * sizeof(fits_t));
-      for(i = 0; i < conf->neth_per_blk; i++)
-      	{
-      	  memset(conf->fits_monitor[i].data, 0x00, sizeof(conf->fits_monitor[i].data));
-      	  cudaHostRegister ((void *) conf->fits_monitor[i].data, sizeof(conf->fits_monitor[i].data), 0);
-      	}
       log_add(conf->log_file, "INFO", 1, log_mutex, "%d network packets are requied for each buffer block", conf->neth_per_blk);
       
       conf->dtsz_network_monitor  = NBYTE_FLOAT * conf->nchan_in;
       conf->pktsz_network_monitor = conf->dtsz_network_monitor + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
       log_add(conf->log_file, "INFO", 1, log_mutex, "Network data size for monitor is %d", conf->dtsz_network_monitor);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size for monitor is %d", conf->pktsz_network_monitor);
-      queue_fits_monitor = create_queue(10* conf->neth_per_blk);
+      queue_fits_monitor = create_queue(10 * conf->neth_per_blk);
     }
   
   /* Prepare buffer, stream and fft plan for process */
@@ -390,7 +383,7 @@ int initialize_baseband2spectral(conf_t *conf)
       log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network);
       log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network);
 
-      queue_fits_spectral = create_queue(10* conf->nchunk_network * NDATA_PER_SAMP_FULL);
+      queue_fits_spectral = create_queue(10 * conf->nchunk_network * NDATA_PER_SAMP_FULL);
     }
 
   fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
@@ -429,17 +422,11 @@ int destroy_baseband2spectral(conf_t conf)
 
   if(conf.monitor)
     {
-      if(conf.fits_monitor)
-	{
-	  for(i = 0; i < conf.neth_per_blk; i++)
-	    cudaHostUnregister ((void *) conf.fits_monitor[i].data);
-	  free(conf.fits_monitor);
-	}
       if(conf.dbuf_out_monitor1)
 	cudaFree(conf.dbuf_out_monitor1);
       if(conf.dbuf_out_monitor2)
 	cudaFree(conf.dbuf_out_monitor2);
-
+      
       destroy_queue(*queue_fits_monitor);
     }
     
@@ -1060,6 +1047,7 @@ void *do_baseband2spectral(void *conf)
 
   struct tm tm_stamp;
   fits_t fits_spectral, fits_monitor;
+  cudaHostRegister ((void *) fits_monitor.data, sizeof(fits_monitor.data), 0);
   
   gridsize_unpack                      = baseband2spectral_conf->gridsize_unpack;
   blocksize_unpack                     = baseband2spectral_conf->blocksize_unpack;
@@ -1090,6 +1078,7 @@ void *do_baseband2spectral(void *conf)
 
 	  
 	  quit = 2;
+	  cudaHostUnregister ((void *) fits_monitor.data);
 	  pthread_exit(NULL);
 	}
       log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
@@ -1114,7 +1103,7 @@ void *do_baseband2spectral(void *conf)
   log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
   
   CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
-  while(!ipcbuf_eod(baseband2spectral_conf->db_in))
+  while(!ipcbuf_eod(baseband2spectral_conf->db_in) && !quit)
     {
       log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "before getting new buffer block");
       baseband2spectral_conf->cbuf_in  = ipcbuf_get_next_read(baseband2spectral_conf->db_in, &cbufsz);
@@ -1808,6 +1797,7 @@ void *do_baseband2spectral(void *conf)
   log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "FINISH the process");
 
   quit = 1;
+  cudaHostUnregister ((void *) fits_monitor.data);
   pthread_exit(NULL);
 }
 
