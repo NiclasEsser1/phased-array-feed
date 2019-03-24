@@ -1037,8 +1037,9 @@ void *do_baseband2spectral(void *conf)
   dim3 gridsize_saccumulate, blocksize_saccumulate;
   dim3 gridsize_faccumulate, blocksize_faccumulate;
   uint64_t cbufsz;
-  double time_res_blk, time_offset = 0, time_res_stream;
+  double time_res_blk, time_offset = 0, time_res_monitor, time_res;
   char time_stamp_monitor[MSTR_LEN];
+  char time_stamp[MSTR_LEN];
   double time_stamp_monitor_f;
   time_t time_stamp_monitor_i;
   uint64_t memcpy_offset;
@@ -1048,6 +1049,7 @@ void *do_baseband2spectral(void *conf)
   struct tm tm_stamp;
   fits_t fits_spectral, fits_monitor;
   cudaHostRegister ((void *) fits_monitor.data, sizeof(fits_monitor.data), 0);
+  cudaHostRegister ((void *) fits_spectral.data, sizeof(fits_spectral.data), 0);
   
   gridsize_unpack                      = baseband2spectral_conf->gridsize_unpack;
   blocksize_unpack                     = baseband2spectral_conf->blocksize_unpack;
@@ -1064,9 +1066,9 @@ void *do_baseband2spectral(void *conf)
   
   if(baseband2spectral_conf->monitor == 1)
     {
-      time_res_stream = baseband2spectral_conf->tsamp_in * baseband2spectral_conf->ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
+      time_res_monitor = baseband2spectral_conf->tsamp_in * baseband2spectral_conf->ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
       strptime(baseband2spectral_conf->utc_start, DADA_TIMESTR, &tm_stamp);
-      time_stamp_monitor_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * time_res_stream;
+      time_stamp_monitor_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * time_res_monitor;
     }
   
   if(baseband2spectral_conf->output_network == 0)
@@ -1079,24 +1081,16 @@ void *do_baseband2spectral(void *conf)
 	  
 	  quit = 2;
 	  cudaHostUnregister ((void *) fits_monitor.data);
+	  cudaHostUnregister ((void *) fits_spectral.data);
 	  pthread_exit(NULL);
 	}
       log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
     }
   if(baseband2spectral_conf->output_network == 1)
-    {      
-      fits_spectral.nchan = baseband2spectral_conf->nchan_out;
-      fits_spectral.pol_type = baseband2spectral_conf->pol_type;
-      fits_spectral.nchunk   = baseband2spectral_conf->nchan_in;
-      memset(fits_spectral.data, 0x00, sizeof(fits_spectral.data));
-	
-      fits_spectral.chan_width = baseband2spectral_conf->bandwidth / (double)baseband2spectral_conf->nchan_out;
-      
-      fits_spectral.center_freq = baseband2spectral_conf->center_freq;
-      fits_spectral.tsamp = time_res_blk * baseband2spectral_conf->nblk_accumulate;
-      fits_spectral.beam_index = baseband2spectral_conf->beam_index;
+    {
       strptime(baseband2spectral_conf->utc_start, DADA_TIMESTR, &tm_stamp);
-      time_stamp_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * fits_spectral.tsamp;
+      time_res = time_res_blk * baseband2spectral_conf->nblk_accumulate;
+      time_stamp_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * time_res;
     }
   fprintf(stdout, "HERE AFTER REGISTER HEADER\n");
   
@@ -1506,9 +1500,10 @@ void *do_baseband2spectral(void *conf)
 		  sprintf(time_stamp_monitor, "%s.%04dUTC ", time_stamp_monitor, (int)((time_stamp_monitor_f - time_stamp_monitor_i) * 1E4 + 0.5));
 		  for(k = 0; k < NDATA_PER_SAMP_FULL; k++)
 		    {
-		      memset(fits_monitor.data, 0x00, sizeof(fits_monitor.data));
+		      //memset(fits_monitor.data, 0x00, sizeof(fits_monitor.data));
+		      memset(&fits_monitor, 0x00, sizeof(fits_monitor));
 		      strncpy(fits_monitor.time_stamp, time_stamp_monitor, FITS_TIME_STAMP_LEN);
-		      fits_monitor.tsamp = time_res_stream;
+		      fits_monitor.tsamp = time_res_monitor;
 		      fits_monitor.nchan = baseband2spectral_conf->nchan_in;
 		      fits_monitor.chan_width = baseband2spectral_conf->bandwidth/baseband2spectral_conf->nchan_in;
 		      fits_monitor.pol_type = baseband2spectral_conf->ptype_monitor;
@@ -1541,7 +1536,7 @@ void *do_baseband2spectral(void *conf)
 		      enqueue(queue_fits_monitor, fits_monitor); // Put the FITS into the queue
 		    }
 		  
-		  time_stamp_monitor_f += time_res_stream;
+		  time_stamp_monitor_f += time_res_monitor;
 		}
 	      else
 		{
@@ -1736,23 +1731,33 @@ void *do_baseband2spectral(void *conf)
 					cudaMemcpyDeviceToHost));
 	    }
 	  if(baseband2spectral_conf->output_network == 1)
-	    {
+	    {  
 	      time_stamp_i = (time_t)time_stamp_f;
-	      strftime(fits_spectral.time_stamp,
+	      strftime(time_stamp,
 		       FITS_TIME_STAMP_LEN,
 		       FITS_TIMESTR,
 		       gmtime(&time_stamp_i));    // String start time without fraction second
-	      sprintf(fits_spectral.time_stamp,
+	      sprintf(time_stamp,
 		      "%s.%04dUTC ",
-		      fits_spectral.time_stamp,
+		      time_stamp,
 		      (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));// To put the fraction part in and make sure that it rounds to closest integer
 	      
 	      for(i = 0; i < NDATA_PER_SAMP_FULL; i++)
 		{
-		  fits_spectral.pol_index = i;
 		  for(j = 0; j < baseband2spectral_conf->nchunk_network; j++)
 		    {
-		      memset(fits_spectral.data, 0x00, sizeof(fits_spectral.data));
+		      memset(&fits_spectral, 0x00, sizeof(fits_spectral));
+
+		      strncpy(fits_spectral.time_stamp, time_stamp, FITS_TIME_STAMP_LEN);		      
+		      fits_spectral.pol_index = i;   
+		      fits_spectral.nchan = baseband2spectral_conf->nchan_out;
+		      fits_spectral.pol_type = baseband2spectral_conf->pol_type;
+		      fits_spectral.nchunk   = baseband2spectral_conf->nchan_in;		      
+		      fits_spectral.chan_width = baseband2spectral_conf->bandwidth / (double)baseband2spectral_conf->nchan_out;		      
+		      fits_spectral.center_freq = baseband2spectral_conf->center_freq;
+		      fits_spectral.tsamp = time_res;
+		      fits_spectral.beam_index = baseband2spectral_conf->beam_index;
+		      
 		      memcpy_offset = i * fits_spectral.nchan +
 			j * baseband2spectral_conf->nchan_per_chunk_network;
 		      fits_spectral.chunk_index = j;
@@ -1798,6 +1803,7 @@ void *do_baseband2spectral(void *conf)
 
   quit = 1;
   cudaHostUnregister ((void *) fits_monitor.data);
+  cudaHostUnregister ((void *) fits_spectral.data);
   pthread_exit(NULL);
 }
 
