@@ -1729,10 +1729,8 @@ void *do_baseband2filterbank(void *conf)
   time_t time_stamp_spectral_i;
   uint64_t memcpy_offset;
   int nblk_accumulate = 0;
-  fits_t fits_monitor, fits_spectral;
-  
-  cudaHostRegister ((void *) fits_monitor.data, sizeof(fits_monitor.data), 0);
-  cudaHostRegister ((void *) fits_spectral.data, sizeof(fits_spectral.data), 0);
+  int eth_index;
+  fits_t *fits_monitor, fits_spectral;
   
   gridsize_unpack                      = baseband2filterbank_conf->gridsize_unpack;
   blocksize_unpack                     = baseband2filterbank_conf->blocksize_unpack;
@@ -1761,6 +1759,10 @@ void *do_baseband2filterbank(void *conf)
       strptime(baseband2filterbank_conf->utc_start, DADA_TIMESTR, &tm_stamp);
       time_stamp_monitor_f = mktime(&tm_stamp) + baseband2filterbank_conf->picoseconds / 1.0E12 + 0.5 * time_res_monitor;
       chan_width_monitor = baseband2filterbank_conf->bandwidth/baseband2filterbank_conf->nchan_out;
+      
+      fits_monitor = (fits_t *)malloc(baseband2filterbank_conf->neth_per_blk * sizeof(fits_t));
+      for(i = 0; i < baseband2filterbank_conf->neth_per_blk; i++)
+	cudaHostRegister ((void *) fits_monitor[i].data, sizeof(fits_monitor[i].data), 0);
     }  
   if(baseband2filterbank_conf->sod == 1)
     {
@@ -1770,8 +1772,14 @@ void *do_baseband2filterbank(void *conf)
 	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
 	  quit = 2;
-	  cudaHostUnregister ((void *) fits_monitor.data);
-	  cudaHostUnregister ((void *) fits_spectral.data);
+	  if(baseband2filterbank_conf->monitor == 1)
+	    {	     
+	      for(i = 0; i < baseband2filterbank_conf->neth_per_blk; i++)
+		cudaHostUnregister((void *) fits_monitor[i].data);
+	      free(fits_monitor);
+	    }
+	  if(baseband2filterbank_conf->spectral2network == 1)
+	    cudaHostUnregister ((void *) fits_spectral.data);
 	  pthread_exit(NULL);
 	}
       log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
@@ -1788,13 +1796,18 @@ void *do_baseband2filterbank(void *conf)
 	      log_add(baseband2filterbank_conf->log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      quit = 2;
-	      cudaHostUnregister ((void *) fits_monitor.data);
-	      cudaHostUnregister ((void *) fits_spectral.data);
+	      if(baseband2filterbank_conf->monitor == 1)
+		{	     
+		  for(i = 0; i < baseband2filterbank_conf->neth_per_blk; i++)
+		    cudaHostUnregister((void *) fits_monitor[i].data);
+		  free(fits_monitor);
+		}
 	      pthread_exit(NULL);
 	    }
 	}
       if(baseband2filterbank_conf->spectral2network == 1)
 	{
+	  cudaHostRegister ((void *) fits_spectral.data, sizeof(fits_spectral.data), 0);
 	  strptime(baseband2filterbank_conf->utc_start, DADA_TIMESTR, &tm_stamp);
 	  time_res_spectral = time_res_blk * baseband2filterbank_conf->nblk_accumulate;
 	  time_stamp_spectral_f = mktime(&tm_stamp) + baseband2filterbank_conf->picoseconds / 1.0E12 + 0.5 * time_res_spectral;
@@ -2388,23 +2401,23 @@ void *do_baseband2filterbank(void *conf)
 		  sprintf(time_stamp_monitor, "%s.%04dUTC ", time_stamp_monitor, (int)((time_stamp_monitor_f - time_stamp_monitor_i) * 1E4 + 0.5));
 		  for(k = 0; k < NDATA_PER_SAMP_FULL; k++)
 		    {
-		      memset(&fits_monitor, 0x00, sizeof(fits_monitor));
-		      strncpy(fits_monitor.time_stamp, time_stamp_monitor, FITS_TIME_STAMP_LEN);		  
-		      fits_monitor.tsamp = time_res_monitor;
-		      fits_monitor.nchan = baseband2filterbank_conf->nchan_out;
-		      fits_monitor.chan_width = chan_width_monitor;
-		      fits_monitor.pol_type = baseband2filterbank_conf->ptype_monitor;
-		      fits_monitor.pol_index = k;
-		      fits_monitor.beam_index  = baseband2filterbank_conf->beam_index;
-		      fits_monitor.center_freq = baseband2filterbank_conf->cfreq_band;
-		      fits_monitor.nchunk = 1;
-		      fits_monitor.chunk_index = 0;
+		      eth_index = i * baseband2filterbank_conf->nstream * NDATA_PER_SAMP_FULL + j * NDATA_PER_SAMP_FULL + k;
+		      strncpy(fits_monitor[eth_index].time_stamp, time_stamp_monitor, FITS_TIME_STAMP_LEN);		  
+		      fits_monitor[eth_index].tsamp = time_res_monitor;
+		      fits_monitor[eth_index].nchan = baseband2filterbank_conf->nchan_out;
+		      fits_monitor[eth_index].chan_width = chan_width_monitor;
+		      fits_monitor[eth_index].pol_type = baseband2filterbank_conf->ptype_monitor;
+		      fits_monitor[eth_index].pol_index = k;
+		      fits_monitor[eth_index].beam_index  = baseband2filterbank_conf->beam_index;
+		      fits_monitor[eth_index].center_freq = baseband2filterbank_conf->cfreq_band;
+		      fits_monitor[eth_index].nchunk = 1;
+		      fits_monitor[eth_index].chunk_index = 0;
 		      
 		      if(k < baseband2filterbank_conf->ptype_monitor)
 			{
 			  if(baseband2filterbank_conf->ptype_monitor == 2)
 			    {
-			      CudaSafeCall(cudaMemcpyAsync(fits_monitor.data,
+			      CudaSafeCall(cudaMemcpyAsync(fits_monitor[eth_index].data,
 							   &baseband2filterbank_conf->dbuf_out_monitor3[dbufout_offset_monitor3 +
 									   baseband2filterbank_conf->nchan_out  *
 									   (NDATA_PER_SAMP_FULL + k)],
@@ -2413,14 +2426,13 @@ void *do_baseband2filterbank(void *conf)
 							   baseband2filterbank_conf->streams[j]));
 			    }
 			  else
-			    CudaSafeCall(cudaMemcpyAsync(fits_monitor.data,
+			    CudaSafeCall(cudaMemcpyAsync(fits_monitor[eth_index].data,
 							 &baseband2filterbank_conf->dbuf_out_monitor3[dbufout_offset_monitor3 +
 									 k * baseband2filterbank_conf->nchan_out],
 							 baseband2filterbank_conf->dtsz_network,
 							 cudaMemcpyDeviceToHost,
 							 baseband2filterbank_conf->streams[j]));
 			}
-		      enqueue(queue_fits_monitor, fits_monitor); // Put the FITS into the queue
 		    }
 		  time_stamp_monitor_f += time_res_monitor;
 		}
@@ -2492,6 +2504,12 @@ void *do_baseband2filterbank(void *conf)
       fflush(stdout);
       nblk_accumulate++;
       
+      if(baseband2filterbank_conf->monitor == 1)
+	{
+	  for(i = 0; i < baseband2filterbank_conf->neth_per_blk; i++)
+	    enqueue(queue_fits_monitor, fits_monitor[i]); // Put the FITS into the queue
+	}
+      
       if(nblk_accumulate == baseband2filterbank_conf->nblk_accumulate)
 	{
 	  if(baseband2filterbank_conf->spectral2disk == 1)
@@ -2522,7 +2540,7 @@ void *do_baseband2filterbank(void *conf)
 		{
 		  for(j = 0; j < baseband2filterbank_conf->nchunk_network_spectral; j++)
 		    {
-		      memset(&fits_spectral, 0x00, sizeof(fits_spectral));
+		      memset(fits_spectral.data, 0x00, sizeof(fits_spectral.data));
 		      
 		      strncpy(fits_spectral.time_stamp, time_stamp_spectral, FITS_TIME_STAMP_LEN);		      	      
 		      fits_spectral.pol_index = i;	      
@@ -2572,7 +2590,14 @@ void *do_baseband2filterbank(void *conf)
   log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "FINISH the process");
 
   quit = 1;
-  cudaHostUnregister ((void *) fits_monitor.data);
-  cudaHostUnregister ((void *) fits_spectral.data);
+  
+  if(baseband2filterbank_conf->monitor)
+    {
+      for(i = 0; i < baseband2filterbank_conf->neth_per_blk; i++)
+	cudaHostUnregister ((void *) fits_monitor[i].data);
+      free(fits_monitor);
+    }
+  if(baseband2filterbank_conf->spectral2network == 1)
+    cudaHostUnregister ((void *) fits_spectral.data);
   pthread_exit(NULL);
 }

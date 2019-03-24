@@ -46,8 +46,6 @@ typedef struct conf_t
   uint64_t file_size_in;
   uint64_t bytes_per_second_in;
 
-  fits_t *fits_monitor;
-  
   int nchunk_network;
   int nchan_per_chunk_network;
   int dtsz_network, dtsz_network_monitor;
