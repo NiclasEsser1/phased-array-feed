@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 		}
 	      else
 		{
-		  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ptype_spectral should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n",conf.ptype_spectral,  __FILE__, __LINE__);
+		  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ptype_spectral should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n",conf.ptype_spectral,  __FILE__, __LINE__);
 		  exit(EXIT_FAILURE);
 		}
 	    }

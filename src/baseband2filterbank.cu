@@ -1558,8 +1558,8 @@ void *spectral_sendto(void *conf)
       while((!quit) && (is_empty(queue_fits_spectral))) // Wait until we get data or quit if error
 	usleep(sleep_time);
       
-      fprintf(stdout, "HERE sending data for spectral, %d\n", index);
-      fflush(stdout);
+      //fprintf(stdout, "HERE sending data for spectral, %d\n", index);
+      //fflush(stdout);
       index ++;
       if(dequeue(queue_fits_spectral, &fits))
 	{
@@ -1569,21 +1569,30 @@ void *spectral_sendto(void *conf)
 	  pthread_exit(NULL);
 	  quit = 2;
 	}
-      if(sendto(sock,
-		(void *)&fits,
-		baseband2filterbank_conf->pktsz_network_spectral,
-		0,
-		(struct sockaddr *)&sa,
-		tolen) == -1)
+      if(fits.nchan != 0) // Rough check data is there
 	{
-	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(baseband2filterbank_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  
-	  close(sock);
-	  quit = 2;
-	  pthread_exit(NULL);
+	  if(sendto(sock,
+		    (void *)&fits,
+		    baseband2filterbank_conf->pktsz_network_spectral,
+		    0,
+		    (struct sockaddr *)&sa,
+		    tolen) == -1)
+	    {
+	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      log_add(baseband2filterbank_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	      
+	      close(sock);
+	      quit = 2;
+	      pthread_exit(NULL);
+	    }
+	  usleep(sleep_time);
 	}
-      usleep(sleep_time);
+      else
+	{
+	  fprintf(stdout, "We got a bad spectral packet\n");
+	  fflush(stdout);
+	  log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "One bad spectral packet", __FILE__, __LINE__);
+	}
     }
     
   close(sock);
@@ -1636,26 +1645,34 @@ void *monitor_sendto(void *conf)
 	  pthread_exit(NULL);
 	  quit = 2;
 	}
-      fprintf(stdout, "HERE sending data for monitor, %d\n", index);
-      fflush(stdout);
+      //fprintf(stdout, "HERE sending data for monitor, %d\n", index);
+      //fflush(stdout);
       index++;
-      if(sendto(sock,
-		(void *)&fits,
-		baseband2filterbank_conf->pktsz_network,
-		0,
-		(struct sockaddr *)&sa,
-		tolen) == -1)
+      if(fits.nchan != 0) // Rough check data is there
 	{
-	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(baseband2filterbank_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  
-	  close(sock);
-	  quit = 2;
-	  pthread_exit(NULL);
+	  if(sendto(sock,
+		    (void *)&fits,
+		    baseband2filterbank_conf->pktsz_network,
+		    0,
+		    (struct sockaddr *)&sa,
+		    tolen) == -1)
+	    {
+	      fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      log_add(baseband2filterbank_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	      
+	      close(sock);
+	      quit = 2;
+	      pthread_exit(NULL);
+	    }
+	  usleep(sleep_time);
 	}
-      usleep(sleep_time);
+      else
+	{
+	  fprintf(stdout, "We got a bad monitor packet\n");
+	  fflush(stdout);
+	  log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "One bad monitor packet.", __FILE__, __LINE__);
+	}
     }
-  
   close(sock);
   quit = 1;
   pthread_exit(NULL);
@@ -2413,6 +2430,13 @@ void *do_baseband2filterbank(void *conf)
 		      fits_monitor[eth_index].nchunk = 1;
 		      fits_monitor[eth_index].chunk_index = 0;
 		      
+		      if(fits_monitor[eth_index].nchan == 0)
+			{
+			  fprintf(stdout, "We get a bad monitor packet before queue\n");
+			  log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "We get a bad monitor packet before queue");
+			  fflush(stdout);
+			}
+		      
 		      if(k < baseband2filterbank_conf->ptype_monitor)
 			{
 			  if(baseband2filterbank_conf->ptype_monitor == 2)
@@ -2552,6 +2576,13 @@ void *do_baseband2filterbank(void *conf)
 		      fits_spectral.tsamp = time_res_spectral;
 		      fits_spectral.beam_index = baseband2filterbank_conf->beam_index;
 	  
+		      if(fits_spectral.nchan == 0)
+			{
+			  fprintf(stdout, "We get a bad spectral packet before queue\n");
+			  log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "We get a bad spectral packet before queue");
+			  fflush(stdout);
+			}
+		      
 		      memcpy_offset = i * baseband2filterbank_conf->nchan_out_spectral +
 			j * baseband2filterbank_conf->nchan_per_chunk_network_spectral;
 		      fits_spectral.chunk_index = j;

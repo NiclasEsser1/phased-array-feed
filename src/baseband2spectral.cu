@@ -729,7 +729,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     {   
       if(!((conf.ptype_monitor == 1) || (conf.ptype_monitor == 2) || (conf.ptype_monitor == 4)))
 	{
-	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ptype_monitor, __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ptype_monitor, __FILE__, __LINE__);
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ptype_monitor, __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
@@ -740,7 +740,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
             
       if(conf.port_monitor == -1)
 	{
-	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port_monitor, __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port_monitor, __FILE__, __LINE__);
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port_monitor, __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
@@ -748,7 +748,7 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
 	}
       if(strstr(conf.ip_monitor, "unset"))
 	{
-	  fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: monitor ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: monitor ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
 	  log_add(conf.log_file, "ERR", 1, log_mutex, "monitor ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
@@ -921,8 +921,8 @@ void *spectral_sendto(void *conf)
       while((!quit) && (is_empty(queue_fits_spectral))) // Wait until we get data or quit if error
 	usleep(sleep_time);
       
-      fprintf(stdout, "HERE sending data for spectral, %d\n", index);
-      fflush(stdout);
+      //fprintf(stdout, "HERE sending data for spectral, %d\n", index);
+      //fflush(stdout);
       index ++;
       if(dequeue(queue_fits_spectral, &fits))
 	{
@@ -932,21 +932,31 @@ void *spectral_sendto(void *conf)
 	  pthread_exit(NULL);
 	  quit = 2;
 	}
-      if(sendto(sock,
-		(void *)&fits,
-		baseband2spectral_conf->pktsz_network,
-		0,
-		(struct sockaddr *)&sa,
-		tolen) == -1)
+      
+      if(fits.nchan != 0) // Rough check data is there
 	{
-	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  
-	  close(sock);
-	  quit = 2;
-	  pthread_exit(NULL);
+	  if(sendto(sock,
+		    (void *)&fits,
+		    baseband2spectral_conf->pktsz_network,
+		    0,
+		    (struct sockaddr *)&sa,
+		    tolen) == -1)
+	    {
+	      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	      
+	      close(sock);
+	      quit = 2;
+	      pthread_exit(NULL);
+	    }
+	  usleep(sleep_time);
 	}
-      usleep(sleep_time);
+      else
+	{
+	  fprintf(stdout, "We got a bad spectral packet\n");
+	  fflush(stdout);
+	  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "One bad spectral packet", __FILE__, __LINE__);
+	}
     }
     
   close(sock);
@@ -999,24 +1009,34 @@ void *monitor_sendto(void *conf)
 	  pthread_exit(NULL);
 	  quit = 2;
 	}
-      fprintf(stdout, "HERE sending data for monitor, %d\n", index);
-      fflush(stdout);
+      //fprintf(stdout, "HERE sending data for monitor, %d\n", index);
+      //fflush(stdout);
       index++;
-      if(sendto(sock,
-		(void *)&fits,
-		baseband2spectral_conf->pktsz_network_monitor,
-		0,
-		(struct sockaddr *)&sa,
-		tolen) == -1)
+      
+      if(fits.nchan != 0) // Rough check the data is there
 	{
-	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  
-	  close(sock);
-	  quit = 2;
-	  pthread_exit(NULL);
+	  if(sendto(sock,
+		    (void *)&fits,
+		    baseband2spectral_conf->pktsz_network_monitor,
+		    0,
+		    (struct sockaddr *)&sa,
+		    tolen) == -1)
+	    {
+	      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	      
+	      close(sock);
+	      quit = 2;
+	      pthread_exit(NULL);
+	    }
+	  usleep(sleep_time);
 	}
-      usleep(sleep_time);
+      else
+	{
+	  fprintf(stdout, "We got a bad monitor packet\n");
+	  fflush(stdout);
+	  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "One bad monitor packet", __FILE__, __LINE__);
+	}
     }
   
   close(sock);
@@ -1520,6 +1540,14 @@ void *do_baseband2spectral(void *conf)
 		      fits_monitor[eth_index].nchunk = 1;
 		      fits_monitor[eth_index].chunk_index = 0;
 		      
+		      if(fits_monitor[eth_index].nchan == 0)
+			{
+			  fprintf(stdout, "We get a bad monitor packet before queue\n");
+			  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "We get a bad monitor packet before queue");
+			  fflush(stdout);
+			}
+
+		      
 		      if(k < baseband2spectral_conf->ptype_monitor)
 			{
 			  if(baseband2spectral_conf->ptype_monitor == 2)
@@ -1768,6 +1796,12 @@ void *do_baseband2spectral(void *conf)
 		      fits_spectral.center_freq = baseband2spectral_conf->center_freq;
 		      fits_spectral.tsamp = time_res;
 		      fits_spectral.beam_index = baseband2spectral_conf->beam_index;
+		      if(fits_spectral.nchan == 0)
+			{
+			  fprintf(stdout, "We get a bad spectral packet before queue\n");
+			  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "We get a bad spectral packet before queue");
+			  fflush(stdout);
+			}
 		      
 		      memcpy_offset = i * fits_spectral.nchan +
 			j * baseband2spectral_conf->nchan_per_chunk_network;
