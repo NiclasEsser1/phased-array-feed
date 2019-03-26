@@ -138,7 +138,7 @@ void *do_capture(void *conf)
 
       //chunk_index = (int)((freq - capture_conf->center_freq + 0.5)/NCHAN_PER_CHUNK + capture_conf->nchunk/2);      
       chunk_index = (int)(freq/NCHAN_PER_CHUNK + chunk_index0);
-      fprintf(stdout, "%f\t%d\n", freq, chunk_index);
+      //fprintf(stdout, "%f\t%d\n", freq, chunk_index);
       
       if (chunk_index<0 || chunk_index > (capture_conf->nchunk-1))
 	{      

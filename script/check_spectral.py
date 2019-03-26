@@ -15,7 +15,7 @@ hdrsize    = 4096
 dsize      = 4
 ndata_samp = 4
 
-#bw         = 336.0
+bw         = 336.0
 #bw         = 14.0
 bw         = 231
 #bw         = 35
@@ -33,7 +33,7 @@ freq       = freq0 + np.arange(int(nchan_band))/float(nchan_chan)
 #fdir  = "/beegfs/DENG/pacifix8_numa0_process0/"
 #fdir  = "/beegfs/DENG/pacifix7_numa0_process0/"
 #fdir  = "/beegfs/DENG/pacifix0_numa0_process1/"
-fdir  = "/beegfs/DENG/beam10/"
+fdir  = "/beegfs/DENG/beam08/"
 #fname = "2018-08-30-19:37:27_0000000000000000.000000.dada"
 #fname = "2018-08-31-01:11:19_0000000000000000.000000.dada"
 #fname = "2018-08-30-20:11:41_0000000000000000.000000.dada"
@@ -43,6 +43,8 @@ fname = "2019-03-25-20:34:29_0000000000000000.000000.dada"  # DATA from on-sky, 
 fname = "2019-03-26-10:47:13_0000000000000000.000000.dada"   # DATA from on-sky, beam05, full band
 fname = "2019-03-26-10:55:41_0000000000000000.000000.dada"   # DATA from on-sky, beam10 and beam11;
 fname = "2019-03-26-11:10:05_0000000000000000.000000.dada"
+fname = "2019-03-26-13:51:59_0000000000000000.000000.dada"   # DATA from on-sky, beam09 and beam08, after capture fix, 33 chunks;
+#fname = "2019-03-26-13:54:21_0000000000000000.000000.dada"   # DATA from on-sky, beam09 and beam04, after capture fix, 48 chunks;
 
 blksize = ndata * dsize
 fname   = os.path.join(fdir, fname)
