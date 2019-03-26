@@ -1088,6 +1088,17 @@ void *do_baseband2spectral(void *conf)
       time_res_monitor = baseband2spectral_conf->tsamp_in * baseband2spectral_conf->ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
       strptime(baseband2spectral_conf->utc_start, DADA_TIMESTR, &tm_stamp);
       time_stamp_monitor_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * time_res_monitor;
+      //struct tm *local;
+      //time_t t;
+      //
+      //t = time(NULL);
+      //local = localtime(&t);
+      //fprintf(stdout, "Local time and date: %s\n", asctime(local));
+      //local = gmtime(&t);
+      //fprintf(stdout, "UTC time and date: %s\n", asctime(local));
+      //fprintf(stdout, "UTC from software: %s\n", time_stamp);
+      //fflush(stdout);
+      
       fits_monitor = (fits_t *)malloc(baseband2spectral_conf->neth_per_blk * sizeof(fits_t));
       for(i = 0; i < baseband2spectral_conf->neth_per_blk; i++)
 	cudaHostRegister ((void *) fits_monitor[i].data, sizeof(fits_monitor[i].data), 0);
@@ -1118,6 +1129,9 @@ void *do_baseband2spectral(void *conf)
       strptime(baseband2spectral_conf->utc_start, DADA_TIMESTR, &tm_stamp);
       time_res = time_res_blk * baseband2spectral_conf->nblk_accumulate;
       time_stamp_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * time_res;
+      
+      fprintf(stdout, "TIME_STAP_F of spectral:\t%f\n", time_stamp_f);
+      fflush(stdout);
     }
   fprintf(stdout, "HERE AFTER REGISTER HEADER\n");
   
@@ -1781,6 +1795,17 @@ void *do_baseband2spectral(void *conf)
 		      "%s.%04dUTC ",
 		      time_stamp,
 		      (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));// To put the fraction part in and make sure that it rounds to closest integer
+
+	      //struct tm *local;
+	      //time_t t;
+	      //
+	      //t = time(NULL);
+	      //local = localtime(&t);
+	      //fprintf(stdout, "Local time and date: %s\n", asctime(local));
+	      //local = gmtime(&t);
+	      //fprintf(stdout, "UTC time and date: %s\n", asctime(local));
+	      //fprintf(stdout, "UTC from software: %s\n", time_stamp);
+	      //fflush(stdout);
 	      
 	      for(i = 0; i < NDATA_PER_SAMP_FULL; i++)
 		{

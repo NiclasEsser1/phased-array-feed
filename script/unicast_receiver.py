@@ -32,9 +32,9 @@ unpack_data = struct.unpack("i28cfiffiiii{}f".format(nchan_per_chunk), data)
 print unpack_data[0:37]
 spectral = unpack_data[37:-1]
 print spectral
-#plt.figure()
-#plt.plot(spectral)
-#plt.show()
+plt.figure()
+plt.plot(spectral)
+plt.show()
 
 while (1):
     data, server = sock.recvfrom(1<<16)
@@ -42,6 +42,6 @@ while (1):
     print unpack_data[0:37]
     spectral = unpack_data[37:-1]
     print spectral
-    #plt.figure()
-    #plt.plot(spectral)
-    #plt.show()
+    plt.figure()
+    plt.plot(spectral)
+    plt.show()

@@ -135,8 +135,11 @@ void *do_capture(void *conf)
       seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
       writebuf = bswap_64(*(ptr + 2));
       freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
-  
+
+      //chunk_index = (int)((freq - capture_conf->center_freq + 0.5)/NCHAN_PER_CHUNK + capture_conf->nchunk/2);      
       chunk_index = (int)(freq/NCHAN_PER_CHUNK + chunk_index0);
+      fprintf(stdout, "%f\t%d\n", freq, chunk_index);
+      
       if (chunk_index<0 || chunk_index > (capture_conf->nchunk-1))
 	{      
 	  log_add(capture_conf->log_file, "ERR", 1, log_mutex, "Frequency chunk is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", capture_conf->nchunk, __FILE__, __LINE__);
@@ -243,7 +246,7 @@ int initialize_capture(conf_t *conf)
   conf->time_res_df  = (double)PERIOD/(double)NDF_PER_CHUNK_PER_PERIOD;
   conf->time_res_blk = conf->time_res_df * (double)conf->ndf_per_chunk_rbuf;
   conf->nchan        = conf->nchunk * NCHAN_PER_CHUNK;
-  conf->chunk_index0 = -(conf->center_freq + 1.0)/(double)NCHAN_PER_CHUNK + 0.5 * conf->nchunk;
+  conf->chunk_index0 = -(conf->center_freq + 1.0)/(double)NCHAN_PER_CHUNK + 0.5 * (conf->nchunk + 1);
 
   log_add(conf->log_file, "INFO", 1, log_mutex, "time_res_df is %f", conf->time_res_df);
   log_add(conf->log_file, "INFO", 1, log_mutex, "time_res_blk is %f", conf->time_res_blk);
@@ -333,7 +336,9 @@ int initialize_capture(conf_t *conf)
       seconds_from_1970 = conf->seconds_from_1970;
       conf->picoseconds = conf->picoseconds_ref;
       conf->mjd_start   = seconds_from_1970 / SECDAY + MJD1970;                       // Float MJD start time without fraction second
-      strftime (conf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&seconds_from_1970)); // String start time without fraction second 
+      strftime (conf->utc_start, MSTR_LEN, DADA_TIMESTR, gmtime(&seconds_from_1970)); // String start time without fraction second
+      fprintf(stdout, "UTC_START at capture: %s\n", conf->utc_start);
+      fflush(stdout);
       register_dada_header(*conf);
     }
   conf->tbufsz = (conf->dfsz_keep + 1) * conf->ndf_per_chunk_tbuf * conf->nchunk;
