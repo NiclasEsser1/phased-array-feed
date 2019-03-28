@@ -69,7 +69,7 @@ int initialize_baseband2baseband(conf_t *conf)
       conf->fits         = (fits_t *)malloc(conf->neth_per_blk * sizeof(fits_t));
       for(i = 0; i < conf->neth_per_blk; i++)
 	{
-	  memset(conf->fits[i].data, 0x00, sizeof(conf->fits[i].data));
+	  memset(conf->fits[i].data, 0x00, UDP_PAYLOAD_SIZE_MAX);
 	  cudaHostRegister ((void *) conf->fits[i].data, sizeof(conf->fits[i].data), 0);
 	}
       log_add(conf->log_file, "INFO", 1, log_mutex, "%d network packets are requied for each buffer block", conf->neth_per_blk);

@@ -26,7 +26,7 @@ LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/local/lib 
 INCLUDE_DIRS = -I/usr/local/include -L/usr/local/cuda/include
 
-all: capture_main baseband2baseband_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test taccumulate_complex_test accumulate_float_test unpack_test unpack1_test transpose_test transpose_complex_test transpose_scale_test transpose_pad_test swap_select_transpose_ptf_test swap_select_transpose_swap_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_taccumulate_dual_test spectral_taccumulate_fold_test saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale2_spectral_faccumulate_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test queue_test clean 
+all: capture_main baseband2baseband_main baseband2filterbank_main baseband2spectral_main dada2filterbank_main reduce6_test reduce7_test reduce8_test reduce9_test reduce10_test scale_test scale1_test scale2_test scale3_test taccumulate_complex_test accumulate_float_test unpack_test unpack1_test transpose_test transpose_complex_test transpose_scale_test transpose_pad_test swap_select_transpose_ptf_test swap_select_transpose_swap_test swap_select_transpose_pft_test swap_select_transpose_pft1_test spectral_taccumulate_test spectral_taccumulate_dual_test spectral_taccumulate_fold_test saccumulate_test detect_faccumulate_scale2_test detect_faccumulate_scale2_spectral_faccumulate_test detect_faccumulate_scale1_test detect_faccumulate_scale_test detect_faccumulate_pad_transpose1_test detect_faccumulate_pad_transpose_test fitswriter_interface_test queue_test cudaMemset_test clean 
 
 capture_main:capture_main.o capture.o log.o
 	$(NVCC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
@@ -42,6 +42,9 @@ baseband2filterbank_main:baseband2filterbank_main.o baseband2filterbank.o kernel
 
 baseband2spectral_main:baseband2spectral_main.o baseband2spectral.o kernel.o log.o queue.o
 	$(NVCC) -o baseband2spectral_main baseband2spectral_main.o baseband2spectral.o kernel.o log.o queue.o $(LIB_DIRS) $(LIBS)
+
+cudaMemset_test:cudaMemset_test.o 
+	$(NVCC) -o cudaMemset_test cudaMemset_test.o $(LIB_DIRS) $(LIBS)
 
 queue_test:queue_test.o queue.o
 	$(NVCC) -o queue_test queue_test.o queue.o $(LIB_DIRS) $(LIBS)
@@ -150,6 +153,9 @@ queue_test.o:queue_test.c
 
 queue.o:queue.c
 	$(NVCC) -c queue.c $(INCLUDE_DIRS) ${C_FLAGS} 
+
+cudaMemset_test.o:cudaMemset_test.cu
+	$(NVCC) -c cudaMemset_test.cu $(LIB_DIRS) $(LIBS)
 
 baseband2baseband_main.o:baseband2baseband_main.cu
 	$(NVCC) -c baseband2baseband_main.cu $(INCLUDE_DIRS) ${C_FLAGS} ${CU_FLAGS}

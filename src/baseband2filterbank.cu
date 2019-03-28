@@ -210,7 +210,8 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * NBYTE_CUFFT_COMPLEX));
-  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, sizeof(conf->offset_scale_d)));// We have to clear the memory for this parameter
+  //CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, sizeof(conf->offset_scale_d)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));// We have to clear the memory for this parameter
   
   /* Prepare the setup of kernels */
   conf->gridsize_unpack.x = conf->ndf_per_chunk_stream;
@@ -1804,7 +1805,8 @@ void *do_baseband2filterbank(void *conf)
 
   if((baseband2filterbank_conf->spectral2disk == 1) || (baseband2filterbank_conf->spectral2network == 1))
     {
-      CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, sizeof(baseband2filterbank_conf->dbuf_out_spectral)));// We have to clear the memory for this parameter
+      //CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, sizeof(baseband2filterbank_conf->dbuf_out_spectral)));// We have to clear the memory for this parameter
+      CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, baseband2filterbank_conf->bufout_size_spectral));// We have to clear the memory for this parameter
       baseband2filterbank_conf->cfreq_spectral = baseband2filterbank_conf->cfreq_band + (baseband2filterbank_conf->start_chunk + 0.5 * baseband2filterbank_conf->nchunk_in_spectral - 0.5 * baseband2filterbank_conf->nchunk_in) * NCHAN_PER_CHUNK;
       if((baseband2filterbank_conf->spectral2disk == 1) && (baseband2filterbank_conf->sod_spectral == 1))
 	{
@@ -2505,16 +2507,16 @@ void *do_baseband2filterbank(void *conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      if((baseband2filterbank_conf->spectral2disk == 1) || (baseband2filterbank_conf->spectral2network == 1))
-	{
-	  saccumulate_kernel
-	    <<<gridsize_saccumulate,
-	    blocksize_saccumulate>>>
-	    (baseband2filterbank_conf->dbuf_out_spectral,
-	     baseband2filterbank_conf->ndata_out_spectral,
-	     baseband2filterbank_conf->nstream);  
-	  CudaSafeKernelLaunch();
-	}
+      //if((baseband2filterbank_conf->spectral2disk == 1) || (baseband2filterbank_conf->spectral2network == 1))
+      //	{
+      //	  saccumulate_kernel
+      //	    <<<gridsize_saccumulate,
+      //	    blocksize_saccumulate>>>
+      //	    (baseband2filterbank_conf->dbuf_out_spectral,
+      //	     baseband2filterbank_conf->ndata_out_spectral,
+      //	     baseband2filterbank_conf->nstream);  
+      //	  CudaSafeKernelLaunch();
+      //	}
       log_add(baseband2filterbank_conf->log_file, "INFO", 1, log_mutex, "before closing old buffer block");
       ipcbuf_mark_filled(baseband2filterbank_conf->db_out, (uint64_t)(cbufsz * baseband2filterbank_conf->scale_dtsz));
       //ipcbuf_mark_filled(baseband2filterbank_conf->db_out, baseband2filterbank_conf->bufout_size_filterbank * baseband2filterbank_conf->nrepeat_per_blk);
@@ -2536,6 +2538,16 @@ void *do_baseband2filterbank(void *conf)
       
       if(nblk_accumulate == baseband2filterbank_conf->nblk_accumulate)
 	{
+	  if((baseband2filterbank_conf->spectral2disk == 1) || (baseband2filterbank_conf->spectral2network == 1))
+	    {
+	      saccumulate_kernel
+		<<<gridsize_saccumulate,
+		blocksize_saccumulate>>>
+		(baseband2filterbank_conf->dbuf_out_spectral,
+		 baseband2filterbank_conf->ndata_out_spectral,
+		 baseband2filterbank_conf->nstream);  
+	      CudaSafeKernelLaunch();
+	    }
 	  if(baseband2filterbank_conf->spectral2disk == 1)
 	    {
 	      if(baseband2filterbank_conf->ptype_spectral == 2)
@@ -2614,7 +2626,8 @@ void *do_baseband2filterbank(void *conf)
 	    }
 	  
 	  nblk_accumulate = 0;
-	  CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, sizeof(baseband2filterbank_conf->dbuf_out_spectral)));// We have to clear the memory for this parameter
+	  //CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, sizeof(baseband2filterbank_conf->dbuf_out_spectral)));// We have to clear the memory for this parameter
+	  CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, baseband2filterbank_conf->bufout_size_spectral));// We have to clear the memory for this parameter
 	}
     }
   

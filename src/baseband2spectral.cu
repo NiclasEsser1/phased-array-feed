@@ -1137,7 +1137,8 @@ void *do_baseband2spectral(void *conf)
   
   log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
   
-  CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
+  //CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, baseband2spectral_conf->bufout_size));// We have to clear the memory for this parameter
   while(!ipcbuf_eod(baseband2spectral_conf->db_in) && !quit)
     {
       log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "before getting new buffer block");
@@ -1751,13 +1752,13 @@ void *do_baseband2spectral(void *conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
       
-      saccumulate_kernel
-	<<<baseband2spectral_conf->gridsize_saccumulate,
-	baseband2spectral_conf->blocksize_saccumulate>>>
-	(baseband2spectral_conf->dbuf_out,
-	 baseband2spectral_conf->ndata_out,
-	 baseband2spectral_conf->nstream);  
-      CudaSafeKernelLaunch();
+      //saccumulate_kernel
+      //	<<<baseband2spectral_conf->gridsize_saccumulate,
+      //	baseband2spectral_conf->blocksize_saccumulate>>>
+      //	(baseband2spectral_conf->dbuf_out,
+      //	 baseband2spectral_conf->ndata_out,
+      //	 baseband2spectral_conf->nstream);  
+      //CudaSafeKernelLaunch();
       
       ipcbuf_mark_cleared(baseband2spectral_conf->db_in);
       log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "after closing old buffer block");      
@@ -1771,6 +1772,14 @@ void *do_baseband2spectral(void *conf)
       
       if(nblk_accumulate == baseband2spectral_conf->nblk_accumulate)
 	{
+	  saccumulate_kernel
+	    <<<baseband2spectral_conf->gridsize_saccumulate,
+	    baseband2spectral_conf->blocksize_saccumulate>>>
+	    (baseband2spectral_conf->dbuf_out,
+	     baseband2spectral_conf->ndata_out,
+	     baseband2spectral_conf->nstream);  
+	  CudaSafeKernelLaunch();
+      
 	  if(baseband2spectral_conf->output_network == 0)
 	    {
 	      if(baseband2spectral_conf->pol_type == 2)
@@ -1859,7 +1868,8 @@ void *do_baseband2spectral(void *conf)
 	    }
 	  
 	  nblk_accumulate = 0;
-	  CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
+	  //CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
+	  CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, baseband2spectral_conf->bufout_size));// We have to clear the memory for this parameter
 	}
       
       time_offset += time_res_blk;
@@ -1870,7 +1880,7 @@ void *do_baseband2spectral(void *conf)
   CudaSynchronizeCall(); // Sync here is for multiple streams
   
   log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "FINISH the process");
-
+  
   quit = 1;
   if(baseband2spectral_conf->monitor)
     {
