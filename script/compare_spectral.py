@@ -50,7 +50,7 @@ for i in range(nsamp - 1):
     plt.figure()
     samp = sample[i+1,0] - sample[i,0] - 0.5 * extra
     extra += samp
-    #plt.plot(samp)
-    #plt.plot(sample1[i+1,0])
-    plt.plot((samp - sample1[i+1,0])/ sample1[i+1,0])
+    plt.plot(freq, samp)
+    plt.plot(freq, sample1[i+1,0])
+    #plt.plot((samp - sample1[i+1,0])/ sample1[i+1,0])
     plt.show()

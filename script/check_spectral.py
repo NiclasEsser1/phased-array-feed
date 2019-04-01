@@ -9,7 +9,7 @@ import sys
 import numpy.fft as fft
 
 nsamp_seek = 0
-nsamp      = 10
+nsamp      = 2
 
 hdrsize    = 4096
 dsize      = 4
@@ -54,28 +54,28 @@ f.seek(hdrsize + nsamp_seek * nchan_band * ndata_samp)# * ndata_samp)
 sample  = np.array(np.fromstring(f.read(blksize), dtype='float32'))
 sample  = np.reshape(sample, (nsamp, ndata_samp, nchan_band))
 
-plt.figure()
-result = []
-#extra = sample[0,0,171000:173000]
-extra = sample[0,0]
-for i in range(nsamp - 1):
-    #samp = sample[i+1,0,171000:173000] - sample[i,0,171000:173000] - 0.5 * extra
-    samp = sample[i+1,0] - sample[i,0] - 0.5 * extra
-    result.append(samp)
-    extra += samp
-    plt.plot(samp)
-plt.show()
-plt.figure()
-result = np.array(result)
-np.savetxt("result1.txt", result)
-
-#result = []
 #plt.figure()
+#result = []
+##extra = sample[0,0,171000:173000]
+#extra = sample[0,0]
 #for i in range(nsamp - 1):
-#    result.append(sample[i+1,0])
-#    plt.plot(sample[i,0])
+#    #samp = sample[i+1,0,171000:173000] - sample[i,0,171000:173000] - 0.5 * extra
+#    samp = sample[i+1,0] - sample[i,0] - 0.5 * extra
+#    result.append(samp)
+#    extra += samp
+#    plt.plot(samp)
 #plt.show()
+#plt.figure()
 #result = np.array(result)
-#np.savetxt("result2.txt", result)
+#np.savetxt("result1.txt", result)
+
+result = []
+plt.figure()
+for i in range(nsamp - 1):
+    result.append(sample[i+1,0])
+    plt.plot(freq, sample[i,0])
+plt.show()
+result = np.array(result)
+np.savetxt("result2.txt", result)
 
 f.close()
