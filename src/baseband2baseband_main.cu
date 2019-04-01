@@ -14,8 +14,6 @@
 #include "cudautil.cuh"
 #include "log.h"
 
-pthread_mutex_t log_mutex;
-
 void usage ()
 {
   fprintf (stdout,
@@ -143,16 +141,16 @@ int main(int argc, char *argv[])
   /* Play with the data */  
   fprintf(stdout, "BASEBAND2BASEBAND_READY\n");  // Ready to take data from ring buffer, just before the header thing
   fflush(stdout);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2BASEBAND_READY");
+  log_add(conf.log_file, "INFO", 1,  "BASEBAND2BASEBAND_READY");
   baseband2baseband(conf);
   
   /* Destory */
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BEFORE destroy");  
+  log_add(conf.log_file, "INFO", 1,  "BEFORE destroy");  
   destroy_baseband2baseband(conf);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "END destroy");
+  log_add(conf.log_file, "INFO", 1,  "END destroy");
   
   /* Destory log interface */  
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2BASEBAND END");  
+  log_add(conf.log_file, "INFO", 1,  "BASEBAND2BASEBAND END");  
   log_close(conf.log_file);
   fprintf(stdout, "HERE AFTER LOG CLOSE\n");
   fflush(stdout);

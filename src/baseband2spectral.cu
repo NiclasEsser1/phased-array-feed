@@ -26,8 +26,6 @@ queue_t *queue_fits_monitor;
 queue_t *queue_fits_spectral;
 int quit = 0; // 0 means no quit, 1 means quit normal, 2 means quit with problem;
 
-extern pthread_mutex_t log_mutex;
-
 int default_arguments(conf_t *conf)
 {
   memset(conf->dir, 0x00, sizeof(conf->dir));
@@ -74,23 +72,23 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->cufft_mod       = (int)(0.5 * conf->nchan_keep_chan);
   conf->scale_dtsz      = NBYTE_SPECTRAL * NDATA_PER_SAMP_FULL * conf->nchan_out / (double)(NBYTE_BASEBAND * NPOL_BASEBAND * NDIM_BASEBAND * conf->ndf_per_chunk_rbufin * conf->nchan_in * NSAMP_DF * conf->nblk_accumulate); // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
 
-  log_add(conf->log_file, "INFO", 1, log_mutex, "We have %d channels input", conf->nchan_in);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The mod to reduce oversampling is %d", conf->cufft_mod);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The data size rate between spectral and baseband data is %E", conf->scale_dtsz);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "%d run to finish one ring buffer block", conf->nrepeat_per_blk);
+  log_add(conf->log_file, "INFO", 1, "We have %d channels input", conf->nchan_in);
+  log_add(conf->log_file, "INFO", 1, "The mod to reduce oversampling is %d", conf->cufft_mod);
+  log_add(conf->log_file, "INFO", 1, "We will keep %d fine channels for each input channel after FFT", conf->nchan_keep_chan);
+  log_add(conf->log_file, "INFO", 1, "The data size rate between spectral and baseband data is %E", conf->scale_dtsz);
+  log_add(conf->log_file, "INFO", 1, "%d run to finish one ring buffer block", conf->nrepeat_per_blk);
 
   /* Prepare monitor */
   if(conf->monitor == 1)
     {
       conf->nseg_per_blk = conf->nstream * conf->nrepeat_per_blk;
       conf->neth_per_blk = conf->nseg_per_blk * NDATA_PER_SAMP_FULL;
-      log_add(conf->log_file, "INFO", 1, log_mutex, "%d network packets are requied for each buffer block", conf->neth_per_blk);
+      log_add(conf->log_file, "INFO", 1, "%d network packets are requied for each buffer block", conf->neth_per_blk);
       
       conf->dtsz_network_monitor  = NBYTE_FLOAT * conf->nchan_in;
       conf->pktsz_network_monitor = conf->dtsz_network_monitor + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Network data size for monitor is %d", conf->dtsz_network_monitor);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Network packet size for monitor is %d", conf->pktsz_network_monitor);
+      log_add(conf->log_file, "INFO", 1,  "Network data size for monitor is %d", conf->dtsz_network_monitor);
+      log_add(conf->log_file, "INFO", 1,  "Network packet size for monitor is %d", conf->pktsz_network_monitor);
       queue_fits_monitor = create_queue(10 * conf->neth_per_blk);
     }
   
@@ -169,9 +167,9 @@ int initialize_baseband2spectral(conf_t *conf)
       conf->dbuf_out_monitor1 = NULL;
       conf->dbuf_out_monitor2 = NULL;
       CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_monitor1, conf->bufout_size_monitor1));
-      log_add(conf->log_file, "INFO", 1, log_mutex, "bufout_size_monitor1 is %"PRIu64"", conf->bufout_size_monitor1);      
+      log_add(conf->log_file, "INFO", 1,  "bufout_size_monitor1 is %"PRIu64"", conf->bufout_size_monitor1);      
       CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_monitor2, conf->bufout_size_monitor2));
-      log_add(conf->log_file, "INFO", 1, log_mutex, "bufout_size_monitor1 is %"PRIu64"", conf->bufout_size_monitor2);      
+      log_add(conf->log_file, "INFO", 1,  "bufout_size_monitor1 is %"PRIu64"", conf->bufout_size_monitor2);      
     }
   
   /* Prepare the setup of kernels */
@@ -181,7 +179,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->blocksize_unpack.x = NSAMP_DF; 
   conf->blocksize_unpack.y = NCHAN_PER_CHUNK;
   conf->blocksize_unpack.z = 1;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of unpack kernel is (%d, %d, %d) and (%d, %d, %d)",
+  log_add(conf->log_file, "INFO", 1,  "The configuration of unpack kernel is (%d, %d, %d) and (%d, %d, %d)",
 	  conf->gridsize_unpack.x, conf->gridsize_unpack.y, conf->gridsize_unpack.z,
 	  conf->blocksize_unpack.x, conf->blocksize_unpack.y, conf->blocksize_unpack.z);
   
@@ -191,7 +189,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->blocksize_swap_select_transpose_pft1.x = TILE_DIM;
   conf->blocksize_swap_select_transpose_pft1.y = NROWBLOCK_TRANS;
   conf->blocksize_swap_select_transpose_pft1.z = 1;
-  log_add(conf->log_file, "INFO", 1, log_mutex,
+  log_add(conf->log_file, "INFO", 1, 
 	  "The configuration of swap_select_transpose_pft1 kernel is (%d, %d, %d) and (%d, %d, %d)",
 	  conf->gridsize_swap_select_transpose_pft1.x,
 	  conf->gridsize_swap_select_transpose_pft1.y,
@@ -207,7 +205,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->blocksize_spectral_taccumulate.x = (naccumulate_pow2<1024)?naccumulate_pow2:1024;
   conf->blocksize_spectral_taccumulate.y = 1;
   conf->blocksize_spectral_taccumulate.z = 1; 
-  log_add(conf->log_file, "INFO", 1, log_mutex,
+  log_add(conf->log_file, "INFO", 1, 
 	  "The configuration of spectral_taccumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
 	  conf->gridsize_spectral_taccumulate.x,
 	  conf->gridsize_spectral_taccumulate.y,
@@ -223,7 +221,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->blocksize_faccumulate.x = naccumulate_pow2;
   conf->blocksize_faccumulate.y = 1;
   conf->blocksize_faccumulate.z = 1;
-  log_add(conf->log_file, "INFO", 1, log_mutex, "The configuration of frequency accumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
+  log_add(conf->log_file, "INFO", 1,  "The configuration of frequency accumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
 	  conf->gridsize_faccumulate.x, conf->gridsize_faccumulate.y, conf->gridsize_faccumulate.z,
 	  conf->blocksize_faccumulate.x, conf->blocksize_faccumulate.y, conf->blocksize_faccumulate.z);
 
@@ -233,7 +231,7 @@ int initialize_baseband2spectral(conf_t *conf)
   conf->blocksize_saccumulate.x = conf->nchan_in;
   conf->blocksize_saccumulate.y = 1;
   conf->blocksize_saccumulate.z = 1; 
-  log_add(conf->log_file, "INFO", 1, log_mutex,
+  log_add(conf->log_file, "INFO", 1, 
 	  "The configuration of saccumulate kernel is (%d, %d, %d) and (%d, %d, %d)",
 	  conf->gridsize_saccumulate.x,
 	  conf->gridsize_saccumulate.y,
@@ -247,7 +245,7 @@ int initialize_baseband2spectral(conf_t *conf)
   dada_hdu_set_key(conf->hdu_in, conf->key_in);
   if(dada_hdu_connect(conf->hdu_in) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex,
+      log_add(conf->log_file, "ERR", 1, 
 	      "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
@@ -257,10 +255,10 @@ int initialize_baseband2spectral(conf_t *conf)
     }  
   conf->db_in = (ipcbuf_t *) conf->hdu_in->data_block;
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "Input buffer block size is %"PRIu64".", conf->rbufin_size);
+  log_add(conf->log_file, "INFO", 1,  "Input buffer block size is %"PRIu64".", conf->rbufin_size);
   if(conf->rbufin_size != (conf->bufin_size * conf->nrepeat_per_blk))  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2spectral(*conf);
@@ -280,9 +278,9 @@ int initialize_baseband2spectral(conf_t *conf)
   fflush(stdout);
   
   conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_in->header_block);  
-  if(conf->hdrsz != DADA_HDRSZ)    // This number should match
+  if(conf->hdrsz != DADA_DEFAULT_HEADER_SIZE)    // This number should match
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
@@ -293,7 +291,7 @@ int initialize_baseband2spectral(conf_t *conf)
   /* make ourselves the read client */
   if(dada_hdu_lock_read(conf->hdu_in) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
@@ -308,7 +306,7 @@ int initialize_baseband2spectral(conf_t *conf)
       dada_hdu_set_key(conf->hdu_out, conf->key_out);
       if(dada_hdu_connect(conf->hdu_out) < 0)
 	{
-	  log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  log_add(conf->log_file, "ERR", 1,  "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  
 	  destroy_baseband2spectral(*conf);
@@ -317,7 +315,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	}
       conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
       conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Output buffer block size is %"PRIu64".", conf->rbufout_size);
+      log_add(conf->log_file, "INFO", 1,  "Output buffer block size is %"PRIu64".", conf->rbufout_size);
       
       clock_gettime(CLOCK_REALTIME, &start);
       dada_cuda_dbregister(conf->hdu_out); // To put this into capture does not improve the memcpy!!!
@@ -329,7 +327,7 @@ int initialize_baseband2spectral(conf_t *conf)
       if(conf->rbufout_size != conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL)
 	{
 	  // replace NDATA_PER_SAMP_FULL with conf->pol_type if we do not fill 0 for other pols
-	  log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout_size, conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
+	  log_add(conf->log_file, "ERR", 1,  "Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].", conf->rbufout_size, conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, %"PRIu64" vs %"PRIu64", which happens at \"%s\", line [%d].\n", conf->rbufout_size, conf->nsamp_out * NDATA_PER_SAMP_FULL * NBYTE_SPECTRAL, __FILE__, __LINE__);
 	  
 	  destroy_baseband2spectral(*conf);
@@ -338,9 +336,9 @@ int initialize_baseband2spectral(conf_t *conf)
 	}
       
       conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_out->header_block);  
-      if(conf->hdrsz != DADA_HDRSZ)    // This number should match
+      if(conf->hdrsz != DADA_DEFAULT_HEADER_SIZE)    // This number should match
 	{
-	  log_add(conf->log_file, "ERR", 1, log_mutex, "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  log_add(conf->log_file, "ERR", 1,  "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  
 	  destroy_baseband2spectral(*conf);
@@ -351,7 +349,7 @@ int initialize_baseband2spectral(conf_t *conf)
       /* make ourselves the write client */
       if(dada_hdu_lock_write(conf->hdu_out) < 0)
 	{
-	  log_add(conf->log_file, "ERR", 1, log_mutex, "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  log_add(conf->log_file, "ERR", 1,  "Error locking HDU, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  
 	  destroy_baseband2spectral(*conf);
@@ -363,7 +361,7 @@ int initialize_baseband2spectral(conf_t *conf)
 	{
 	  if(ipcbuf_disable_sod(conf->db_out) < 0)
 	    {
-	      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
+	      log_add(conf->log_file, "ERR", 1,  "Can not write data before start, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
 	      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      
 	      destroy_baseband2spectral(*conf);
@@ -378,28 +376,28 @@ int initialize_baseband2spectral(conf_t *conf)
       conf->nchan_per_chunk_network = conf->nchan_out/conf->nchunk_network;
       conf->dtsz_network = NBYTE_FLOAT * conf->nchan_per_chunk_network;
       conf->pktsz_network     = conf->dtsz_network + 3 * NBYTE_FLOAT + 6 * NBYTE_INT + FITS_TIME_STAMP_LEN;
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network);
-      log_add(conf->log_file, "INFO", 1, log_mutex, "Size of each network packet is %d bytes.", conf->pktsz_network);
+      log_add(conf->log_file, "INFO", 1,  "Spectral data will be sent with %d frequency chunks for each pol.", conf->nchunk_network);
+      log_add(conf->log_file, "INFO", 1,  "Spectral data will be sent with %d frequency channels in each frequency chunks.", conf->nchan_per_chunk_network);
+      log_add(conf->log_file, "INFO", 1,  "Size of spectral data in  each network packet is %d bytes.", conf->dtsz_network);
+      log_add(conf->log_file, "INFO", 1,  "Size of each network packet is %d bytes.", conf->pktsz_network);
 
       queue_fits_spectral = create_queue(10 * conf->nchunk_network * NDATA_PER_SAMP_FULL);
     }
 
   fprintf(stdout, "BASEBAND2SPECTRAL_READY\n");  // Ready to take data from ring buffer, just before the header thing
   fflush(stdout);
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BASEBAND2SPECTRAL_READY");
+  log_add(conf->log_file, "INFO", 1,  "BASEBAND2SPECTRAL_READY");
   
   if(read_dada_header(conf))
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "header read failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "header read failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: header read failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "read_dada_header done");
+  log_add(conf->log_file, "INFO", 1,  "read_dada_header done");
   
   return EXIT_SUCCESS;
 }
@@ -418,7 +416,7 @@ int destroy_baseband2spectral(conf_t conf)
     }
   if(conf.fft_plans)
     free(conf.fft_plans);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "destroy fft plan and stream done");
+  log_add(conf.log_file, "INFO", 1,  "destroy fft plan and stream done");
 
   if(conf.monitor)
     {
@@ -438,7 +436,7 @@ int destroy_baseband2spectral(conf_t conf)
     cudaFree(conf.buf_rt1);
   if(conf.buf_rt2)
     cudaFree(conf.buf_rt2);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Free cuda memory done");
+  log_add(conf.log_file, "INFO", 1,  "Free cuda memory done");
 
   if(conf.db_in)
     {
@@ -455,7 +453,7 @@ int destroy_baseband2spectral(conf_t conf)
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "destory hdu done");  
+  log_add(conf.log_file, "INFO", 1,  "destory hdu done");  
   
   for(i = 0; i < conf.nstream; i++)
     {
@@ -464,7 +462,7 @@ int destroy_baseband2spectral(conf_t conf)
     }
   if(conf.streams)
     free(conf.streams);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "destroy stream done");
+  log_add(conf.log_file, "INFO", 1,  "destroy stream done");
   
   /* Cleanup GPU and return profile if it is the case */
   CudaSafeCall(cudaProfilerStop());
@@ -480,16 +478,16 @@ int read_dada_header(conf_t *conf)
   conf->hdrbuf_in  = ipcbuf_get_next_read(conf->hdu_in->header_block, &hdrsz);  
   if (!conf->hdrbuf_in)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  if(hdrsz != DADA_HDRSZ)
+  if(hdrsz != DADA_DEFAULT_HEADER_SIZE)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Header size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Header size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Header size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
@@ -499,96 +497,96 @@ int read_dada_header(conf_t *conf)
   
   if(ascii_header_get(conf->hdrbuf_in, "BW", "%lf", &(conf->bandwidth)) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting BW, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BW, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       log_close(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BW from DADA header is %f MHz", conf->bandwidth);
+  log_add(conf->log_file, "INFO", 1,  "BW from DADA header is %f MHz", conf->bandwidth);
   
   if(ascii_header_get(conf->hdrbuf_in, "PICOSECONDS", "%"SCNu64"", &(conf->picoseconds)) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting PICOSECONDS, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       log_close(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
+  log_add(conf->log_file, "INFO", 1,  "PICOSECONDS from DADA header is %"PRIu64"", conf->picoseconds);
   
   if(ascii_header_get(conf->hdrbuf_in, "FREQ", "%lf", &(conf->center_freq)) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error egtting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error egtting FREQ, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting FREQ, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       log_close(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "FREQ from DADA header is %f", conf->center_freq);
+  log_add(conf->log_file, "INFO", 1,  "FREQ from DADA header is %f", conf->center_freq);
   
   if (ascii_header_get(conf->hdrbuf_in, "FILE_SIZE", "%"SCNu64"", &conf->file_size_in) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting FILE_SIZE, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }   
-  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE from DADA header is %"PRIu64"", conf->file_size_in);
+  log_add(conf->log_file, "INFO", 1,  "FILE_SIZE from DADA header is %"PRIu64"", conf->file_size_in);
   
   if (ascii_header_get(conf->hdrbuf_in, "BYTES_PER_SECOND", "%"SCNu64"", &conf->bytes_per_second_in) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND from DADA header is %"PRIu64"", conf->bytes_per_second_in);
+  log_add(conf->log_file, "INFO", 1,  "BYTES_PER_SECOND from DADA header is %"PRIu64"", conf->bytes_per_second_in);
   
   if (ascii_header_get(conf->hdrbuf_in, "TSAMP", "%lf", &conf->tsamp_in) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP from DADA header is %f", conf->tsamp_in);
+  log_add(conf->log_file, "INFO", 1,  "TSAMP from DADA header is %f", conf->tsamp_in);
   
   /* Get utc_start from hdrin */
   if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting UTC_START, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);      
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "UTC_START from DADA header is %s", conf->utc_start);
+  log_add(conf->log_file, "INFO", 1,  "UTC_START from DADA header is %s", conf->utc_start);
 
   if (ascii_header_get(conf->hdrbuf_in, "RECEIVER", "%d", &conf->beam_index) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting RECEIVER, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting RECEIVER, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting RECEIVER, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "RECEIVER from DADA header is %d", conf->beam_index);
+  log_add(conf->log_file, "INFO", 1,  "RECEIVER from DADA header is %d", conf->beam_index);
       
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error header_clear, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error header_clear, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
@@ -606,100 +604,100 @@ int register_dada_header(conf_t *conf)
   hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
   if (!hdrbuf_out)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error getting header_buf, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }  
-  memcpy(hdrbuf_out, conf->hdrbuf_in, DADA_HDRSZ); // Pass the header
+  memcpy(hdrbuf_out, conf->hdrbuf_in, DADA_DEFAULT_HEADER_SIZE); // Pass the header
   
   file_size = (uint64_t)(conf->file_size_in * conf->scale_dtsz);
   bytes_per_second = (uint64_t)(conf->bytes_per_second_in * conf->scale_dtsz);
   
   if (ascii_header_set(hdrbuf_out, "NCHAN", "%d", conf->nchan_out) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error setting NCHAN, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NCHAN, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NCHAN to DADA header is %d", conf->nchan_out);
+  log_add(conf->log_file, "INFO", 1,  "NCHAN to DADA header is %d", conf->nchan_out);
   
   conf->tsamp_out = conf->tsamp_in * conf->ndf_per_chunk_rbufin * NSAMP_DF * conf->nblk_accumulate;
   if (ascii_header_set(hdrbuf_out, "TSAMP", "%f", conf->tsamp_out) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error setting TSAMP, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting TSAMP, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
+  log_add(conf->log_file, "INFO", 1,  "TSAMP to DADA header is %f microseconds", conf->tsamp_out);
   
   if (ascii_header_set(hdrbuf_out, "NBIT", "%d", NBIT_SPECTRAL) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Can not connect to hdu, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NBIT, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NBIT to DADA header is %d", NBIT_SPECTRAL);
+  log_add(conf->log_file, "INFO", 1,  "NBIT to DADA header is %d", NBIT_SPECTRAL);
   
   if (ascii_header_set(hdrbuf_out, "NDIM", "%d", conf->ndim_out) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NDIM to DADA header is %d", conf->ndim_out);
+  log_add(conf->log_file, "INFO", 1,  "NDIM to DADA header is %d", conf->ndim_out);
   
   if (ascii_header_set(hdrbuf_out, "NPOL", "%d", conf->npol_out) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "NPOL to DADA header is %d", conf->npol_out);
+  log_add(conf->log_file, "INFO", 1,  "NPOL to DADA header is %d", conf->npol_out);
   
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: BASEBAND2SPECTRAL_ERROR:\tError setting FILE_SIZE, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "FILE_SIZE to DADA header is %"PRIu64"", file_size);
+  log_add(conf->log_file, "INFO", 1,  "FILE_SIZE to DADA header is %"PRIu64"", file_size);
   
   if (ascii_header_set(hdrbuf_out, "BYTES_PER_SECOND", "%"PRIu64"", bytes_per_second) < 0)  
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error setting BYTES_PER_SECOND, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       destroy_baseband2spectral(*conf);
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf->log_file, "INFO", 1, log_mutex, "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
+  log_add(conf->log_file, "INFO", 1,  "BYTES_PER_SECOND to DADA header is %"PRIu64"", bytes_per_second);
   
   /* donot set header parameters anymore */
-  if (ipcbuf_mark_filled (conf->hdu_out->header_block, DADA_HDRSZ) < 0)
+  if (ipcbuf_mark_filled (conf->hdu_out->header_block, DADA_DEFAULT_HEADER_SIZE) < 0)
     {
-      log_add(conf->log_file, "ERR", 1, log_mutex, "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "Error header_fill, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
       destroy_baseband2spectral(*conf);
@@ -722,26 +720,26 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       strcat(command_line, " ");
       strcat(command_line, argv[i]);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The command line is \"%s\"", command_line);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The input ring buffer key is %x", conf.key_in);
+  log_add(conf.log_file, "INFO", 1,  "The command line is \"%s\"", command_line);
+  log_add(conf.log_file, "INFO", 1,  "The input ring buffer key is %x", conf.key_in);
 
   if(conf.monitor == 1)
     {   
       if(!((conf.ptype_monitor == 1) || (conf.ptype_monitor == 2) || (conf.ptype_monitor == 4)))
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ptype_monitor, __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ptype_monitor, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1,  "ptype_monitor should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ptype_monitor, __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
 	  exit(EXIT_FAILURE);
 	}
       else
-	log_add(conf.log_file, "INFO", 1, log_mutex, "ptype_monitor is %d", conf.ptype_monitor);
+	log_add(conf.log_file, "INFO", 1,  "ptype_monitor is %d", conf.ptype_monitor);
             
       if(conf.port_monitor == -1)
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.port_monitor, __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port_monitor, __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1,  "monitor port shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.port_monitor, __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
 	  exit(EXIT_FAILURE);
@@ -749,82 +747,82 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       if(strstr(conf.ip_monitor, "unset"))
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: monitor ip is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "monitor ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1,  "monitor ip is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
 	  exit(EXIT_FAILURE);
 	}
-      log_add(conf.log_file, "INFO", 1, log_mutex, "We will send monitor data to %s:%d", conf.ip_monitor, conf.port_monitor); 
+      log_add(conf.log_file, "INFO", 1,  "We will send monitor data to %s:%d", conf.ip_monitor, conf.port_monitor); 
     }  
   else
-    log_add(conf.log_file, "INFO", 1, log_mutex, "We will not send monitor data to FITSwriter interface");
+    log_add(conf.log_file, "INFO", 1,  "We will not send monitor data to FITSwriter interface");
   
   if(conf.ndf_per_chunk_rbufin == 0)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "ndf_per_chunk_rbuf shoule be a positive number, but it is %"PRIu64", which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_rbufin, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
+  log_add(conf.log_file, "INFO", 1,  "Each input ring buffer block has %"PRIu64" packets per frequency chunk", conf.ndf_per_chunk_rbufin); 
 
   if(conf.nblk_accumulate == -1)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: nblk_accumulate is unset, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nblk_accumulate is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "nblk_accumulate is unset, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We will average %d buffer blocks", conf.nblk_accumulate); 
+  log_add(conf.log_file, "INFO", 1,  "We will average %d buffer blocks", conf.nblk_accumulate); 
 
   if(conf.nstream <= 0)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.nstream, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "nstream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.nstream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "%d streams run on GPU", conf.nstream);
+  log_add(conf.log_file, "INFO", 1,  "%d streams run on GPU", conf.nstream);
   
   if(conf.ndf_per_chunk_stream == 0)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "ndf_per_chunk_stream shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.ndf_per_chunk_stream, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
+  log_add(conf.log_file, "INFO", 1,  "Each stream process %d packets per frequency chunk", conf.ndf_per_chunk_stream);
 
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The runtime information is %s", conf.dir);  // Checked already
+  log_add(conf.log_file, "INFO", 1,  "The runtime information is %s", conf.dir);  // Checked already
 
   if(conf.output_network == 0)
     {
-      log_add(conf.log_file, "INFO", 1, log_mutex, "We will send spectral data with ring buffer");
+      log_add(conf.log_file, "INFO", 1,  "We will send spectral data with ring buffer");
       if(conf.sod == 1)
-	log_add(conf.log_file, "INFO", 1, log_mutex, "The spectral data is enabled at the beginning");
+	log_add(conf.log_file, "INFO", 1,  "The spectral data is enabled at the beginning");
       else if(conf.sod == 0)
-	log_add(conf.log_file, "INFO", 1, log_mutex, "The spectral data is NOT enabled at the beginning");
+	log_add(conf.log_file, "INFO", 1,  "The spectral data is NOT enabled at the beginning");
       else
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: The sod should be 0 or 1 when we use ring buffer to send spectral data, but it is -1, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "The sod should be 0 or 1 when we use ring buffer to send spectral data, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1,  "The sod should be 0 or 1 when we use ring buffer to send spectral data, but it is -1, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
 	  exit(EXIT_FAILURE);
 	}
-      log_add(conf.log_file, "INFO", 1, log_mutex, "The key for the spectral ring buffer is %x", conf.key_out);  
+      log_add(conf.log_file, "INFO", 1,  "The key for the spectral ring buffer is %x", conf.key_out);  
     }
   if(conf.output_network == 1)
     {
-      log_add(conf.log_file, "INFO", 1, log_mutex, "We will send spectral data with network interface");
+      log_add(conf.log_file, "INFO", 1,  "We will send spectral data with network interface");
       if(strstr(conf.ip, "unset"))
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: We are going to send spectral data with network interface, but no ip is given, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "We are going to send spectral data with network interface, but no ip is given, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1,  "We are going to send spectral data with network interface, but no ip is given, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
 	  exit(EXIT_FAILURE);
@@ -832,18 +830,18 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
       if(conf.port == -1)
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: We are going to send spectral data with network interface, but no port is given, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-	  log_add(conf.log_file, "ERR", 1, log_mutex, "We are going to send spectral data with network interface, but no port is given, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+	  log_add(conf.log_file, "ERR", 1,  "We are going to send spectral data with network interface, but no port is given, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
 	  
 	  log_close(conf.log_file);
 	  exit(EXIT_FAILURE);
 	}
       else
-	log_add(conf.log_file, "INFO", 1, log_mutex, "The network interface for the spectral data is %s_%d", conf.ip, conf.port);  
+	log_add(conf.log_file, "INFO", 1,  "The network interface for the spectral data is %s_%d", conf.ip, conf.port);  
     }
   if(conf.output_network == -1)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: The method to send spectral data is not configured, which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "The method to send spectral data is not configured, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "The method to send spectral data is not configured, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
@@ -852,34 +850,34 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
   if(conf.nchunk_in<=0 || conf.nchunk_in>NCHUNK_FULL_BEAM)    
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort\n", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "nchunk_in shoule be in (0 %d], but it is %d, which happens at \"%s\", line [%d], has to abort", NCHUNK_FULL_BEAM, conf.nchunk_in, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }  
-  log_add(conf.log_file, "INFO", 1, log_mutex, "%d chunks of input data", conf.nchunk_in);
+  log_add(conf.log_file, "INFO", 1,  "%d chunks of input data", conf.nchunk_in);
 
   if(conf.cufft_nx<=0)    
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.cufft_nx, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "cufft_nx shoule be a positive number, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.cufft_nx, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "We use %d points FFT", conf.cufft_nx);
+  log_add(conf.log_file, "INFO", 1,  "We use %d points FFT", conf.cufft_nx);
 
   if(!((conf.pol_type == 1) || (conf.pol_type == 2) || (conf.pol_type == 4)))
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: pol_type should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort\n", conf.pol_type, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1, log_mutex, "pol_type should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.pol_type, __FILE__, __LINE__);
+      log_add(conf.log_file, "ERR", 1,  "pol_type should be 1, 2 or 4, but it is %d, which happens at \"%s\", line [%d], has to abort", conf.pol_type, __FILE__, __LINE__);
       
       log_close(conf.log_file);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "pol_type is %d", conf.pol_type, __FILE__, __LINE__);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "npol_out is %d", conf.npol_out, __FILE__, __LINE__);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "ndim_out is %d", conf.ndim_out, __FILE__, __LINE__);
+  log_add(conf.log_file, "INFO", 1,  "pol_type is %d", conf.pol_type, __FILE__, __LINE__);
+  log_add(conf.log_file, "INFO", 1,  "npol_out is %d", conf.npol_out, __FILE__, __LINE__);
+  log_add(conf.log_file, "INFO", 1,  "ndim_out is %d", conf.ndim_out, __FILE__, __LINE__);
   
   return EXIT_SUCCESS;
 }
@@ -897,7 +895,7 @@ void *spectral_sendto(void *conf)
   if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(baseband2spectral_conf->log_file, "ERR", 1,  "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       quit = 2;
       pthread_exit(NULL);
@@ -913,7 +911,7 @@ void *spectral_sendto(void *conf)
     NSAMP_DF * baseband2spectral_conf->nblk_accumulate;
   sleep_time = (unsigned int)(0.90 * sendto_period / (baseband2spectral_conf->nchunk_network * NDATA_PER_SAMP_FULL)); // To be safe, do not use 100% cycle, in microseconds
   fprintf(stdout, "baseband2spectral_conf->tsamp_in is %f microseconds, sendto_period is %f microseconds and sleep_time is %d microseconds [spectral]\n", baseband2spectral_conf->tsamp_in, sendto_period, sleep_time);
-  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "sendto_period is %f microseconds and sleep_time is %d microseconds, [spectral].", sendto_period, sleep_time);
+  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "sendto_period is %f microseconds and sleep_time is %d microseconds, [spectral].", sendto_period, sleep_time);
 
   int index = 0;
   while((!quit) || (!is_empty(queue_fits_spectral)))
@@ -927,7 +925,7 @@ void *spectral_sendto(void *conf)
       if(dequeue(queue_fits_spectral, &fits))
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: queue is empty on spectral,  which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "queue is empty on spectral,  which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  log_add(baseband2spectral_conf->log_file, "ERR", 1,  "queue is empty on spectral,  which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	  close(sock);
 	  pthread_exit(NULL);
 	  quit = 2;
@@ -943,7 +941,7 @@ void *spectral_sendto(void *conf)
 		    tolen) == -1)
 	    {
 	      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	      log_add(baseband2spectral_conf->log_file, "ERR", 1,  "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	      
 	      close(sock);
 	      quit = 2;
@@ -955,7 +953,7 @@ void *spectral_sendto(void *conf)
 	{
 	  fprintf(stdout, "We got a bad spectral packet\n");
 	  fflush(stdout);
-	  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "One bad spectral packet", __FILE__, __LINE__);
+	  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "One bad spectral packet", __FILE__, __LINE__);
 	}
     }
     
@@ -977,7 +975,7 @@ void *monitor_sendto(void *conf)
   if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {
       fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      log_add(baseband2spectral_conf->log_file, "ERR", 1,  "socket creation failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       
       quit = 2;
       pthread_exit(NULL);
@@ -993,7 +991,7 @@ void *monitor_sendto(void *conf)
     NSAMP_DF;
   sleep_time = (unsigned int)(0.90 * sendto_period / (baseband2spectral_conf->neth_per_blk)); // To be safe, do not use 100% cycle, in microseconds
   fprintf(stdout, "sendto_period is %f microseconds, sleep_time is %d microseconds, [monitor]\n", sendto_period, sleep_time);
-  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "sendto_period is %f microseconds and sleep_time is %d microseconds, [monitor].", sendto_period, sleep_time);
+  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "sendto_period is %f microseconds and sleep_time is %d microseconds, [monitor].", sendto_period, sleep_time);
 
   int index = 0;
   while((!quit) || (!is_empty(queue_fits_monitor)))
@@ -1004,7 +1002,7 @@ void *monitor_sendto(void *conf)
       if(dequeue(queue_fits_monitor, &fits))
 	{
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: queue is empty on monitor,  which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "queue is empty on monitor,  which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  log_add(baseband2spectral_conf->log_file, "ERR", 1,  "queue is empty on monitor,  which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	  close(sock);
 	  pthread_exit(NULL);
 	  quit = 2;
@@ -1023,7 +1021,7 @@ void *monitor_sendto(void *conf)
 		    tolen) == -1)
 	    {
 	      fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: sendto() failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	      log_add(baseband2spectral_conf->log_file, "ERR", 1,  "sendto() failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	      
 	      close(sock);
 	      quit = 2;
@@ -1035,7 +1033,7 @@ void *monitor_sendto(void *conf)
 	{
 	  fprintf(stdout, "We got a bad monitor packet\n");
 	  fflush(stdout);
-	  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "One bad monitor packet", __FILE__, __LINE__);
+	  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "One bad monitor packet", __FILE__, __LINE__);
 	}
     }
   
@@ -1108,7 +1106,7 @@ void *do_baseband2spectral(void *conf)
     {
       if(register_dada_header(baseband2spectral_conf))
 	{
-	  log_add(baseband2spectral_conf->log_file, "ERR", 1, log_mutex, "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
+	  log_add(baseband2spectral_conf->log_file, "ERR", 1,  "header register failed, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
 	  fprintf(stderr, "BASEBAND2SPECTRAL_ERROR: header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
 	  
@@ -1121,7 +1119,7 @@ void *do_baseband2spectral(void *conf)
 	    }
 	  pthread_exit(NULL);
 	}
-      log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
+      log_add(baseband2spectral_conf->log_file, "INFO", 1,  "register_dada_header done");
     }
   if(baseband2spectral_conf->output_network == 1)
     {
@@ -1135,18 +1133,18 @@ void *do_baseband2spectral(void *conf)
     }
   fprintf(stdout, "HERE AFTER REGISTER HEADER\n");
   
-  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "register_dada_header done");
+  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "register_dada_header done");
   
   //CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
   CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, baseband2spectral_conf->bufout_size));// We have to clear the memory for this parameter
   while(!ipcbuf_eod(baseband2spectral_conf->db_in) && !quit)
     {
-      log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "before getting new buffer block");
+      log_add(baseband2spectral_conf->log_file, "INFO", 1,  "before getting new buffer block");
       baseband2spectral_conf->cbuf_in  = ipcbuf_get_next_read(baseband2spectral_conf->db_in, &cbufsz);
       if(baseband2spectral_conf->output_network == 0)
 	{
 	  baseband2spectral_conf->cbuf_out = ipcbuf_get_next_write(baseband2spectral_conf->db_out);
-	  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "after getting new buffer block");
+	  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "after getting new buffer block");
 	}
       
       for(i = 0; i < baseband2spectral_conf->nrepeat_per_blk; i ++)
@@ -1204,7 +1202,7 @@ void *do_baseband2spectral(void *conf)
 
 	      if(baseband2spectral_conf->monitor == 1)
 		{
-		  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "IN the processing loop with monitor");
+		  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "IN the processing loop with monitor");
 		  /* Convert to required pol and accumulate in time */
 		  switch(blocksize_spectral_taccumulate.x)
 		    {
@@ -1374,7 +1372,7 @@ void *do_baseband2spectral(void *conf)
 		      break;
 		    }
 		  CudaSafeKernelLaunch();
-		  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "IN the processing loop with monitor, first kernel done");
+		  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "IN the processing loop with monitor, first kernel done");
 		  
 		  /* Frequency accumulate kernel here */		  
 		  switch (blocksize_faccumulate.x)
@@ -1534,7 +1532,7 @@ void *do_baseband2spectral(void *conf)
 		      break;
 		    }
 		  CudaSafeKernelLaunch();
-		  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "IN the processing loop with monitor, second kernel done");
+		  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "IN the processing loop with monitor, second kernel done");
 		  
 		  /* Setup ethernet packets */
 		  time_stamp_monitor_i = (time_t)time_stamp_monitor_f;
@@ -1558,7 +1556,7 @@ void *do_baseband2spectral(void *conf)
 		      if(fits_monitor[eth_index].nchan == 0)
 			{
 			  fprintf(stdout, "We get a bad monitor packet before queue\n");
-			  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "We get a bad monitor packet before queue");
+			  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "We get a bad monitor packet before queue");
 			  fflush(stdout);
 			}
 
@@ -1761,7 +1759,7 @@ void *do_baseband2spectral(void *conf)
       //CudaSafeKernelLaunch();
       
       ipcbuf_mark_cleared(baseband2spectral_conf->db_in);
-      log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "after closing old buffer block");      
+      log_add(baseband2spectral_conf->log_file, "INFO", 1,  "after closing old buffer block");      
       nblk_accumulate++;
 
       if(baseband2spectral_conf->monitor == 1)
@@ -1833,7 +1831,7 @@ void *do_baseband2spectral(void *conf)
 		      if(fits_spectral.nchan == 0)
 			{
 			  fprintf(stdout, "We get a bad spectral packet before queue\n");
-			  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "We get a bad spectral packet before queue");
+			  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "We get a bad spectral packet before queue");
 			  fflush(stdout);
 			}
 		      
@@ -1861,7 +1859,7 @@ void *do_baseband2spectral(void *conf)
 	  
 	  if(baseband2spectral_conf->output_network == 0)
 	    {
-	      log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "before closing old buffer block");
+	      log_add(baseband2spectral_conf->log_file, "INFO", 1,  "before closing old buffer block");
 	      ipcbuf_mark_filled(baseband2spectral_conf->db_out, (uint64_t)(baseband2spectral_conf->nblk_accumulate * cbufsz * baseband2spectral_conf->scale_dtsz));
 	      //ipcbuf_mark_filled(baseband2spectral_conf->db_out, baseband2spectral_conf->bufout_size * baseband2spectral_conf->nrepeat_per_blk);
 	      //ipcbuf_mark_filled(baseband2spectral_conf->db_out, baseband2spectral_conf->rbufout_size);
@@ -1874,12 +1872,12 @@ void *do_baseband2spectral(void *conf)
       
       time_offset += time_res_blk;
       fprintf(stdout, "BASEBAND2SPECTRAL, finished %f seconds data\n", time_offset);
-      log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "finished %f seconds data", time_offset);
+      log_add(baseband2spectral_conf->log_file, "INFO", 1,  "finished %f seconds data", time_offset);
       fflush(stdout);
     }
   CudaSynchronizeCall(); // Sync here is for multiple streams
   
-  log_add(baseband2spectral_conf->log_file, "INFO", 1, log_mutex, "FINISH the process");
+  log_add(baseband2spectral_conf->log_file, "INFO", 1,  "FINISH the process");
   
   quit = 1;
   if(baseband2spectral_conf->monitor)
@@ -1914,7 +1912,7 @@ int threads(conf_t conf)
   for(i = 0; i < nthread; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
   
-  log_add(conf.log_file, "INFO", 1, log_mutex, "Join threads? The last quit is %d", quit);
+  log_add(conf.log_file, "INFO", 1,  "Join threads? The last quit is %d", quit);
     
   return EXIT_SUCCESS;
 }

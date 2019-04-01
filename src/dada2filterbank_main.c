@@ -10,8 +10,6 @@
 #include "log.h"
 #include "dada2filterbank.h"
 
-extern pthread_mutex_t log_mutex;
-
 void usage()
 {
   fprintf(stdout,
@@ -71,7 +69,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "DADA2FILTERBANK_ERROR: Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "DADA2FILTERBANK START");
+  log_add(conf.log_file, "INFO", 1,  "DADA2FILTERBANK START");
   
   /* init the thing */
   initialization(&conf);
@@ -89,7 +87,7 @@ int main(int argc, char **argv)
   destroy(conf);
   
   /* Destory log interface */
-  log_add(conf.log_file, "INFO", 1, log_mutex, "FINISH DADA2FILTERBANK");
+  log_add(conf.log_file, "INFO", 1,  "FINISH DADA2FILTERBANK");
   fclose(conf.log_file);
 
   return EXIT_SUCCESS;

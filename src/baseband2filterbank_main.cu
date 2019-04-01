@@ -18,7 +18,6 @@
 // Clean up unused kernels and parameters
 // Clean up testers also
 
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 extern int quit;
 
 void usage ()
@@ -178,7 +177,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Can not open log file %s\n", log_fname);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK START");
+  log_add(conf.log_file, "INFO", 1,  "BASEBAND2FILTERBANK START");
 
   /* check the command line and record it */
   examine_record_arguments(conf, argv, argc);
@@ -199,12 +198,12 @@ int main(int argc, char *argv[])
   threads(conf);
   
   /* Destroy */
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BEFORE destroy");  
+  log_add(conf.log_file, "INFO", 1,  "BEFORE destroy");  
   destroy_baseband2filterbank(conf);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "END destroy");
+  log_add(conf.log_file, "INFO", 1,  "END destroy");
   
   /* Destory log interface */  
-  log_add(conf.log_file, "INFO", 1, log_mutex, "BASEBAND2FILTERBANK END");  
+  log_add(conf.log_file, "INFO", 1,  "BASEBAND2FILTERBANK END");  
   log_close(conf.log_file);
   fprintf(stdout, "HERE AFTER LOG CLOSE\n");
   fflush(stdout);

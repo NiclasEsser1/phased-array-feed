@@ -10,6 +10,8 @@
 #include <string.h>
 #include "log.h"
 
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 FILE *log_open(char *fname, const char *mode)
 {  
   FILE *fp = fopen(fname, mode);
@@ -21,7 +23,7 @@ FILE *log_open(char *fname, const char *mode)
   return fp;
 }
 
-int log_add(FILE *fp, const char *type, int flush, pthread_mutex_t mutex, const char *format, ...)
+int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
 {
   struct tm *local = NULL;
   time_t rawtime;
@@ -38,9 +40,9 @@ int log_add(FILE *fp, const char *type, int flush, pthread_mutex_t mutex, const 
   va_end (args);
   
   /* Write to log file */
-  pthread_mutex_lock(&mutex);
+  pthread_mutex_lock(&log_mutex);
   fprintf(fp, "[%s] %s\t%s\n", strtok(asctime(local), "\n"), type, buffer);
-  pthread_mutex_unlock(&mutex);
+  pthread_mutex_unlock(&log_mutex);
   
   /* Flush it if required */
   if(flush)

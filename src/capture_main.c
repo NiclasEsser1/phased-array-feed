@@ -11,7 +11,6 @@
 #include "capture.h"
 #include "log.h"
 
-extern pthread_mutex_t log_mutex;
 extern int quit;
 
 void usage()
@@ -151,7 +150,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "CAPTURE_ERROR: Can not open log file %s, which happends at \"%s\", line [%d], has to abort\n", fname_log, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
-  log_add(conf.log_file, "INFO", 1, log_mutex, "CAPTURE START");
+  log_add(conf.log_file, "INFO", 1,  "CAPTURE START");
   
   /* check the command line and record it */
   examine_record_arguments(conf, argv, argc);
@@ -166,8 +165,8 @@ int main(int argc, char **argv)
   destroy_capture(conf);
   
   /* Destory log interface */
-  log_add(conf.log_file, "INFO", 1, log_mutex, "The last quit is %d", quit);
-  log_add(conf.log_file, "INFO", 1, log_mutex, "CAPTURE END");
+  log_add(conf.log_file, "INFO", 1,  "The last quit is %d", quit);
+  log_add(conf.log_file, "INFO", 1,  "CAPTURE END");
   fclose(conf.log_file);
 
   /* termine it */

@@ -10,7 +10,7 @@ extern "C" {
 #define MSTR_LEN 1024
 
   FILE *log_open(char *fname, const char *mode);
-  int log_add(FILE *fp, const char *type, int flush, pthread_mutex_t mutex, const char *format, ...);
+  int log_add(FILE *fp, const char *type, int flush, const char *format, ...);
   int log_close(FILE *fp);
   
 #endif
