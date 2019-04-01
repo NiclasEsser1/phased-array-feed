@@ -30,6 +30,8 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   char buffer[MSTR_LEN] = {'\0'};
   va_list args;
 
+  pthread_mutex_lock(&log_mutex);
+  
   /* Get current time */
   time(&rawtime);
   local = localtime(&rawtime);
@@ -40,13 +42,13 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   va_end (args);
   
   /* Write to log file */
-  pthread_mutex_lock(&log_mutex);
   fprintf(fp, "[%s] %s\t%s\n", strtok(asctime(local), "\n"), type, buffer);
-  pthread_mutex_unlock(&log_mutex);
   
   /* Flush it if required */
   if(flush)
     fflush(fp);
+
+  pthread_mutex_unlock(&log_mutex);
   
   return EXIT_SUCCESS;
 }
