@@ -15,7 +15,7 @@ pthread_mutex_t log_mutex;
 int filterbank_header(conf_t conf)
 {
   /* If the data is generated in a different machine, we may have litter and big proglem */
-  char field[MSTR_LEN];
+  char field[MSTR_LEN] = {'\0'};
   int length;
 
   conf.telescope_id = 8;
@@ -23,160 +23,133 @@ int filterbank_header(conf_t conf)
   conf.machine_id = 2;
     
   /* Write filterbank header */
-  length = 12;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // HEADER_START
   strcpy(field, "HEADER_START");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-    
-  length = 11;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  
+  memset(field, 0x00, sizeof(field)); // rawdatafile
   strcpy(field, "rawdatafile");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite(conf.f_fname, NBYTE_INT, 1, conf.f_fp);
-  fprintf(stdout, "%s\n", conf.f_fname);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  memset(field, 0x00, sizeof(field));
+  strcpy(field, conf.f_fname);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fprintf(stdout, "%s\n", field);
   fflush(stdout);
   
-  length = 12;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // telescope_id
   strcpy(field, "telescope_id");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.telescope_id, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.telescope_id, sizeof(int), 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.telescope_id);
   fflush(stdout);
-    
-  length = 9;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  
+  memset(field, 0x00, sizeof(field)); // data_type
   strcpy(field, "data_type");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.data_type, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.data_type, sizeof(int), 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.data_type);
   fflush(stdout);
-    
-  //length = 5;
-  //double refdm = 196.0;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "refdm");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&refdm, NBYTE_INT, 1, conf.f_fp);
-  //fprintf(stdout, "%f\n", refdm);
-  //fflush(stdout);
-	
-  length = 5;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  
+  memset(field, 0x00, sizeof(field)); // tsamp
   strcpy(field, "tsamp");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.tsamp, sizeof(double), 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.tsamp, sizeof(double), 1, conf.f_fp);
   fprintf(stdout, "%f\n", conf.tsamp);
   fflush(stdout);
   
-  length = 6;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // tstart
   strcpy(field, "tstart");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.mjd_start, sizeof(double), 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.mjd_start, sizeof(double), 1, conf.f_fp);
   fprintf(stdout, "%f\n", conf.mjd_start);
   fflush(stdout);
   
-  length = 5;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // nbits
   strcpy(field, "nbits");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.nbits, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.nbits, sizeof(int), 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.nbits);
   fflush(stdout);
   
-  length = 4;
-  conf.nifs = conf.npol * conf.ndim;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // nifs
   strcpy(field, "nifs");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.nifs, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.nifs, sizeof(int), 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.nifs);
   fflush(stdout);
   
-  length = 4;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // fch1
   strcpy(field, "fch1");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.fch1, sizeof(double), 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.fch1, sizeof(double), 1, conf.f_fp);
   fprintf(stdout, "%f\n", conf.fch1);
   fflush(stdout);
   
-  length = 4;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // foff
   strcpy(field, "foff");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.foff, sizeof(double), 1, conf.f_fp);  
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.foff, sizeof(double), 1, conf.f_fp);
   fprintf(stdout, "%f\n", conf.foff);
   fflush(stdout);
-  
-  length = 6;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+      
+  memset(field, 0x00, sizeof(field)); // nchans
   strcpy(field, "nchans");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.nchans, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.nchans, sizeof(int), 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.nchans);
   fflush(stdout);
   
-  //length = 6;
-  //int nbeams = 1;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "nbeams");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&nbeams, NBYTE_INT, 1, conf.f_fp);
-  //fprintf(stdout, "%d\n", nbeams);
-  //fflush(stdout);
-  //
-  //length = 5;
-  //int ibeam = 1;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "ibeam");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&ibeam, NBYTE_INT, 1, conf.f_fp);
-  //fprintf(stdout, "%d\n", ibeam);
-  //fflush(stdout);
-  
-  length = 11;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // source_name
   strcpy(field, "source_name");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  length = strlen(conf.source_name);
-  strncpy(field, conf.source_name, length);
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fprintf(stdout, "%s\n", conf.source_name);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  memset(field, 0x00, sizeof(field));
+  strcpy(field, conf.source_name);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fprintf(stdout, "%s\n", field);
   fflush(stdout);
   
-  //length = 7;
-  //conf.raj = 30;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "src_raj");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&conf.raj, sizeof(double), 1, conf.f_fp);
-  //fprintf(stdout, "%f\n", conf.raj);
-  //fflush(stdout);
-  //
-  //length = 7;
-  //conf.decj = 10;
-  //fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
-  //strcpy(field, "src_dej");
-  //fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  //fwrite((char*)&conf.decj, sizeof(double), 1, conf.f_fp); 
-  //fprintf(stdout, "%f\n", conf.decj);
-  //fflush(stdout);
-  
-  length = 10;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+  memset(field, 0x00, sizeof(field)); // machine_id
   strcpy(field, "machine_id");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
-  fwrite((char*)&conf.machine_id, NBYTE_INT, 1, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
+  fwrite(&conf.machine_id, sizeof(int), 1, conf.f_fp);
   fprintf(stdout, "%d\n", conf.machine_id);
   fflush(stdout);
-    
-  length = 10;
-  fwrite((char*)&length, NBYTE_INT, 1, conf.f_fp);
+      
+  memset(field, 0x00, sizeof(field)); // HEAD_END
   strcpy(field, "HEADER_END");
-  fwrite(field, NBYTE_CHAR, length, conf.f_fp);
+  length = strlen(field);
+  fwrite(&length, sizeof(int), 1, conf.f_fp);
+  fwrite(field, sizeof(char), length, conf.f_fp);
     
   return EXIT_SUCCESS;
 }
