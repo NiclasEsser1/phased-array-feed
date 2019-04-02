@@ -11,7 +11,8 @@ extern "C" {
 #include "ascii_header.h"
 #include "daemon.h"
 #include "futils.h"
-
+#include "constants.h"
+  
 typedef struct conf_t
 {
   int file;

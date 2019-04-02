@@ -7,8 +7,6 @@ extern "C" {
   
 #include <pthread.h>
   
-#define MSTR_LEN 1024
-
   FILE *log_open(char *fname, const char *mode);
   int log_add(FILE *fp, const char *type, int flush, const char *format, ...);
   int log_close(FILE *fp);

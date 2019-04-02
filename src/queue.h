@@ -3,9 +3,10 @@ extern "C" {
 #endif
 #ifndef _QUEUE_H
 #define _QUEUE_H
-  
+
+#include <pthread.h>
 #include "fits.h"
-  
+
   // A structure to represent a queue 
   typedef struct queue_t
   { 

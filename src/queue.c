@@ -7,7 +7,7 @@
 
 #include "queue.h"
 
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t paf_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // function to create a queue of given capacity.  
 // It initializes size of queue as 0 
@@ -37,9 +37,9 @@ int is_full(queue_t* queue)
 {
   int return_value;
   
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&paf_queue_mutex);
   return_value = (queue->size == queue->capacity);
-  pthread_mutex_unlock(&queue_mutex);
+  pthread_mutex_unlock(&paf_queue_mutex);
   
   return return_value;
 }
@@ -49,9 +49,9 @@ int is_empty(queue_t* queue)
 {
   int return_value;
 
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&paf_queue_mutex);
   return_value = (queue->size == 0);
-  pthread_mutex_unlock(&queue_mutex);
+  pthread_mutex_unlock(&paf_queue_mutex);
   
   return return_value;
 } 
@@ -63,11 +63,11 @@ int enqueue(queue_t* queue, fits_t fits)
   if (is_full(queue))
     exit(EXIT_FAILURE);
 
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&paf_queue_mutex);
   queue->rear = (queue->rear + 1)%queue->capacity; 
   queue->fits[queue->rear] = fits; 
   queue->size = queue->size + 1;
-  pthread_mutex_unlock(&queue_mutex);
+  pthread_mutex_unlock(&paf_queue_mutex);
   
   return EXIT_SUCCESS;
 } 
@@ -82,11 +82,11 @@ int dequeue(queue_t* queue, fits_t *fits)
       exit(EXIT_FAILURE);
     }
   
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&paf_queue_mutex);
   *fits = queue->fits[queue->front]; 
   queue->front = (queue->front + 1)%queue->capacity; 
   queue->size = queue->size - 1;
-  pthread_mutex_unlock(&queue_mutex);
+  pthread_mutex_unlock(&paf_queue_mutex);
   
   return EXIT_SUCCESS;
 } 
@@ -99,9 +99,9 @@ int front(queue_t* queue, fits_t *fits)
       fprintf(stdout, "The queue is EMPTY!\n");
       exit(EXIT_FAILURE);
     }
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&paf_queue_mutex);
   *fits = queue->fits[queue->front];
-  pthread_mutex_unlock(&queue_mutex);
+  pthread_mutex_unlock(&paf_queue_mutex);
   
   return EXIT_SUCCESS;
 } 
@@ -115,9 +115,9 @@ int rear(queue_t* queue, fits_t *fits)
       exit(EXIT_FAILURE);
     }
   
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&paf_queue_mutex);
   *fits = queue->fits[queue->rear];
-  pthread_mutex_unlock(&queue_mutex);
+  pthread_mutex_unlock(&paf_queue_mutex);
   
   return EXIT_SUCCESS;
 } 

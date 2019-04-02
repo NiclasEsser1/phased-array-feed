@@ -2,15 +2,16 @@
 #define _GNU_SOURCE
 #endif
 
-#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+
+#include "constants.h"
 #include "log.h"
 
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t paf_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 FILE *log_open(char *fname, const char *mode)
 {  
@@ -30,7 +31,7 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   char buffer[MSTR_LEN] = {'\0'};
   va_list args;
 
-  pthread_mutex_lock(&log_mutex);
+  pthread_mutex_lock(&paf_log_mutex);
   
   /* Get current time */
   time(&rawtime);
@@ -48,7 +49,7 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   if(flush)
     fflush(fp);
 
-  pthread_mutex_unlock(&log_mutex);
+  pthread_mutex_unlock(&paf_log_mutex);
   
   return EXIT_SUCCESS;
 }
