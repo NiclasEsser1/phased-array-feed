@@ -182,6 +182,8 @@ int dada_header(conf_t *conf)
   ascii_header_get(hdrbuf, "BW", "%lf", &conf->bw);
   ascii_header_get(hdrbuf, "RECEIVER", "%d", &conf->beam_id);
 
+  conf->nifs = conf->npol * conf->ndim;
+  
   if(conf->file == 0)
     ipcbuf_mark_cleared(conf->hdu->header_block);
   else

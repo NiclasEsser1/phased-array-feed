@@ -5,45 +5,42 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import os
 
-ddir  = "/beegfs/DENG/pacifix7_numa1_process0"
-#ddir  = "./"
+source = "J1819-1458"
+source = "J0332+5434"
+#source = "J1939+2134"
+#source = "J1713+0747"
 
-#cand_fname = "cand-J1819-1458-zap0511-snr10.txt"
-#cand_fname = "cand-J1819-1458-snr10.txt"
-#cand_fname = "cand-J1819-1458-snr10-swap.txt"
-#cand_fname = "cand-J1819-1458-zap0511-snr10-swap.txt"
-#fil_fname  = "J1819-1458-1024chan-64scl.fil"
+#nchunk = 30
+nchunk = 48
+nchan  = 512
+tsamp  = 216
 
-#cand_fname = "cand-J0332+5434-zap0511-snr10.txt"
-#fil_fname  = "J0332+5434-1024chan-64scl.fil"
-#cand_fname = "cand-J1939+2134-zap0511-snr10.txt"
-#fil_fname  = "J1939+2134-1024chan-64scl.fil"
-
-#cand_fname = "cand-J1819-1458-zap5121023-snr10-swap.txt"
-cand_fname = "cand-J1819-1458-zap5121023-zap304310-snr10-swap.txt"
-fil_fname  = "J1819-1458-1024chan-64scl-swap.fil"
-mask_fname = "J1819-1458-1024chan-64scl-swap_rfifind.mask"
-
-#cand_fname = "cand.txt"
-#fil_fname  = "J1819-1458-1024chan-64scl.fil"
-
-cand_fname = "cand.txt"
-fil_fname  = "J1819-1458.fil"
+ddir   = "/beegfs/DENG/AUG/{}".format(source)
+cand_fname = "{}-{}chan-{}us-{}chunks.cand".format(source, nchan, tsamp, nchunk)
+fil_fname  = "{}-{}chan-{}us-{}chunks.fil".format(source, nchan, tsamp, nchunk)
 
 fil_fname  = os.path.join(ddir, fil_fname)
 cand_fname = os.path.join(ddir, cand_fname)
-mask_fname = os.path.join(ddir, mask_fname)
 cand       = np.loadtxt(cand_fname)
 ncand      = len(cand)
-tsamp      = 54.0E-6
-dm         = 196.0
+shift      = 0.3
 
 for i in range(ncand):
-    tstart   = cand[i,2] - 0.2
-    duration = 0.4
+    tstart   = cand[i,2] - shift
+    duration = 2 * shift
 
-    #command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec --bandpass --maskfile=\"{:s}\"".format(fil_fname, tstart, duration, dm, mask_fname)
-    command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
+    dm       = cand[i,5]
+    dm       = 26.794137
+    command  = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
     print command, ", SNR:", cand[i,0]
     os.system(command)
-    exit(1)
+    
+    #dm = 0
+    #command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
+    #print command, ", SNR:", cand[i,0]
+    #os.system(command)
+    #
+    #dm = 195.786
+    #command = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
+    #print command, ", SNR:", cand[i,0]
+    #os.system(command)

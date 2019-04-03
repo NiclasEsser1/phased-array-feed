@@ -24,6 +24,7 @@ from os import O_NONBLOCK
 # Configuration of input for different number of beams 
 INPUT_1BEAM = {"input_nbeam":                  1,
                "input_nchunk":                 48,
+               #"input_nchunk":                 30,
 }
 
 INPUT_2BEAMS = {"input_nbeam":                  2,
@@ -55,9 +56,10 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "rbuf_ndf_per_chunk_per_block": 16384,# For all ring buffers
 
                    # Configuration of input
-                   "input_source_name":          "J1819-1458",
-                   #"input_source_name":          "J0332+5434",
-                   #"input_source_name":          "J1939+2134",
+                   #"input_source_name":          "J1819-1458",
+                   "input_source_name":          "J0332+5434",
+                   "input_source_name":          "J1939+2134",
+                   #"input_source_name":          "J1713+0747",
                    "input_keys":                 ["dada", "dadc"], # To put baseband data from file
                    "input_nblk":                 5,
                    "input_nreader":              1,
@@ -81,7 +83,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "search_heimdall":     1,
                    "search_dbdisk":       1,
                    "search_monitor":      1,
-                   "search_spectrometer": 1,
+                   "search_spectrometer": 0,
                    "search_detect_thresh":10,
                    "search_dm":           [1, 3000],
                    "search_zap_chans":    [],
@@ -1449,6 +1451,7 @@ if __name__ == "__main__":
 
     if beam == 1:
         freq = 1340.5
+        #freq = 1403.5
     if beam == 2:
         freq = 1337.0
 
