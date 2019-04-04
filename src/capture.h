@@ -14,58 +14,42 @@ extern "C" {
 #include "daemon.h"
 #include "futils.h"
 #include "constants.h"
+#include "psrdada.h"
 
-typedef struct conf_t
-{
-  FILE *log_file;
-  int process_index, thread_index, beam_index;
+#define acquire_chunk_index(freq, cfreq, nchunk) (int((freq - cfreq + 0.5)/NCHAN_PER_CHUNK + 0.5 * nchunk))
+
+  typedef struct conf_t
+  {
+    FILE *log_file;  
+    key_t key;
+    
+    uint64_t ndf_per_chunk_rbuf, ndf_per_chunk_tbuf;
+    
+    int dfsz_seek;
+    int nchunk_expect, nchan_expect, nchunk_actual;  
+    
+    char ip[MSTR_LEN];
+    int port;
+    char *tbuf;
+    uint64_t tbufsz, blksz_rbuf;
+    
+    char dir[MSTR_LEN], dada_header_template[MSTR_LEN];
+    
+    int days_from_1970;   // Number days of epoch from 1970 
+    uint64_t seconds_from_epoch, df_in_period; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
+    
+    dada_header_t dada_header;
+    dada_hdu_t *hdu;
+    ipcbuf_t *data_block, *header_block;
+    
+    struct timeval tout;
+  }conf_t;
   
-  key_t key;
-  dada_hdu_t *hdu;
-  ipcbuf_t *data_block, *header_block;
+  int default_arguments(conf_t *conf);
+  int examine_record_arguments(conf_t conf, char **argv, int argc);
+  int create_buffer(conf_t *conf);
+  int destory_buffer(conf_t conf);
   
-  uint64_t ndf_per_chunk_rbuf, ndf_per_chunk_tbuf, blksz_rbuf, tbufsz;
-  
-  int pad;
-  int dfsz_seek, dfsz_keep;
-  int capture_cpu[NPORT_MAX], rbuf_ctrl_cpu, capture_ctrl_cpu, capture_ctrl, cpu_bind;
-  char capture_ctrl_addr[MSTR_LEN];
-  
-  char ip_alive[NPORT_MAX][MSTR_LEN], ip_dead[NPORT_MAX][MSTR_LEN];;
-  int port_alive[NPORT_MAX], port_dead[NPORT_MAX];
-  int nport_alive, nport_dead;
-  int nchunk_alive_expect_on_port[NPORT_MAX], nchunk_alive_actual_on_port[NPORT_MAX], nchunk_dead_on_port[NPORT_MAX];;  // For each port;
-  int nchan, nchunk, nchunk_alive;
-  char obs_id[MSTR_LEN];
-  
-  char dir[MSTR_LEN], dada_header_template[MSTR_LEN];
-  char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
-
-  double center_freq, freq_res, bandwidth;
-  double time_res_df, time_res_blk;  // time resolution of each data frame and ring buffer block, for start time determination;
-  double chunk_index0;
-
-  int days_from_1970;   // Number of days from 1970
-  time_t seconds_from_1970;
-  uint64_t seconds_from_epoch, df_in_period; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
-  uint64_t picoseconds, picoseconds_ref;
-  char utc_start[MSTR_LEN];
-  double mjd_start;
-
-  struct timeval tout;
-}conf_t;
-
-int initialize_capture(conf_t *conf);
-void *do_capture(void *conf);
-int destroy_capture(conf_t conf);
-
-void *capture_control(void *conf);
-void *buf_control(void *conf);
-
-int default_arguments(conf_t *conf);
-int threads(conf_t *conf);
-int register_dada_header(conf_t conf);
-int examine_record_arguments(conf_t conf, char **argv, int argc);
 #endif
 
 #ifdef __cplusplus
