@@ -7,11 +7,12 @@ import os
 
 source = "J1819-1458"
 source = "J0332+5434"
-#source = "J1939+2134"
+source = "J1939+2134"
 #source = "J1713+0747"
 
 #nchunk = 30
-nchunk = 48
+#nchunk = 48
+nchunk = 24
 nchan  = 512
 tsamp  = 216
 
@@ -30,7 +31,7 @@ for i in range(ncand):
     duration = 2 * shift
 
     dm       = cand[i,5]
-    dm       = 26.794137
+    #dm       = 26.794137
     command  = "waterfaller.py {:s} -T {:f} -t {:f} -d {:f} --show-ts --show-spec".format(fil_fname, tstart, duration, dm)
     print command, ", SNR:", cand[i,0]
     os.system(command)

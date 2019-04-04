@@ -23,8 +23,9 @@ from os import O_NONBLOCK
 
 # Configuration of input for different number of beams 
 INPUT_1BEAM = {"input_nbeam":                  1,
-               "input_nchunk":                 48,
+               #"input_nchunk":                 48,
                #"input_nchunk":                 30,
+               "input_nchunk":                 24,
 }
 
 INPUT_2BEAMS = {"input_nbeam":                  2,
@@ -1450,8 +1451,9 @@ if __name__ == "__main__":
     ip = "10.17.{}.{}".format(host_id, numa + 1)
 
     if beam == 1:
-        freq = 1340.5
+        #freq = 1340.5
         #freq = 1403.5
+        freq = 1424.5
     if beam == 2:
         freq = 1337.0
 
