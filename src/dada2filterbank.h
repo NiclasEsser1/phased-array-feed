@@ -24,15 +24,15 @@ typedef struct conf_t
   ipcbuf_t *db;
   double mjd_start, freq, bw, tsamp, raj, dej, fch1, foff;
   uint64_t picoseconds;
-  int nchans, nbits, npol, ndim, nifs, data_type, machine_id, telescope_id, beam_id;
+  int nchans, nbits, npol, ndim, nifs, data_type, machine_id, telescope_id, ibeam, nbeams;
   FILE *d_fp, *f_fp;
 }conf_t;
 
-int filterbank_header(conf_t conf);
-int dada_header(conf_t *conf);
-int filterbank_data(conf_t conf);
-int destroy(conf_t conf);
-int initialization(conf_t *conf);
+  int filterbank_header(conf_t conf);
+  int dada_header(conf_t *conf);
+  int filterbank_data(conf_t conf);
+  int destroy(conf_t conf);
+  int initialization(conf_t *conf);
   int write_string(FILE *fp, char *string);
   int write_int(FILE *fp, char *key, int value);
   int write_double(FILE *fp, char *key, double value);

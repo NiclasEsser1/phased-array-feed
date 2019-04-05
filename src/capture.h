@@ -16,8 +16,8 @@ extern "C" {
 #include "constants.h"
 #include "psrdada.h"
 
-#define acquire_chunk_index(freq, cfreq, nchunk) (int((freq - cfreq + 0.5)/NCHAN_PER_CHUNK + 0.5 * nchunk))
-#define acquire_df_in_blk(df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref) ((int64_t)(df_in_period - df_in_period_ref) + \((double)seconds_from_epoch - (double)seconds_from_epoch_ref) / TIME_RES_DF)
+#define acquire_chunk_index(freq, cfreq, nchunk) ((int)((freq - cfreq + 0.5)/NCHAN_PER_CHUNK + 0.5 * nchunk))
+#define acquire_df_from_ref(df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref) ((int64_t)(df_in_period - df_in_period_ref) + ((double)seconds_from_epoch - (double)seconds_from_epoch_ref) / TRES_DF)
   
   typedef struct conf_t
   {
@@ -27,7 +27,7 @@ extern "C" {
     
     uint64_t ndf_per_chunk_rbuf, ndf_per_chunk_tbuf;
 
-    double time_res_blk;
+    double tres_rbuf_blk;
     int dfsz_seek, dfsz_keep;
     int nchunk_expect, nchunk_actual;  
     

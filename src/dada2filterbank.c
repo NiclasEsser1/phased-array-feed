@@ -21,7 +21,8 @@ int filterbank_header(conf_t conf)
   conf.telescope_id = 8;
   conf.data_type = 1;
   conf.machine_id = 2;
-    
+  conf.nbeams = 36;
+  
   /* Write filterbank header */
   write_string(conf.f_fp, "HEADER_START");
 
@@ -34,6 +35,12 @@ int filterbank_header(conf_t conf)
 
   /* Write data_type */
   write_int(conf.f_fp, "data_type", conf.data_type);
+
+  /* Write data_type */
+  write_int(conf.f_fp, "ibeam", conf.ibeam);
+
+  /* Write data_type */
+  write_int(conf.f_fp, "nbeams", conf.nbeams);
 
   /* Write tsamp */
   write_double(conf.f_fp, "tsamp", conf.tsamp);
@@ -99,8 +106,8 @@ int dada_header(conf_t *conf)
   ascii_header_get(hdrbuf, "NDIM", "%d", &conf->ndim);
   ascii_header_get(hdrbuf, "TSAMP", "%lf", &conf->tsamp);
   ascii_header_get(hdrbuf, "BW", "%lf", &conf->bw);
-  ascii_header_get(hdrbuf, "RECEIVER", "%d", &conf->beam_id);
-
+  ascii_header_get(hdrbuf, "RECEIVER", "%d", &conf->ibeam);
+  
   conf->nifs = conf->npol * conf->ndim;  
   if(conf->file == 0)
     ipcbuf_mark_cleared(conf->hdu->header_block);

@@ -101,15 +101,15 @@ int initialize_capture(conf_t *conf, int argc, char **argv)
     }
 
   /* Setup other parameters */
-  conf->time_res_blk = conf->ndf_per_chunk_rbuf * TIME_RES_DF;  
-  conf->dfsz_keep    = DFSZ - conf->dfsz_seek;
-  conf->blksz_rbuf   = conf->nchunk_expect * conf->dfsz_keep * conf->ndf_per_chunk_rbuf;
-  conf->tbufsz       = (conf->dfsz_keep + 1) * conf->ndf_per_chunk_tbuf * conf->nchunk_expect;
+  conf->tres_rbuf_blk = conf->ndf_per_chunk_rbuf * TRES_DF;  
+  conf->dfsz_keep     = DFSZ - conf->dfsz_seek;
+  conf->blksz_rbuf    = conf->nchunk_expect * conf->dfsz_keep * conf->ndf_per_chunk_rbuf;
+  conf->tbufsz        = (conf->dfsz_keep) * conf->ndf_per_chunk_tbuf * conf->nchunk_expect;
 
-  conf->tout.tv_sec  = floor(conf->time_res_blk);  // Time out if we do not receive data for one buffer block
-  conf->tout.tv_usec = 1.0E6*(conf->time_res_blk - conf->tout.tv_sec);
+  conf->tout.tv_sec   = floor(conf->tres_rbuf_blk);  // Time out if we do not receive data for one buffer block
+  conf->tout.tv_usec  = 1.0E6*(conf->tres_rbuf_blk - conf->tout.tv_sec);
   
-  log_add_wrap(*conf, "INFO", 1,  "time_res_blk is %f \n", conf->time_res_blk);
+  log_add_wrap(*conf, "INFO", 1,  "tres_rbuf_blk is %f \n", conf->tres_rbuf_blk);
   log_add_wrap(*conf, "INFO", 1,  "dfsz_keep is %d \n", conf->dfsz_keep);
   log_add_wrap(*conf, "INFO", 1,  "blksz_rbuf is %"PRIu64" \n", conf->blksz_rbuf);
   log_add_wrap(*conf, "INFO", 1,  "tbufsz is %"PRIu64" \n", conf->tbufsz);
@@ -119,16 +119,43 @@ int initialize_capture(conf_t *conf, int argc, char **argv)
 
 int do_capture(conf_t conf)
 {
-  int sock, reuseaddr = 1;
+  double freq, time_offset = 0;
+  int sock, chunk_index, reuseaddr = 1;
   struct sockaddr_in sa = {0}, fromsa = {0};
+  socklen_t fromlen = sizeof(fromsa);
+  uint64_t df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref;
+  uint64_t tbuf_loc, rbuf_loc, ndf_per_chunk_rtbuf;
+  uint64_t ndf_in_rbuf_blk_expect, ndf_in_rbuf_blk, ndf, ndf_expect = 0;
+  uint64_t ndf_in_tbuf = 0;
+  int64_t df_from_ref;
+  char *rbuf;
   
+  /* Setup */
+  seconds_from_epoch_ref = conf.seconds_from_epoch;
+  df_in_period_ref       = conf.df_in_period;
+  ndf_per_chunk_rtbuf    = conf.ndf_per_chunk_rbuf + conf.ndf_per_chunk_tbuf;
+  ndf_in_rbuf_blk_expect = conf.ndf_per_chunk_rbuf * conf.nchunk_expect;
+  rbuf                   = ipcbuf_get_next_write(conf.data_block);
+  if(rbuf == NULL)
+    {
+      log_add_wrap(conf, "ERR", 0, "ipcbuf_get_next_write failed\n");
+      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+      fprintf(stderr, "CAPTURE_ERROR: ipcbuf_get_next_write failed, ");
+      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+      destroy_capture(conf);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1,  "Setup do_capture function, done\n");
+  
+  /* Setup socket and bind it */
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&conf.tout, sizeof(conf.tout));
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
   sa.sin_family      = AF_INET;
   sa.sin_port        = htons(conf.port);
-  sa.sin_addr.s_addr = inet_addr(conf.ip);
-    
+  sa.sin_addr.s_addr = inet_addr(conf.ip);    
   if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
     {
       log_add_wrap(conf, "ERR", 0,  "Can not bind to %s_%d\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
@@ -136,9 +163,204 @@ int do_capture(conf_t conf)
       
       fprintf(stderr, "CAPTURE_ERROR: Can not bind to %s_%d ", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
       fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-      
+
+      close(sock);
       destroy_capture(conf);
       exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1,  "Setup data capture socket, done\n");
+  
+  /* Receive one packet and check where are we */
+  if(recvfrom(sock, (void *)conf.dbuf, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+    {
+      log_add_wrap(conf, "ERR", 0, "Can not receive data from %s_%d\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      
+      fprintf(stderr, "CAPTURE_ERROR: Can not receive data from %s_%d ", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+
+      close(sock);
+      destroy_capture(conf);
+      exit(EXIT_FAILURE);
+    }
+  if(decode_df_header(conf.dbuf, &df_in_period, &seconds_from_epoch, &freq))
+    {
+      log_add_wrap(conf, "ERR", 0, "Can not decode BMF packet header\n");
+      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      
+      fprintf(stderr, "CAPTURE_ERROR: Can not decode BMF packet header ");
+      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+
+      close(sock);
+      destroy_capture(conf);
+      exit(EXIT_FAILURE);
+    }
+  df_from_ref = acquire_df_from_ref(df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref);
+  if(df_from_ref >= conf.ndf_per_chunk_rbuf) // the reference has to be in the current buffer or be in future
+    {
+      log_add_wrap(conf, "ERR", 0, "The reference is in the past more than one buffer block\n");
+      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      
+      fprintf(stderr, "CAPTURE_ERROR: The reference is in the past more than one buffer block ");
+      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+
+      close(sock);
+      destroy_capture(conf);
+      exit(EXIT_FAILURE);
+    }
+  ndf_in_rbuf_blk = (df_from_ref>0)?df_from_ref:0; // For counter in each buffer block;
+  log_add(conf.log_file, "INFO", 1,  "Check first packet, done\n");
+  
+  /* Tell pipeline that the capture is ready */
+  fprintf(stdout, "CAPTURE_READY\n"); 
+  fflush(stdout);
+
+  /* Do the capture */
+  while(true)
+    {
+      /* Receive packet */
+      if(recvfrom(sock, (void *)conf.dbuf, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
+	{
+	  log_add_wrap(conf, "ERR", 0, "Can not receive data from %s_%d\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+	  log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  
+	  fprintf(stderr, "CAPTURE_ERROR: Can not receive data from %s_%d ", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+	  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+
+	  close(sock);
+	  destroy_capture(conf);
+	  exit(EXIT_FAILURE);
+	}
+      
+      /* Decode packet header */
+      if(decode_df_header(conf.dbuf, &df_in_period, &seconds_from_epoch, &freq))
+	{
+	  log_add_wrap(conf, "ERR", 0, "Can not decode BMF packet header\n");
+	  log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  
+	  fprintf(stderr, "CAPTURE_ERROR: Can not decode BMF packet header ");
+	  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+
+	  close(sock);
+	  destroy_capture(conf);
+	  exit(EXIT_FAILURE);
+	}
+
+      /* Get the location of the packet */
+      df_from_ref = acquire_df_from_ref(df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref);
+      chunk_index = acquire_chunk_index(freq, conf.freq, conf.nchunk_expect);
+      if ((chunk_index<0) || (chunk_index >= conf.nchunk_expect))
+	{      
+	  log_add_wrap(conf, "ERR", 0, "Frequency chunk %d is outside the range [0 %d]\n", chunk_index, conf.nchunk_expect);
+	  log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+	  
+	  fprintf(stderr, "CAPTURE_ERROR: Frequency chunk %d is outside the range [0 %d], ", chunk_index, conf.nchunk_expect);
+	  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+	  close(sock);
+	  destroy_capture(conf);
+	  exit(EXIT_FAILURE);
+	}
+
+      /* Record data into current ring buffer block if it is covered by it */
+      if((df_from_ref>=0) && (df_from_ref < conf.ndf_per_chunk_rbuf))  
+	{
+	  rbuf_loc = (uint64_t)((df_from_ref * conf.nchunk_expect + chunk_index) * conf.dfsz_keep);         // This is in TFTFP order
+	  memcpy(rbuf + rbuf_loc, conf.dbuf + conf.dfsz_seek, conf.dfsz_keep);
+	  ndf_in_rbuf_blk++; 
+	}
+
+      /* Record data into temp buffer if it is covered by it */
+      if((df_from_ref >= conf.ndf_per_chunk_rbuf) && (df_from_ref < ndf_per_chunk_rtbuf))
+	{		  
+	  tbuf_loc  = (uint64_t)(((df_from_ref - conf.ndf_per_chunk_rbuf) * conf.nchunk_expect + chunk_index) * conf.dfsz_keep);
+	  memcpy(conf.tbuf + tbuf_loc, conf.dbuf + conf.dfsz_seek, conf.dfsz_keep);
+	  ndf_in_tbuf++;
+	}
+
+      /* 
+	 Move to a new ring buffer block if temp buffer is half 
+	 or data can not be covered either by current ring buffer block or temp buffer 
+      */
+      if((df_from_ref >= ndf_per_chunk_rtbuf) || (ndf_in_tbuf >= (0.5 * (conf.ndf_per_chunk_tbuf * conf.nchunk_expect))))
+	{
+	  log_add(conf.log_file, "INFO", 1,  "Change ring buffer block, start\n");
+	  /* Close current ring buffer block */
+	  if(ipcbuf_mark_filled(conf.data_block, conf.blksz_rbuf) < 0)  
+	    {
+	      log_add_wrap(conf, "ERR", 0, "ipcbuf_mark_filled failed\n");
+	      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      
+	      fprintf(stderr, "CAPTURE_ERROR: ipcbuf_mark_filled failed, ");
+	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+	      close(sock);
+	      destroy_capture(conf);
+	      exit(EXIT_FAILURE);
+	    }
+	  log_add(conf.log_file, "INFO", 1,  "Close current buffer block, done\n");
+	  
+	  /*
+	    To see if the buffer is full, quit if yes.
+	    If we have a reader, there will be at least one buffer which is not full
+	  */
+	  if(ipcbuf_get_nfull(conf.data_block) >= (ipcbuf_get_nbufs(conf.data_block) - 1)) 
+	    {	      
+	      log_add_wrap(conf, "ERR", 0, "Buffers are all full\n");
+	      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      
+	      fprintf(stderr, "CAPTURE_ERROR: buffers are all full, ");
+	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      
+	      close(sock);
+	      destroy_capture(conf);
+	      exit(EXIT_FAILURE);
+	    }
+	  log_add(conf.log_file, "INFO", 1,  "Check available buffer block, done\n");
+	  
+	  /* Open a new ring buffer block */
+	  rbuf = ipcbuf_get_next_write(conf.data_block);  
+	  if(rbuf == NULL)
+	    {
+	      log_add_wrap(conf, "ERR", 0, "ipcbuf_get_next_write failed\n");
+	      log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      
+	      fprintf(stderr, "CAPTURE_ERROR: ipcbuf_get_next_write failed, ");
+	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+	      close(sock);
+	      destroy_capture(conf);
+	      exit(EXIT_FAILURE);
+	    }
+	  log_add(conf.log_file, "INFO", 1,  "Open new buffer block, done\n");
+	  
+	  /* Check the packet loss rate */
+	  time_offset += conf.tres_rbuf_blk;
+	  ndf_expect  += ndf_in_rbuf_blk_expect;
+	  ndf         += (ndf_in_rbuf_blk + ndf_in_tbuf);
+	  fprintf(stdout, "CAPTURE_STATUS: %f %E %E\n", time_offset, 1.0 - ndf/(double)ndf_expect, 1.0 - ndf_in_rbuf_blk/(double)ndf_in_rbuf_blk_expect);
+	  fflush(stdout);	  
+	  log_add(conf.log_file, "INFO", 1,  "Check packet loss rate, done\n");
+
+	  /* Update reference */
+	  df_in_period_ref    += conf.ndf_per_chunk_rbuf;
+	  if(df_in_period_ref >= NDF_PER_CHUNK_PER_PERIOD)
+	    {
+	      seconds_from_epoch_ref += PERIOD;
+	      df_in_period_ref       -= NDF_PER_CHUNK_PER_PERIOD;
+	    }
+	  log_add(conf.log_file, "INFO", 1,  "Update reference, done\n");
+
+	  /* Copy temp buffer to ring buffer block */
+	  memcpy(rbuf, conf.tbuf, conf.ndf_per_chunk_tbuf * conf.nchunk_expect * conf.dfsz_keep);		  
+	  log_add(conf.log_file, "INFO", 1,  "Copy temp buffer to ring buffer block, done\n");
+
+	  /* Reset counters*/
+	  ndf_in_rbuf_blk = 0;
+	  ndf_in_tbuf     = 0;
+	  
+	  log_add(conf.log_file, "INFO", 1,  "Change ring buffer block, done\n");
+	}      
     }
   
   return EXIT_SUCCESS;
@@ -546,7 +768,7 @@ int update_dada_header(conf_t *conf)
   nchan = conf->nchunk_expect * NCHAN_PER_CHUNK; // Number of channels in real;
   scale = nchan / (double)conf->dada_header->nchan;
   
-  seconds_in_period = TIME_RES_DF * conf->df_in_period;  
+  seconds_in_period = TRES_DF * conf->df_in_period;  
   seconds_from_1970 = floor(seconds_in_period) + conf->seconds_from_epoch + SECDAY * conf->days_from_1970;
 
   conf->dada_header->freq     = conf->freq;
