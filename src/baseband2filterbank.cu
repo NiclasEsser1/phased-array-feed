@@ -890,7 +890,7 @@ int destroy_baseband2filterbank(conf_t conf)
       fprintf(stdout, "HERE db_out_spectral free\n");
       fflush(stdout);
     }  
-  log_add(conf.log_file, "INFO", 1,  "destory hdu done");  
+  log_add(conf.log_file, "INFO", 1,  "destroy hdu done");  
 
   for(i = 0; i < conf.nstream; i++)
     {

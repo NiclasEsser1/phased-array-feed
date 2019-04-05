@@ -19,7 +19,7 @@ FILE *log_open(char *fname, const char *mode)
   if(fp == NULL)
     {
       fprintf(stderr, "Can not open log file %s\n", fname);
-      exit(EXIT_FAILURE);
+      return NULL;
     }
   return fp;
 }
@@ -31,6 +31,12 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   char buffer[MSTR_LEN] = {'\0'};
   va_list args;
 
+  if(fp == NULL)
+    {      
+      fprintf(stderr, "LOG_ERROR: log file is not open to write, ");
+      fprintf(stderr, "which happens at which happens at \"%s\", line [%d], has to abort\n\n", __FILE__, __LINE__);
+      return EXIT_FAILURE;
+    }
   pthread_mutex_lock(&paf_log_mutex);
   
   /* Get current time */
@@ -43,7 +49,7 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   va_end (args);
   
   /* Write to log file */
-  fprintf(fp, "[%s] %s\t%s\n", strtok(asctime(local), "\n"), type, buffer);
+  fprintf(fp, "[%s] %s\t%s", strtok(asctime(local), "\n"), type, buffer);
   
   /* Flush it if required */
   if(flush)

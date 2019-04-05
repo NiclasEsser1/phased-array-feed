@@ -453,7 +453,7 @@ int destroy_baseband2spectral(conf_t conf)
       dada_hdu_unlock_write(conf.hdu_out);
       dada_hdu_destroy(conf.hdu_out);
     }
-  log_add(conf.log_file, "INFO", 1,  "destory hdu done");  
+  log_add(conf.log_file, "INFO", 1,  "destroy hdu done");  
   
   for(i = 0; i < conf.nstream; i++)
     {

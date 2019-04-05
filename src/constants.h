@@ -37,8 +37,8 @@ extern "C" {
 #define NDATA_PER_SAMP_FULL  4
 #define NBIT_SPECTRAL        32
 #define NBYTE_SPECTRAL       4    // float
-  
-#define NPORT_MAX       10
+
+#define TIME_RES_DF     0.84375E-6
 #define NSAMP_DF        128
 #define NCHAN_PER_CHUNK 7
 #define OVER_SAMP_RATE  (32.0/27.0)
