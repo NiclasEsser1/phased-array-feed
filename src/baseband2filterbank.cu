@@ -1679,19 +1679,19 @@ void *monitor_sendto(void *conf)
 
 int threads(conf_t conf)
 {  
-  int i, ret[3], nthread = 0;
+  int i, nthread = 0;
   pthread_t thread[3];
   
-  ret[0] = pthread_create(&thread[0], NULL, do_baseband2filterbank, (void *)&conf);
+  pthread_create(&thread[0], NULL, do_baseband2filterbank, (void *)&conf);
   nthread ++;
   if(conf.monitor == 1)
     {      
-      ret[1] = pthread_create(&thread[1], NULL, monitor_sendto, (void *)&conf);
+      pthread_create(&thread[1], NULL, monitor_sendto, (void *)&conf);
       nthread ++;
     }
   if(conf.spectral2network == 1)
     {      
-      ret[2] = pthread_create(&thread[2], NULL, spectral_sendto, (void *)&conf);
+      pthread_create(&thread[2], NULL, spectral_sendto, (void *)&conf);
       nthread ++;
     }
   

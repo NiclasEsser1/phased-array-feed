@@ -105,11 +105,41 @@ int initialize_capture(conf_t *conf, int argc, char **argv)
   conf->dfsz_keep    = DFSZ - conf->dfsz_seek;
   conf->blksz_rbuf   = conf->nchunk_expect * conf->dfsz_keep * conf->ndf_per_chunk_rbuf;
   conf->tbufsz       = (conf->dfsz_keep + 1) * conf->ndf_per_chunk_tbuf * conf->nchunk_expect;
+
+  conf->tout.tv_sec  = floor(conf->time_res_blk);  // Time out if we do not receive data for one buffer block
+  conf->tout.tv_usec = 1.0E6*(conf->time_res_blk - conf->tout.tv_sec);
   
   log_add_wrap(*conf, "INFO", 1,  "time_res_blk is %f \n", conf->time_res_blk);
   log_add_wrap(*conf, "INFO", 1,  "dfsz_keep is %d \n", conf->dfsz_keep);
   log_add_wrap(*conf, "INFO", 1,  "blksz_rbuf is %"PRIu64" \n", conf->blksz_rbuf);
   log_add_wrap(*conf, "INFO", 1,  "tbufsz is %"PRIu64" \n", conf->tbufsz);
+  
+  return EXIT_SUCCESS;
+}
+
+int do_capture(conf_t conf)
+{
+  int sock, reuseaddr = 1;
+  struct sockaddr_in sa = {0}, fromsa = {0};
+  
+  sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&conf.tout, sizeof(conf.tout));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
+  sa.sin_family      = AF_INET;
+  sa.sin_port        = htons(conf.port);
+  sa.sin_addr.s_addr = inet_addr(conf.ip);
+    
+  if(bind(sock, (struct sockaddr *)&sa, sizeof(sa)) == -1)
+    {
+      log_add_wrap(conf, "ERR", 0,  "Can not bind to %s_%d\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+      log_add_wrap(conf, "ERR", 1,  "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      
+      fprintf(stderr, "CAPTURE_ERROR: Can not bind to %s_%d ", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
+      
+      destroy_capture(conf);
+      exit(EXIT_FAILURE);
+    }
   
   return EXIT_SUCCESS;
 }

@@ -17,6 +17,9 @@ int main(int argc, char **argv)
 
   /* Initialization */
   initialize_capture(&conf, argc, argv);
+
+  /* Do the job */
+  do_capture(conf);
   
   /* Destroy log interface */
   destroy_capture(conf);

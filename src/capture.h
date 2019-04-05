@@ -17,7 +17,8 @@ extern "C" {
 #include "psrdada.h"
 
 #define acquire_chunk_index(freq, cfreq, nchunk) (int((freq - cfreq + 0.5)/NCHAN_PER_CHUNK + 0.5 * nchunk))
-
+#define acquire_df_in_blk(df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref) ((int64_t)(df_in_period - df_in_period_ref) + \((double)seconds_from_epoch - (double)seconds_from_epoch_ref) / TIME_RES_DF)
+  
   typedef struct conf_t
   {
     int debug; // If debug, disable_sod
@@ -62,7 +63,8 @@ extern "C" {
 
   int destroy_buffer(conf_t conf);
   int destroy_capture(conf_t conf);
-    
+  int do_capture(conf_t conf);
+  
 #endif
 
 #ifdef __cplusplus
