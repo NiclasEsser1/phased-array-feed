@@ -8,12 +8,20 @@ import argparse
 import inspect
 from subprocess import check_output
 
-ONE_BEAM = {"nchunk_per_port":        16,
-            "ports":                  [[17100, 17101, 17102]]
+#ONE_BEAM = {"nchunk_per_port":        16,
+#            "ports":                  [[17100, 17101, 17102]]
+#}
+#
+#TWO_BEAM = {"nchunk_per_port":       11,
+#            "ports":                 [[17100, 17101, 17102], [17103, 17104, 17105]]
+#}
+
+ONE_BEAM = {"nchunk_per_port":        48,
+            "ports":                  [[17100]]
 }
 
-TWO_BEAM = {"nchunk_per_port":       11,
-            "ports":                 [[17100, 17101, 17102], [17103, 17104, 17105]]
+TWO_BEAM = {"nchunk_per_port":       33,
+            "ports":                 [[17100], [17101]]
 }
 
 PAF_DF_PKTSZ = 7232
@@ -98,7 +106,7 @@ if __name__ == "__main__":
     host_id = check_output("hostname").strip()[-1]
     ip      = "10.17.{}.{}".format(host_id, numa + 1)
 
-    check_ndf_per_chunk = 1024
+    check_ndf_per_chunk = 10240
 
     if nbeam == 1:
         nchunk_per_port = ONE_BEAM["nchunk_per_port"]

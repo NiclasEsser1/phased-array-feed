@@ -8,7 +8,7 @@ extern "C" {
 #include <pthread.h>
   
   FILE *log_open(char *fname, const char *mode);
-  int log_add(FILE *fp, const char *type, int flush, const char *format, ...);
+  int log_add(FILE *fp, const char *type, int flush, const char *format, va_list args);
   int log_close(FILE *fp);
   
 #endif

@@ -24,12 +24,11 @@ FILE *log_open(char *fname, const char *mode)
   return fp;
 }
 
-int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
+int log_add(FILE *fp, const char *type, int flush, const char *format, va_list args)
 {
   struct tm *local = NULL;
   time_t rawtime;
   char buffer[MSTR_LEN] = {'\0'};
-  va_list args;
 
   if(fp == NULL)
     {      
@@ -44,9 +43,7 @@ int log_add(FILE *fp, const char *type, int flush, const char *format, ...)
   local = localtime(&rawtime);
 
   /* Get real message */
-  va_start(args, format);
   vsprintf(buffer, format, args);
-  va_end (args);
   
   /* Write to log file */
   fprintf(fp, "[%s] %s\t%s", strtok(asctime(local), "\n"), type, buffer);

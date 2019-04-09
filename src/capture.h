@@ -16,9 +16,6 @@ extern "C" {
 #include "constants.h"
 #include "psrdada.h"
 
-#define acquire_chunk_index(freq, cfreq, nchunk) ((int)((freq - cfreq + 0.5)/NCHAN_PER_CHUNK + 0.5 * nchunk))
-#define acquire_df_from_ref(df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref) ((int64_t)(df_in_period - df_in_period_ref) + ((double)seconds_from_epoch - (double)seconds_from_epoch_ref) / TRES_DF)
-  
   typedef struct conf_t
   {
     int debug; // If debug, disable_sod
@@ -40,8 +37,9 @@ extern "C" {
     
     int days_from_1970;   // Number days of epoch from 1970 
     uint64_t seconds_from_epoch, df_in_period; // Seconds from epoch time of BMF and the index of data frame in BMF stream period
+    int write, dbregister;
     
-    dada_header_t *dada_header;
+    dada_header_t dada_header;
     dada_hdu_t *hdu;
     ipcbuf_t *data_block, *header_block;
 

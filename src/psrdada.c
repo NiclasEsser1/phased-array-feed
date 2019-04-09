@@ -156,9 +156,9 @@ int read_dada_header_from_buffer(ipcbuf_t *hdr, dada_header_t *dada_header)
 
 int read_dada_header_from_file(char *fname, dada_header_t *dada_header)
 {
-  char *hdrbuf = NULL;
+  char hdrbuf[DADA_DEFAULT_HEADER_SIZE];
   
-   if(fileread(fname, hdrbuf, DADA_DEFAULT_HEADER_SIZE) < 0)
+  if(fileread(fname, hdrbuf, DADA_DEFAULT_HEADER_SIZE) < 0)
     {
       fprintf(stderr, "PSRDADA_ERROR: Can not open %s to read, ", fname);
       fprintf(stderr, "which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -365,23 +365,23 @@ int dada_hdu(dada_hdu_t *hdu, key_t key, int create, int write, int dbregister)
     {
       if(hdu->data_block)
 	{
-	  if (dbregister == 1)
+	  if (write == 1 || write == 2)
 	    {
-	      if(dada_cuda_dbunregister(hdu) < 0)
+	      if(write == 1)
 		{
-		  fprintf(stderr, "PSRDADA_ERROR: Error dbunregistering HDU, ");
-		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  return EXIT_FAILURE;
+		  if(ipcbuf_enable_eod((ipcbuf_t *)hdu->data_block) < 0)
+		    {
+		      fprintf(stderr, "PSRDADA_ERROR: Error enable_eod , ");
+		      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		      return EXIT_FAILURE;
+		    }
 		}
-	    }
-	  if (write == 1)
-	    {
 	      if(dada_hdu_unlock_write(hdu) <0)
 		{
 		  fprintf(stderr, "PSRDADA_ERROR: Error unlocking HDU write, ");
 		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 		  return EXIT_FAILURE;
-		}	    
+		}
 	    }
 	  else
 	    {
@@ -391,6 +391,16 @@ int dada_hdu(dada_hdu_t *hdu, key_t key, int create, int write, int dbregister)
 		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 		  return EXIT_FAILURE;
 		}	    
+	    }
+	  
+	  if (dbregister == 1)
+	    {
+	      if(dada_cuda_dbunregister(hdu) < 0)
+		{
+		  fprintf(stderr, "PSRDADA_ERROR: Error dbunregistering HDU, ");
+		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  return EXIT_FAILURE;
+		}
 	    }
 	  dada_hdu_destroy(hdu);
 	}	
