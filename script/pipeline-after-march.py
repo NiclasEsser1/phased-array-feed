@@ -1991,6 +1991,7 @@ class Search(Pipeline):
 
             # capture command
             os.environ["LD_PRELOAD"] = "libvma.so"
+            os.environ["VMA_THREAD_MODE"] = "0"
             #os.environ["VMA_SPEC"] = "latency"
             #os.environ["VMA_SPEC"] = "multi_ring_latency"
             #os.environ["VMA_MEM_ALLOC_TYPE"] = "1"
