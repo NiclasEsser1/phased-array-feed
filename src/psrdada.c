@@ -11,7 +11,6 @@
 #include "ascii_header.h"
 #include "futils.h"
 
-
 int read_dada_header_work(char *hdrbuf, dada_header_t *dada_header)
 {  
   if (ascii_header_get(hdrbuf, "UTC_START", "%s", dada_header->utc_start) < 0)  
@@ -306,105 +305,111 @@ int write_dada_header(ipcbuf_t *hdr, dada_header_t dada_header)
 }
 
 /*
-  Wrapper of dada_hdu routines 
-  write = 0, create/delete hdu as reader
-  write = 1, create/delete hdu as writer
+  Wrapper of dada_hdu_create routine
+  write = 0, create hdu as reader
+  write = 1, create hdu as writer
   write = 2, create hdu as writer and disable_sod
 */
-int dada_hdu(dada_hdu_t *hdu, key_t key, int create, int write, int dbregister)
+dada_hdu_t* dada_hdu_create_wrap(key_t key, int write, int dbregister)
 {
-  if (create == 1)
+  dada_hdu_t *hdu = NULL;
+  hdu = dada_hdu_create(NULL);
+  dada_hdu_set_key(hdu, key);  
+  if(dada_hdu_connect(hdu) < 0)
+    { 
+      fprintf(stderr, "PSRDADA_ERROR: Can not connect to hdu, ");
+      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      return NULL;    
+    }
+  
+  if (dbregister == 1)
     {
-      hdu = dada_hdu_create(NULL);
-      dada_hdu_set_key(hdu, key);  
-      if(dada_hdu_connect(hdu) < 0)
-	{ 
-	  fprintf(stderr, "PSRDADA_ERROR: Can not connect to hdu, ");
+      if(dada_cuda_dbregister(hdu) < 0)  // registers the existing host memory range for use by CUDA
+	{
+	  fprintf(stderr, "PSRDADA_ERROR: Error dbregistering HDU, ");
 	  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;    
+	  return NULL;
+	}
+    }
+  if (write == 1 || write == 2)
+    {
+      if(dada_hdu_lock_write(hdu) < 0) // make ourselves the write client
+	{
+	  fprintf(stderr, "PSRDADA_ERROR: Error locking HDU write, ");
+	  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  return NULL;
+	}
+      if(write == 2) // disable sod as required
+	{
+	  if(ipcbuf_disable_sod((ipcbuf_t *)hdu->data_block) < 0)
+	    {
+	      fprintf(stderr, "PSRDADA_ERROR: Can not write data before start, ");
+	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      return NULL;
+	    }
+	}
+    }
+  else    
+    {
+      if(dada_hdu_lock_read(hdu) < 0) // make ourselves the write client
+	{
+	  fprintf(stderr, "PSRDADA_ERROR: Error locking HDU read, ");
+	  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	  return NULL;
+	}
+    }
+  
+  return hdu;
+}
+
+/*
+  Wrapper of dada_hdu_destroy routine
+  write = 0, create hdu as reader
+  write = 1, create hdu as writer
+  write = 2, create hdu as writer and disable_sod
+*/
+int dada_hdu_destroy_wrap(dada_hdu_t *hdu, key_t key, int write, int dbregister)
+{
+  if(hdu->data_block)
+    {
+      if (write == 1 || write == 2)
+	{
+	  if(write == 1)
+	    {
+	      if(ipcbuf_enable_eod((ipcbuf_t *)hdu->data_block) < 0)
+		{
+		  fprintf(stderr, "PSRDADA_ERROR: Error enable_eod , ");
+		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+		  return EXIT_FAILURE;
+		}
+	    }
+	  if(dada_hdu_unlock_write(hdu) <0)
+	    {
+	      fprintf(stderr, "PSRDADA_ERROR: Error unlocking HDU write, ");
+	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }
+	}
+      else
+	{
+	  if(dada_hdu_unlock_read(hdu) < 0)
+	    {
+	      fprintf(stderr, "PSRDADA_ERROR: Error unlocking HDU read, ");
+	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }	    
 	}
       
       if (dbregister == 1)
 	{
-	  if(dada_cuda_dbregister(hdu) < 0)  // registers the existing host memory range for use by CUDA
+	  if(dada_cuda_dbunregister(hdu) < 0)
 	    {
-	      fprintf(stderr, "PSRDADA_ERROR: Error dbregistering HDU, ");
-	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      return EXIT_FAILURE;	      
-	    }
-	}
-      if (write == 1 || write == 2)
-	{
-	  if(dada_hdu_lock_write(hdu) < 0) // make ourselves the write client
-	    {
-	      fprintf(stderr, "PSRDADA_ERROR: Error locking HDU write, ");
-	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	  if(write == 2) // disable sod as required
-	    {
-	      if(ipcbuf_disable_sod((ipcbuf_t *)hdu->data_block) < 0)
-		{
-		  fprintf(stderr, "PSRDADA_ERROR: Can not write data before start, ");
-		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  return EXIT_FAILURE;
-		}
-	    }
-	}
-      else    
-	{
-	  if(dada_hdu_lock_read(hdu) < 0) // make ourselves the write client
-	    {
-	      fprintf(stderr, "PSRDADA_ERROR: Error locking HDU read, ");
+	      fprintf(stderr, "PSRDADA_ERROR: Error dbunregistering HDU, ");
 	      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
 	}
+      dada_hdu_destroy(hdu);
     }
-  else
-    {
-      if(hdu->data_block)
-	{
-	  if (write == 1 || write == 2)
-	    {
-	      if(write == 1)
-		{
-		  if(ipcbuf_enable_eod((ipcbuf_t *)hdu->data_block) < 0)
-		    {
-		      fprintf(stderr, "PSRDADA_ERROR: Error enable_eod , ");
-		      fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		      return EXIT_FAILURE;
-		    }
-		}
-	      if(dada_hdu_unlock_write(hdu) <0)
-		{
-		  fprintf(stderr, "PSRDADA_ERROR: Error unlocking HDU write, ");
-		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  return EXIT_FAILURE;
-		}
-	    }
-	  else
-	    {
-	      if(dada_hdu_unlock_read(hdu) < 0)
-		{
-		  fprintf(stderr, "PSRDADA_ERROR: Error unlocking HDU read, ");
-		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  return EXIT_FAILURE;
-		}	    
-	    }
-	  
-	  if (dbregister == 1)
-	    {
-	      if(dada_cuda_dbunregister(hdu) < 0)
-		{
-		  fprintf(stderr, "PSRDADA_ERROR: Error dbunregistering HDU, ");
-		  fprintf(stderr, "which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  return EXIT_FAILURE;
-		}
-	    }
-	  dada_hdu_destroy(hdu);
-	}	
-    }
-  
   return EXIT_SUCCESS;
 }

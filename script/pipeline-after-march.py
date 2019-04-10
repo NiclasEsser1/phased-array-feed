@@ -104,7 +104,7 @@ PIPELINE_CONFIG = {"execution":                    1,
                    "input_source_default":       "UNKNOW_00:00:00.00_00:00:00.00",
                    "input_dada_hdr_fname":       "dada_header_template_PAF.txt",
                    # To put baseband data from file
-                   "input_debug":                0,
+                   "input_debug":                1,
                    "input_keys":                 ["dada", "dadc"],
                    "input_nblk":                 5,
                    "input_nreader":              1,
@@ -1990,11 +1990,25 @@ class Search(Pipeline):
             refinfo = "{}_{}_{}".format(refinfo[0], refinfo[1], refinfo[2])
 
             # capture command
+            os.environ["LD_PRELOAD"] = "libvma.so"
+            #os.environ["VMA_SPEC"] = "latency"
+            #os.environ["VMA_SPEC"] = "multi_ring_latency"
+            #os.environ["VMA_MEM_ALLOC_TYPE"] = "1"
             command = ("{} -a {}_{} -b {}_{} -c {} -d {} -e {} -f {} -g {} "
                        "-i {} -j {} -k {} -l {} -m {} ").format(
-                           self._input_main, alive_info[0].split("_")[0], alive_info[0].split("_")[1], alive_info[0].split("_")[2], alive_info[0].split("_")[3],
+                           self._input_main, alive_info[0].split("_")[0], alive_info[0].split("_")[1], alive_info[0].split("_")[2],
+                           alive_info[0].split("_")[3],
                            refinfo, beam_index, self._freq, self._paf_df_hdrsz, self._input_dada_hdr_fname, self._input_keys[i], 
                            self._rbuf_ndf_per_chunk_per_block, self._tbuf_ndf_per_chunk_per_block, pipeline_runtime_directory, self._input_debug)
+            #input_cpu = self._pacifix_numa * self._pacifix_ncpu_per_numa_node +\
+            #            i * self._pacifix_ncpu_per_instance 
+            #command = ("taskset -c {} {} -a {}_{} -b {}_{} -c {} -d {} -e {} -f {} -g {} "
+            #           "-i {} -j {} -k {} -l {} -m {} ").format(
+            #               input_cpu, self._input_main, alive_info[0].split("_")[0], alive_info[0].split("_")[1], alive_info[0].split("_")[2],
+            #               alive_info[0].split("_")[3],
+            #               refinfo, beam_index, self._freq, self._paf_df_hdrsz, self._input_dada_hdr_fname, self._input_keys[i], 
+            #               self._rbuf_ndf_per_chunk_per_block, self._tbuf_ndf_per_chunk_per_block, pipeline_runtime_directory, self._input_debug)
+            print command
             self._input_commands.append(command)
 
             # search command
@@ -2177,6 +2191,7 @@ class Search(Pipeline):
 
         self.state = "ready"
         log.info("Ready")
+        exit()
 
     def start(self, status_json):
         log.info("Received 'START' command")

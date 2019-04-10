@@ -6,6 +6,7 @@ extern "C" {
 
 #include "constants.h"
 #include "dada_hdu.h"
+#include "ipcbuf.h"
 #include "dada_cuda.h"
   
   typedef struct dada_header_t
@@ -49,7 +50,8 @@ extern "C" {
   int read_dada_header_from_file(char *fname, dada_header_t *dada_header);
   int read_dada_header_work(char *hdrbuf, dada_header_t *dada_header);
   int write_dada_header(ipcbuf_t *hdr, dada_header_t dada_header);
-  int dada_hdu(dada_hdu_t *hdu, key_t key, int create, int write, int dbregister);
+  dada_hdu_t* dada_hdu_create_wrap(key_t key, int write, int dbregister);
+  int dada_hdu_destroy_wrap(dada_hdu_t *hdu, key_t key, int write, int dbregister);
   
 #endif
   

@@ -39,7 +39,7 @@ extern "C" {
 #define NBYTE_SPECTRAL       4    // float
 
   //#define TIME_RES_DF     0.84375E-6
-#define TRES_DF     0.84375E-6
+#define TRES_DF         108.0E-6
 #define NSAMP_DF        128
 #define NCHAN_PER_CHUNK 7
 #define OVER_SAMP_RATE  (32.0/27.0)

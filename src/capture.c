@@ -16,6 +16,7 @@
 #include <linux/un.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <inttypes.h>
 
 #include "dada_cuda.h"
 #include "ipcbuf.h"
@@ -95,7 +96,10 @@ int initialize_capture(conf_t *conf, int argc, char **argv)
       log_add_wrap(*conf, "INFO", 1,  "We will disable_sod\n");
     }
   else
-    log_add_wrap(*conf, "INFO", 1,  "We will not disable_sod\n");
+    {
+      conf->write = 1;
+      log_add_wrap(*conf, "INFO", 1,  "We will not disable_sod\n");
+    }
   
   /* Create buffers */
   create_buffer(conf);
@@ -132,7 +136,7 @@ int do_capture(conf_t conf)
   socklen_t fromlen = sizeof(fromsa);
   uint64_t df_in_period, df_in_period_ref, seconds_from_epoch, seconds_from_epoch_ref;
   uint64_t tbuf_loc, rbuf_loc, ndf_per_chunk_rtbuf;
-  uint64_t ndf_in_rbuf_blk_expect, ndf_in_rbuf_blk, ndf, ndf_expect = 0;
+  uint64_t ndf_in_rbuf_blk_expect, ndf_in_rbuf_blk = 0, ndf = 0, ndf_expect = 0;
   uint64_t ndf_in_tbuf = 0;
   int64_t df_from_ref;
   char *rbuf;
@@ -141,7 +145,7 @@ int do_capture(conf_t conf)
   seconds_from_epoch_ref = conf.seconds_from_epoch;
   df_in_period_ref       = conf.df_in_period;
   ndf_per_chunk_rtbuf    = conf.ndf_per_chunk_rbuf + conf.ndf_per_chunk_tbuf;
-  ndf_in_rbuf_blk_expect = conf.ndf_per_chunk_rbuf * conf.nchunk_expect;
+  ndf_in_rbuf_blk_expect = conf.ndf_per_chunk_rbuf * conf.nchunk_actual;
   rbuf                   = ipcbuf_get_next_write(conf.data_block);
   if(rbuf == NULL)
     {
@@ -206,10 +210,10 @@ int do_capture(conf_t conf)
   df_from_ref = ((int64_t)(df_in_period - df_in_period_ref) + ((double)seconds_from_epoch - (double)seconds_from_epoch_ref) / TRES_DF);
   if(df_from_ref > 0) // the reference has to be in future
     {
-      log_add_wrap(conf, "ERR", 0, "The reference is in the past more than one buffer block\n");
+      log_add_wrap(conf, "ERR", 0, "The reference is in the past \n");
       log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
       
-      fprintf(stderr, "CAPTURE_ERROR: The reference is in the past more than one buffer block ");
+      fprintf(stderr, "CAPTURE_ERROR: The reference is in the past ");
       fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
 
       close(sock);
@@ -270,7 +274,7 @@ int do_capture(conf_t conf)
 	}
 
       /* Record data into current ring buffer block if it is covered by it */
-      if((df_from_ref>=0) && (df_from_ref < conf.ndf_per_chunk_rbuf))  
+      if((df_from_ref>=0) && (df_from_ref < (int64_t)conf.ndf_per_chunk_rbuf))  
 	{
 	  rbuf_loc = (uint64_t)((df_from_ref * conf.nchunk_expect + chunk_index) * conf.dfsz_keep);         // This is in TFTFP order
 	  memcpy(rbuf + rbuf_loc, conf.dbuf + conf.dfsz_seek, conf.dfsz_keep);
@@ -278,7 +282,7 @@ int do_capture(conf_t conf)
 	}
 
       /* Record data into temp buffer if it is covered by it */
-      if((df_from_ref >= conf.ndf_per_chunk_rbuf) && (df_from_ref < ndf_per_chunk_rtbuf))
+      if((df_from_ref >= (int64_t)conf.ndf_per_chunk_rbuf) && (df_from_ref < (int64_t)ndf_per_chunk_rtbuf))
 	{		  
 	  tbuf_loc  = (uint64_t)(((df_from_ref - conf.ndf_per_chunk_rbuf) * conf.nchunk_expect + chunk_index) * conf.dfsz_keep);
 	  memcpy(conf.tbuf + tbuf_loc, conf.dbuf + conf.dfsz_seek, conf.dfsz_keep);
@@ -289,7 +293,7 @@ int do_capture(conf_t conf)
 	 Move to a new ring buffer block if temp buffer is half 
 	 or data can not be covered either by current ring buffer block or temp buffer 
       */
-      if((df_from_ref >= ndf_per_chunk_rtbuf) || (ndf_in_tbuf >= (0.5 * (conf.ndf_per_chunk_tbuf * conf.nchunk_expect))))
+      if((df_from_ref >= (int64_t)ndf_per_chunk_rtbuf) || (ndf_in_tbuf >= (int64_t)(0.5 * (conf.ndf_per_chunk_tbuf * conf.nchunk_expect))))
 	{
 	  log_add_wrap(conf, "INFO", 1,  "Change ring buffer block, start\n");
 	  /* Close current ring buffer block */
@@ -345,9 +349,11 @@ int do_capture(conf_t conf)
 	  time_offset += conf.tres_rbuf_blk;
 	  ndf_expect  += ndf_in_rbuf_blk_expect;
 	  ndf         += (ndf_in_rbuf_blk + ndf_in_tbuf);
-	  fprintf(stdout, "CAPTURE_STATUS: %f %E %E\n", time_offset, 1.0 - ndf/(double)ndf_expect, 1.0 - ndf_in_rbuf_blk/(double)ndf_in_rbuf_blk_expect);
+	  fprintf(stdout, "HERE 1 %"PRId64"\t%.0f\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n", df_from_ref, 0.5 * (conf.ndf_per_chunk_tbuf * conf.nchunk_expect), ndf_per_chunk_rtbuf, ndf_in_tbuf, ndf_in_rbuf_blk + ndf_in_tbuf, ndf_in_rbuf_blk_expect);
+	  
+	  fprintf(stdout, "CAPTURE_STATUS: %f %E %E\n", time_offset, 1.0 - ndf/(double)ndf_expect, 1.0 - (ndf_in_rbuf_blk + ndf_in_tbuf)/(double)ndf_in_rbuf_blk_expect);
 	  fflush(stdout);	  
-	  log_add_wrap(conf, "INFO", 1,  "Check packet loss rate, done\n");
+	  log_add_wrap(conf, "INFO", 1,  "Check packet loss rate %f %E %E, done\n", time_offset, 1.0 - ndf/(double)ndf_expect, 1.0 - (ndf_in_rbuf_blk + ndf_in_tbuf)/(double)ndf_in_rbuf_blk_expect);
 
 	  /* Update reference */
 	  df_in_period_ref    += conf.ndf_per_chunk_rbuf;
@@ -688,24 +694,20 @@ int create_buffer(conf_t *conf)
 {
   int write = conf->write;
   int dbregister = conf->dbregister;
-  int create = 1;
-
-  if (conf->debug == 0) 
-    write = 1;
-  else // disable_sod
-    write = 2;
   
-  if(dada_hdu(conf->hdu, conf->key, create, write, dbregister))
+  conf->hdu = dada_hdu_create_wrap(conf->key, write, dbregister);
+  if(conf->hdu == NULL)
     {        
       log_add_wrap(*conf, "ERR", 0,  "Can not create ring buffer\n");
       log_add_wrap(*conf, "ERR", 1,  "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
       
       fprintf(stderr, "CAPTURE_ERROR: Can not create ring buffer, ");
       fprintf(stderr, "which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
-
+      
       destroy_capture(*conf);
       exit(EXIT_FAILURE);
     }
+
   conf->data_block   = (ipcbuf_t *)(conf->hdu->data_block);
   conf->header_block = (ipcbuf_t *)(conf->hdu->header_block);
   conf->tbuf = (char *)malloc(NBYTE_CHAR * conf->tbufsz);
@@ -718,9 +720,8 @@ int destroy_buffer(conf_t conf)
 {
   int write = conf.write;
   int dbregister = conf.dbregister;
-  int create = 0;
   
-  if(dada_hdu(conf.hdu, conf.key, create, write, dbregister))
+  if(dada_hdu_destroy_wrap(conf.hdu, conf.key, write, dbregister))
     {        
       log_add_wrap(conf, "ERR", 0, "Can not destroy ring buffer\n");
       log_add_wrap(conf, "ERR", 1, "Which happens at \"%s\", line [%d], has to abort\n", __FILE__, __LINE__);
@@ -780,10 +781,10 @@ int update_dada_header(conf_t *conf)
   seconds_in_period = TRES_DF * conf->df_in_period;  
   seconds_from_1970 = floor(seconds_in_period) + conf->seconds_from_epoch + SECDAY * conf->days_from_1970;
 
-  conf->dada_header.freq     = conf->freq;
+  conf->dada_header.freq  = conf->freq;
   conf->dada_header.nchan =  nchan;
   conf->dada_header.bw   *= scale;  
-  
+    
   memset(conf->dada_header.receiver, '\0', sizeof(conf->dada_header.receiver));
   strncpy(conf->dada_header.receiver, conf->receiver, strlen(conf->receiver));
   
