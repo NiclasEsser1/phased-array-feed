@@ -100,8 +100,8 @@ inline void __cufftSafeCall(cufftResult err, const char *file, const int line)
 #ifdef CUDA_ERROR_CHECK
   if( CUFFT_SUCCESS != err)
     {
-      fprintf(stderr, "CUFFT error in file '%s', line %d\n %s\nerror %d: %s\nterminating!\n",__FILE__, __LINE__,err, 
-	      _cudaGetErrorEnum(err));					
+      fprintf(stderr, "CUFFT error in file \"%s\", line %d, error %d: %s terminating!\n",
+	      __FILE__, __LINE__, err, _cudaGetErrorEnum(err));					
       cudaDeviceReset();
     }
   #endif

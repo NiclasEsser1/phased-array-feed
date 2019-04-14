@@ -416,8 +416,9 @@ int initialize_capture(conf_t *conf)
   if(df_in_blk>0) // If the reference time is before the current time;
     {
       nblk_behind = (int)floor(df_in_blk/(double)conf->ndf_per_chunk_rbuf);
+      fprintf(stdout, "HERE, force buffer change, %"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%d\n", seconds_from_epoch, df_in_period, conf->df_in_period, conf->seconds_from_epoch, nblk_behind);
       for(i = 0; i < nblk_behind; i++)
-	{      
+	{
 	  cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
 	  if(cbuf == NULL)
 	    {
