@@ -164,14 +164,19 @@ int main(int argc, char **argv)
   /* Destory capture */
   destroy_capture(conf);
   
-  /* Destory log interface */
-  log_add(conf.log_file, "INFO", 1,  "The last quit is %d", quit);
-  log_add(conf.log_file, "INFO", 1,  "CAPTURE END");
-  fclose(conf.log_file);
-
-  /* termine it */
+  /* Stop it */
   if(quit > 1)
-    exit(EXIT_FAILURE);
-
-  return EXIT_SUCCESS;
+    {
+      log_add(conf.log_file, "INFO", 1,  "CAPTURE END WITH a problem");
+      fclose(conf.log_file);
+      
+      exit(EXIT_FAILURE);
+    }
+  else
+    {
+      log_add(conf.log_file, "INFO", 1,  "CAPTURE END WITHOUT a problem");
+      fclose(conf.log_file);
+      
+      return EXIT_SUCCESS;
+    }
 }

@@ -45,6 +45,7 @@ void *do_capture(void *conf)
   struct sockaddr_in sa = {0}, fromsa = {0};
   socklen_t fromlen = sizeof(fromsa);
   uint64_t df_in_period, seconds_from_epoch, tbuf_loc, cbuf_loc, writebuf, *ptr = NULL;
+  uint64_t tail_temp;
   register int nchunk = capture_conf->nchunk;
   register double chunk_index0 = capture_conf->chunk_index0;
   register double time_res_df = capture_conf->time_res_df;
@@ -56,7 +57,6 @@ void *do_capture(void *conf)
   register int thread_index = capture_conf->thread_index;
   
   dbuf = (char *)malloc(NBYTE_CHAR * DFSZ);
-  log_add(capture_conf->log_file, "INFO", 1,  "In funtion thread id = %ld, %d, %d", (long)pthread_self(), capture_conf->thread_index, thread_index);
   
   sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&capture_conf->tout, sizeof(capture_conf->tout));
@@ -134,10 +134,7 @@ void *do_capture(void *conf)
       seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
       writebuf = bswap_64(*(ptr + 2));
       freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
-
-      //chunk_index = (int)((freq - capture_conf->center_freq + 0.5)/NCHAN_PER_CHUNK + capture_conf->nchunk/2);      
       chunk_index = (int)(freq/NCHAN_PER_CHUNK + chunk_index0);
-      //fprintf(stdout, "%f\t%d\n", freq, chunk_index);
       
       if (chunk_index<0 || chunk_index > (capture_conf->nchunk-1))
 	{      
@@ -169,17 +166,19 @@ void *do_capture(void *conf)
 	    }
 	  else
 	    {
-	      //log_add(capture_conf->log_file, "INFO", 1,  "Cross the boundary");
-
 	      transit[thread_index] = 1; // tell buffer control thread that current capture thread is crossing the boundary
 	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf)
-		{		  
-		  tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nchunk + chunk_index); // This is in TFTFP order
-		  tbuf_loc           = (uint64_t)(tail[thread_index] * (dfsz_keep + 1));
+		{
+		  //tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nchunk + chunk_index);
+		  //tbuf_loc           = (uint64_t)(tail[thread_index] * (dfsz_keep + 1));
+		  //tail[thread_index]++;  // have to ++, otherwise we will miss the last available data frame in tbuf;
+		  //tbuf[tbuf_loc] = 'Y';
+		  //memcpy(tbuf + tbuf_loc + 1, dbuf + dfsz_seek, dfsz_keep);
 		  
-		  tail[thread_index]++;  // have to ++, otherwise we will miss the last available data frame in tbuf;
-		  
-		  tbuf[tbuf_loc] = 'Y';
+		  tail_temp          = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nchunk + chunk_index); // This is in TFTFP order
+		  tail[thread_index] = ((tail_temp + 1) > tail[thread_index]) ? (tail_temp + 1) : tail[thread_index];		  
+		  tbuf_loc           = (uint64_t)(tail_temp * (dfsz_keep + 1));
+		  tbuf[tbuf_loc]     = 'Y';
 		  memcpy(tbuf + tbuf_loc + 1, dbuf + dfsz_seek, dfsz_keep);
 		  
 		  pthread_mutex_lock(&ndf_mutex[thread_index]);
@@ -192,7 +191,7 @@ void *do_capture(void *conf)
       else
 	transit[thread_index] = 0;
     }
-  log_add(capture_conf->log_file, "INFO", 1,  "DONE the capture thread, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+  log_add(capture_conf->log_file, "INFO", 1,  "DONE the capture thread");
   
   /* Exit */
   if (quit == 0)
@@ -285,15 +284,6 @@ int initialize_capture(conf_t *conf)
       log_close(conf->log_file);
       exit(EXIT_FAILURE);    
     }
-  
-  struct timespec start, stop;
-  double elapsed_time;
-  clock_gettime(CLOCK_REALTIME, &start);
-  //dada_cuda_dbregister(conf->hdu);  // registers the existing host memory range for use by CUDA
-  clock_gettime(CLOCK_REALTIME, &stop);
-  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-  fprintf(stdout, "elapsed_time for dbregister of input ring buffer is %f\n", elapsed_time);
-  fflush(stdout);
   
   if(dada_hdu_lock_write(conf->hdu) < 0) // make ourselves the write client
     {
@@ -801,11 +791,8 @@ int threads(conf_t *conf)
   else
     nthread = nport_alive + 1;
 
-  log_add(conf->log_file, "INFO", 1,  "Join threads? Before it");
   for(i = 0; i < nthread; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
-
-  log_add(conf->log_file, "INFO", 1,  "Join threads? The last quit is %d", quit);
     
   return EXIT_SUCCESS;
 }
@@ -875,8 +862,6 @@ void *buf_control(void *conf)
       
       fprintf(stdout, "CAPTURE_STATUS: %f %E %E\n", rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
       fflush(stdout);
-      log_add(capture_conf->log_file, "INFO", 1,  "After fflush stdout");
-      log_add(capture_conf->log_file, "INFO", 1,  "Before mark filled");
       
       /* Close current buffer */
       if(ipcbuf_mark_filled(capture_conf->data_block, capture_conf->blksz_rbuf) < 0)
@@ -887,7 +872,6 @@ void *buf_control(void *conf)
 	  quit = 2;
 	  pthread_exit(NULL);
 	}
-      log_add(capture_conf->log_file, "INFO", 1,  "Mark filled done");
       
       /*
 	To see if the buffer is full, quit if yes.
@@ -901,11 +885,9 @@ void *buf_control(void *conf)
 	  quit = 2;
 	  pthread_exit(NULL);
 	}
-      log_add(capture_conf->log_file, "INFO", 1,  "Available buffer block check done");
       
       /* Get new buffer block */
       cbuf = ipcbuf_get_next_write(capture_conf->data_block);
-      log_add(capture_conf->log_file, "INFO", 1,  "Get next write done");
       if(cbuf == NULL)
 	{
 	  log_add(capture_conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
@@ -934,7 +916,6 @@ void *buf_control(void *conf)
 	}
       
       /* To see if we need to copy data from temp buffer into ring buffer */
-      log_add(capture_conf->log_file, "INFO", 1,  "Just before the second transit state change");
       while(transited && (!quit))
 	{
 	  transited = transit[0];
@@ -990,7 +971,6 @@ void *buf_control(void *conf)
   if (quit == 0)
     quit = 1;
   
-  log_add(capture_conf->log_file, "INFO", 1,  "Normale quit of buffer control thread");
   pthread_exit(NULL);
 }
 
@@ -1094,9 +1074,7 @@ void *capture_control(void *conf)
 	      close(sock);
 	      pthread_exit(NULL);
 	    }
-	  log_add(capture_conf->log_file, "INFO", 1,  "enable eod DONE, current states is IPCBUF_WRITING %d", (capture_conf->data_block->state == 3));
 	  memset(capture_control_command, 0, sizeof(capture_control_command));	      
-	  log_add(capture_conf->log_file, "INFO", 1,  "enable eod DONE");
 	  fprintf(stdout, "END-OF-DATA DONE\n");
 	  fflush(stdout);
 	}
@@ -1105,8 +1083,6 @@ void *capture_control(void *conf)
 	{
 	  fprintf(stdout, "GET START-OF-DATA\n");
 	  fflush(stdout);
-	  
-	  log_add(capture_conf->log_file, "INFO", 1,  "Got START-OF-DATA signal, has to enable sod");
 	  
 	  sscanf(capture_control_command, "%[^_]_%[^_]_%[^_]_%[^_]_%[^_]_%"SCNd64"", capture_control_keyword, capture_conf->source, capture_conf->ra, capture_conf->dec, capture_conf->obs_id, &start_buf); // Read the start buffer from socket or get the minimum number from the buffer, we keep starting at the begining of buffer block;
 	  start_buf_mini = ipcbuf_get_sod_minbuf (capture_conf->data_block);
