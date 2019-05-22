@@ -208,7 +208,6 @@ int initialize_baseband2filterbank(conf_t *conf)
     }
   CudaSafeCall(cudaMalloc((void **)&conf->offset_scale_d, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));
   CudaSafeCall(cudaMallocHost((void **)&conf->offset_scale_h, conf->nchan_out * NBYTE_CUFFT_COMPLEX));
-  //CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, sizeof(conf->offset_scale_d)));// We have to clear the memory for this parameter
   CudaSafeCall(cudaMemset((void *)conf->offset_scale_d, 0, conf->nstream * conf->nchan_out * NBYTE_CUFFT_COMPLEX));// We have to clear the memory for this parameter
   
   /* Prepare the setup of kernels */
@@ -1349,7 +1348,7 @@ int register_dada_header(conf_t *conf)
   log_add(conf->log_file, "INFO", 1,  "FILE_SIZE to DADA header is %"PRIu64"", file_size);
   
   if (ascii_header_set(hdrbuf_out, "BW", "%f", -conf->bandwidth) < 0)  // Reverse frequency order
-    //if (ascii_header_set(hdrbuf_out, "BW", "%f", conf->bandwidth) < 0)  // Reverse frequency order
+    //if (ascii_header_set(hdrbuf_out, "BW", "%f", conf->bandwidth) < 0)  
     {
       log_add(conf->log_file, "ERR", 1,  "Error setting BW, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
       fprintf(stderr, "BASEBAND2FILTERBANK_ERROR: Error setting BW, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -1557,8 +1556,6 @@ void *spectral_sendto(void *conf)
       while((!quit) && (is_empty(queue_fits_spectral))) // Wait until we get data or quit if error
 	usleep(sleep_time);
       
-      //fprintf(stdout, "HERE sending data for spectral, %d\n", index);
-      //fflush(stdout);
       index ++;
       if(dequeue(queue_fits_spectral, &fits))
 	{
@@ -1644,8 +1641,6 @@ void *monitor_sendto(void *conf)
 	  pthread_exit(NULL);
 	  quit = 2;
 	}
-      //fprintf(stdout, "HERE sending data for monitor, %d\n", index);
-      //fflush(stdout);
       index++;
       if(fits.nchan != 0) // Rough check data is there
 	{
@@ -1679,19 +1674,19 @@ void *monitor_sendto(void *conf)
 
 int threads(conf_t conf)
 {  
-  int i, ret[3], nthread = 0;
+  int i, nthread = 0;
   pthread_t thread[3];
   
-  ret[0] = pthread_create(&thread[0], NULL, do_baseband2filterbank, (void *)&conf);
+  pthread_create(&thread[0], NULL, do_baseband2filterbank, (void *)&conf);
   nthread ++;
   if(conf.monitor == 1)
     {      
-      ret[1] = pthread_create(&thread[1], NULL, monitor_sendto, (void *)&conf);
+      pthread_create(&thread[1], NULL, monitor_sendto, (void *)&conf);
       nthread ++;
     }
   if(conf.spectral2network == 1)
-    {      
-      ret[2] = pthread_create(&thread[2], NULL, spectral_sendto, (void *)&conf);
+    {
+      pthread_create(&thread[2], NULL, spectral_sendto, (void *)&conf);
       nthread ++;
     }
   
@@ -1803,7 +1798,6 @@ void *do_baseband2filterbank(void *conf)
 
   if((baseband2filterbank_conf->spectral2disk == 1) || (baseband2filterbank_conf->spectral2network == 1))
     {
-      //CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, sizeof(baseband2filterbank_conf->dbuf_out_spectral)));// We have to clear the memory for this parameter
       CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, baseband2filterbank_conf->bufout_size_spectral));// We have to clear the memory for this parameter
       baseband2filterbank_conf->cfreq_spectral = baseband2filterbank_conf->cfreq_band + (baseband2filterbank_conf->start_chunk + 0.5 * baseband2filterbank_conf->nchunk_in_spectral - 0.5 * baseband2filterbank_conf->nchunk_in) * NCHAN_PER_CHUNK;
       if((baseband2filterbank_conf->spectral2disk == 1) && (baseband2filterbank_conf->sod_spectral == 1))
@@ -2505,16 +2499,6 @@ void *do_baseband2filterbank(void *conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      //if((baseband2filterbank_conf->spectral2disk == 1) || (baseband2filterbank_conf->spectral2network == 1))
-      //	{
-      //	  saccumulate_kernel
-      //	    <<<gridsize_saccumulate,
-      //	    blocksize_saccumulate>>>
-      //	    (baseband2filterbank_conf->dbuf_out_spectral,
-      //	     baseband2filterbank_conf->ndata_out_spectral,
-      //	     baseband2filterbank_conf->nstream);  
-      //	  CudaSafeKernelLaunch();
-      //	}
       log_add(baseband2filterbank_conf->log_file, "INFO", 1,  "before closing old buffer block");
       ipcbuf_mark_filled(baseband2filterbank_conf->db_out, (uint64_t)(cbufsz * baseband2filterbank_conf->scale_dtsz));
       //ipcbuf_mark_filled(baseband2filterbank_conf->db_out, baseband2filterbank_conf->bufout_size_filterbank * baseband2filterbank_conf->nrepeat_per_blk);
@@ -2624,7 +2608,6 @@ void *do_baseband2filterbank(void *conf)
 	    }
 	  
 	  nblk_accumulate = 0;
-	  //CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, sizeof(baseband2filterbank_conf->dbuf_out_spectral)));// We have to clear the memory for this parameter
 	  CudaSafeCall(cudaMemset((void *)baseband2filterbank_conf->dbuf_out_spectral, 0, baseband2filterbank_conf->bufout_size_spectral));// We have to clear the memory for this parameter
 	}
     }

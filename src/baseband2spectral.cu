@@ -919,8 +919,6 @@ void *spectral_sendto(void *conf)
       while((!quit) && (is_empty(queue_fits_spectral))) // Wait until we get data or quit if error
 	usleep(sleep_time);
       
-      //fprintf(stdout, "HERE sending data for spectral, %d\n", index);
-      //fflush(stdout);
       index ++;
       if(dequeue(queue_fits_spectral, &fits))
 	{
@@ -1007,8 +1005,6 @@ void *monitor_sendto(void *conf)
 	  pthread_exit(NULL);
 	  quit = 2;
 	}
-      //fprintf(stdout, "HERE sending data for monitor, %d\n", index);
-      //fflush(stdout);
       index++;
       
       if(fits.nchan != 0) // Rough check the data is there
@@ -1086,16 +1082,6 @@ void *do_baseband2spectral(void *conf)
       time_res_monitor = baseband2spectral_conf->tsamp_in * baseband2spectral_conf->ndf_per_chunk_stream * NSAMP_DF / 1.0E6; // This has to be after read_register_header, in seconds
       strptime(baseband2spectral_conf->utc_start, DADA_TIMESTR, &tm_stamp);
       time_stamp_monitor_f = mktime(&tm_stamp) + baseband2spectral_conf->picoseconds / 1.0E12 + 0.5 * time_res_monitor;
-      //struct tm *local;
-      //time_t t;
-      //
-      //t = time(NULL);
-      //local = localtime(&t);
-      //fprintf(stdout, "Local time and date: %s\n", asctime(local));
-      //local = gmtime(&t);
-      //fprintf(stdout, "UTC time and date: %s\n", asctime(local));
-      //fprintf(stdout, "UTC from software: %s\n", time_stamp);
-      //fflush(stdout);
       
       fits_monitor = (fits_t *)malloc(baseband2spectral_conf->neth_per_blk * sizeof(fits_t));
       for(i = 0; i < baseband2spectral_conf->neth_per_blk; i++)
@@ -1135,7 +1121,6 @@ void *do_baseband2spectral(void *conf)
   
   log_add(baseband2spectral_conf->log_file, "INFO", 1,  "register_dada_header done");
   
-  //CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
   CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, baseband2spectral_conf->bufout_size));// We have to clear the memory for this parameter
   while(!ipcbuf_eod(baseband2spectral_conf->db_in) && !quit)
     {
@@ -1750,14 +1735,6 @@ void *do_baseband2spectral(void *conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
       
-      //saccumulate_kernel
-      //	<<<baseband2spectral_conf->gridsize_saccumulate,
-      //	baseband2spectral_conf->blocksize_saccumulate>>>
-      //	(baseband2spectral_conf->dbuf_out,
-      //	 baseband2spectral_conf->ndata_out,
-      //	 baseband2spectral_conf->nstream);  
-      //CudaSafeKernelLaunch();
-      
       ipcbuf_mark_cleared(baseband2spectral_conf->db_in);
       log_add(baseband2spectral_conf->log_file, "INFO", 1,  "after closing old buffer block");      
       nblk_accumulate++;
@@ -1803,17 +1780,6 @@ void *do_baseband2spectral(void *conf)
 		      time_stamp,
 		      (int)((time_stamp_f - time_stamp_i) * 1E4 + 0.5));// To put the fraction part in and make sure that it rounds to closest integer
 
-	      //struct tm *local;
-	      //time_t t;
-	      //
-	      //t = time(NULL);
-	      //local = localtime(&t);
-	      //fprintf(stdout, "Local time and date: %s\n", asctime(local));
-	      //local = gmtime(&t);
-	      //fprintf(stdout, "UTC time and date: %s\n", asctime(local));
-	      //fprintf(stdout, "UTC from software: %s\n", time_stamp);
-	      //fflush(stdout);
-	      
 	      for(i = 0; i < NDATA_PER_SAMP_FULL; i++)
 		{
 		  for(j = 0; j < baseband2spectral_conf->nchunk_network; j++)
@@ -1866,7 +1832,6 @@ void *do_baseband2spectral(void *conf)
 	    }
 	  
 	  nblk_accumulate = 0;
-	  //CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, sizeof(baseband2spectral_conf->dbuf_out)));// We have to clear the memory for this parameter
 	  CudaSafeCall(cudaMemset((void *)baseband2spectral_conf->dbuf_out, 0, baseband2spectral_conf->bufout_size));// We have to clear the memory for this parameter
 	}
       
@@ -1893,19 +1858,19 @@ void *do_baseband2spectral(void *conf)
 
 int threads(conf_t conf)
 {  
-  int i, ret[3], nthread = 0;
+  int i, nthread = 0;
   pthread_t thread[3];
-  
-  ret[0] = pthread_create(&thread[0], NULL, do_baseband2spectral, (void *)&conf);
+
+  pthread_create(&thread[0], NULL, do_baseband2spectral, (void *)&conf);
   nthread ++;
   if(conf.monitor == 1)
-    {      
-      ret[1] = pthread_create(&thread[1], NULL, monitor_sendto, (void *)&conf);
+    {
+      pthread_create(&thread[1], NULL, monitor_sendto, (void *)&conf);
       nthread ++;
     }
   if(conf.output_network == 1)
-    {      
-      ret[2] = pthread_create(&thread[2], NULL, spectral_sendto, (void *)&conf);
+    {
+      pthread_create(&thread[2], NULL, spectral_sendto, (void *)&conf);
       nthread ++;
     }
   
