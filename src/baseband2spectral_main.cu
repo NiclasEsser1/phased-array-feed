@@ -22,7 +22,8 @@ extern int quit;
 void usage ()
 {
   fprintf (stdout,
-	   "baseband2spectral_main - Convert BMF 16bits baseband data into 32bits float spectral data and remove the oversampling \n"
+	   "baseband2spectral_main - Convert BMF 16-bits baseband data into 32-bits float spectral data \n"
+	   "                       - Generate bandpass of received bandwidth in IQUV or AABB\n"
 	   "\n"
 	   "Usage: baseband2spectral_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
@@ -74,7 +75,6 @@ int main(int argc, char *argv[])
 	    {
 	      conf.output_network = 0;
 	      if(sscanf(optarg, "%*[^_]_%[^_]_%d", temp, &conf.sod) != 2)
-		//if(sscanf(optarg, "%*[^_]_%x_%d", &conf.key_out, &conf.sod) != 2)
 		{
 	     	  fprintf (stderr, "BASEBAND2SPECTRAL_ERROR:Can not get output ring buffer configuration, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	     	  exit(EXIT_FAILURE);
@@ -189,7 +189,6 @@ int main(int argc, char *argv[])
   fflush(stdout);
   
   /* Play with data */  
-  //baseband2spectral(conf);
   fprintf(stdout, "%f\n", conf.tsamp_in);
   threads(conf);
   
@@ -198,14 +197,17 @@ int main(int argc, char *argv[])
   destroy_baseband2spectral(conf);
   log_add(conf.log_file, "INFO", 1,  "END destroy");
 
-  /* Destory log interface */  
-  log_add(conf.log_file, "INFO", 1,  "BASEBAND2SPECTRAL END");    
-  log_close(conf.log_file);
-  fprintf(stdout, "Finally after log_close!!!\n");
-  fflush(stdout);
-
+  /* Stop it */
   if(quit == 2)
-    exit(EXIT_FAILURE);
+    {       
+      log_add(conf.log_file, "INFO", 1,  "BASEBAND2SPECTRAL END WITH a problem");    
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
   else
-    return EXIT_SUCCESS;
+    {
+      log_add(conf.log_file, "INFO", 1,  "BASEBAND2SPECTRAL END WITHOUT a problem");    
+      log_close(conf.log_file);
+      return EXIT_SUCCESS;
+    }
 }

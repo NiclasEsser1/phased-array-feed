@@ -23,7 +23,9 @@ extern int quit;
 void usage ()
 {
   fprintf (stdout,
-	   "baseband2filterbank_main - Convert BMF 16bits baseband data into 8bits filterbank data \n"
+	   "baseband2filterbank_main - Convert BMF 16-bits baseband data into 8-bits filterbank data \n"
+	   "                         - Generate bandpass of received bandwidth in IQUV or AABB\n"
+	   "                         - Generate spectral data with sub-band in IQUV and AABB\n" 
 	   "\n"
 	   "Usage: baseband2filterbank_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
@@ -190,11 +192,7 @@ int main(int argc, char *argv[])
   fprintf(stdout, "elapsed_time for baseband2filterbank initialization is %f\n", elapsed_time);
   fflush(stdout);
 
-  //fprintf(stderr, "FORCE TO QUIT\n");
-  //exit(EXIT_FAILURE);
-  
   /* Play with data */  
-  //baseband2filterbank(conf);
   threads(conf);
   
   /* Destroy */
@@ -202,14 +200,17 @@ int main(int argc, char *argv[])
   destroy_baseband2filterbank(conf);
   log_add(conf.log_file, "INFO", 1,  "END destroy");
   
-  /* Destory log interface */  
-  log_add(conf.log_file, "INFO", 1,  "BASEBAND2FILTERBANK END");  
-  log_close(conf.log_file);
-  fprintf(stdout, "HERE AFTER LOG CLOSE\n");
-  fflush(stdout);
-  
+  /* Stop it */
   if(quit == 2)
-    exit(EXIT_FAILURE);
+    {
+      log_add(conf.log_file, "INFO", 1,  "BASEBAND2FILTERBANK END WITH a problem");  
+      log_close(conf.log_file);
+      exit(EXIT_FAILURE);
+    }
   else
-    return EXIT_SUCCESS;
+    {
+      log_add(conf.log_file, "INFO", 1,  "BASEBAND2FILTERBANK END WITHOUT a problem");  
+      log_close(conf.log_file);
+      return EXIT_SUCCESS;
+    }
 }

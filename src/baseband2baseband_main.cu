@@ -17,7 +17,8 @@
 void usage ()
 {
   fprintf (stdout,
-	   "baseband2baseband_main - Convert BMF baseband data from 16bits to 8bits and remove the oversampling \n"
+	   "baseband2baseband_main - Convert BMF baseband data from 16-bits to 8-bits\n"
+	   "                       - Generate bandpass of received bandwidth in IQUV or AABB\n"
 	   "\n"
 	   "Usage: baseband2baseband_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"

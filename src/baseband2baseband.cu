@@ -310,7 +310,6 @@ int initialize_baseband2baseband(conf_t *conf)
   conf->rbufin_size = ipcbuf_get_bufsz(conf->db_in);
   log_add(conf->log_file, "INFO", 1,  "Input buffer block size is %"PRIu64".", conf->rbufin_size);
   
-  //if(conf->rbufin_size % conf->bufin_size != 0)
   if(conf->rbufin_size != conf->bufin_size*conf->nrepeat_per_blk)  
     {
       log_add(conf->log_file, "ERR", 1,  "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -355,10 +354,8 @@ int initialize_baseband2baseband(conf_t *conf)
     }
   conf->db_out = (ipcbuf_t *) conf->hdu_out->data_block;
   conf->rbufout_size = ipcbuf_get_bufsz(conf->db_out);
-  //fprintf(stdout, "%"PRIu64"\t%"PRIu64"\n", conf->rbufout_size, conf->bufout_size);
   log_add(conf->log_file, "INFO", 1,  "Output buffer block size is %"PRIu64".", conf->rbufout_size);
   
-  //if(conf->rbufout_size % conf->bufout_size != 0)
   if(conf->rbufout_size != (conf->bufout_size * conf->nrepeat_per_blk))  
     {
       log_add(conf->log_file, "ERR", 1,  "Buffer size mismatch, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
@@ -702,9 +699,6 @@ int baseband2baseband(conf_t conf)
 		      conf.fits[eth_index].nchunk = 1;
 		      conf.fits[eth_index].chunk_index = 0;
 
-		      //fprintf(stdout, "DBUFOUT_OFFSET_MONITOR:\t%"PRIu64"\t%d\n", dbufout_offset_monitor, eth_index);
-		      //fflush(stdout);
-
 		      if(k < conf.pol_type)
 			{
 			  if(conf.pol_type == 2)
@@ -873,13 +867,10 @@ int offset_scale(conf_t conf)
   blocksize_taccumulate = conf.blocksize_taccumulate;
 
   for(i = 0; i < conf.nrepeat_per_blk; i ++)
-    //for(i = 0; i < conf.rbufin_size; i += conf.bufin_size)
     {
       for (j = 0; j < conf.nstream; j++)
 	{
-	  hbufin_offset = (i * conf.nstream + j) * conf.hbufin_offset;// + i * conf.bufin_size;
-	  //hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
-	  //hbufin_offset = j * conf.hbufin_offset + i;
+	  hbufin_offset = (i * conf.nstream + j) * conf.hbufin_offset;
 	  dbufin_offset = j * conf.dbufin_offset; 
 	  bufrt1_offset = j * conf.bufrt1_offset;
 	  bufrt2_offset = j * conf.bufrt2_offset;
@@ -1251,28 +1242,6 @@ int register_dada_header(conf_t *conf)
       exit(EXIT_FAILURE);
     }
   log_add(conf->log_file, "INFO", 1,  "NBIT to DADA header is %d", NBIT_BASEBAND);
-  
-  //if (ascii_header_set(hdrbuf_out, "NDIM", "%d", NDIM_BASEBAND) < 0)  
-  //  {
-  //    log_add(conf->log_file, "ERR", 1,  "Error setting NDIM, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-  //    fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Error setting NDIM, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    
-  //    destroy_baseband2baseband(*conf);
-  //    fclose(conf->log_file);
-  //    exit(EXIT_FAILURE);
-  //  }
-  //log_add(conf->log_file, "INFO", 1,  "NDIM to DADA header is %d", NDIM_BASEBAND);
-  //
-  //if (ascii_header_set(hdrbuf_out, "NPOL", "%d", NPOL_BASEBAND) < 0)  
-  //  {
-  //    log_add(conf->log_file, "ERR", 1,  "Error setting NPOL, which happens at \"%s\", line [%d].", __FILE__, __LINE__);
-  //    fprintf(stderr, "BASEBAND2BASEBAND_ERROR: Error setting NPOL, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //    
-  //    destroy_baseband2baseband(*conf);
-  //    fclose(conf->log_file);
-  //    exit(EXIT_FAILURE);
-  //  }
-  //log_add(conf->log_file, "INFO", 1,  "NPOL to DADA header is %d", NPOL_BASEBAND);
   
   if (ascii_header_set(hdrbuf_out, "FILE_SIZE", "%"PRIu64"", file_size) < 0)  
     {

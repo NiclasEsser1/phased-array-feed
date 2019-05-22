@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
       for(j = 0; j < ndim; j++)
 	if(fabs((h_result[i*ndim + j] - g_result[i*ndim + j])/g_result[i*ndim + j])>1E-3)
 	  {
-	    fprintf(stdout, "%d\t%d\t%f\t%f\t%E\t", i, j, h_result[i*ndim + j], g_result[i*ndim + j], (h_result[i*ndim + j] - g_result[i*ndim + j])/g_result[i*ndim + j]);
+	    fprintf(stdout, "%"PRIu64"\t%"PRIu64"\t%f\t%f\t%E\t", i, j, h_result[i*ndim + j], g_result[i*ndim + j], (h_result[i*ndim + j] - g_result[i*ndim + j])/g_result[i*ndim + j]);
 	    fprintf(stdout, "\n");
 	  }
     }
