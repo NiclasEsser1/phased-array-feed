@@ -18,11 +18,11 @@ void usage()
   fprintf(stdout,
 	  "capture_main - capture PAF BMF raw data from NiC\n"
 	  "\n"
-	  "Usage: paf_capture [options]\n"
+	  "Usage: capture_main [options]\n"
 	  " -a Hexadecimal shared memory key for capture \n"
 	  " -b Start point of packet\n"
-	  " -c Alive IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunkexpected_nchunkactual_cpu\" \n"
-	  " -d Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunkexpected\" \n"
+	  " -c Alive IP address and port, accept multiple values with -c value1 -c value2 ... \n the format of it is \"ip_port_nchunkexpected_nchunkactual_cpu\" \n"
+	  " -d Dead IP address and port, accept multiple values with -d value1 -d value2 ... \n the format of it is \"ip_port_nchunkexpected\" \n"
 	  " -e The center frequency of captured data\n"
 	  " -f Reference information for the current capture, get from BMF packet header, epoch_sec_idf\n"
 	  " -g Which directory to put runtime file\n"
@@ -34,8 +34,8 @@ void usage()
 	  " -m The number of data frames in each temp buffer of each frequency chunk\n"
 	  " -n The name of header template for PSRDADA\n"
 	  " -o The source information, which is required for the case without capture control, in the format \"name_ra_dec\" \n"
-	  " -p Force to pad band edge \n"
-	  " -q The index of  beam \n"
+	  " -p Pretend to work with full bandwidth \n "
+	  "-q The index of beam \n"
 	  );
 }
 

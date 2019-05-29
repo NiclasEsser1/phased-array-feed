@@ -18,7 +18,7 @@ void usage ()
 {
   fprintf (stdout,
 	   "baseband2baseband_main - Convert BMF baseband data from 16-bits to 8-bits\n"
-	   "                       - Generate bandpass of received bandwidth in IQUV or AABB\n"
+	   "                       - Configurable to generate bandpass of received bandwidth in IQUV or AABB\n"
 	   "\n"
 	   "Usage: baseband2baseband_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
@@ -31,7 +31,7 @@ void usage ()
 	   " -h  show help\n"
 	   " -i  FFT length\n"
 	   " -j  Start-of-data or not\n"
-	   " -k  Network interface Y_ip_port_ptype or N\n"
+	   " -k  Bandpass, Y_ip_port_ptype or N\n"
 	   );
 }
 

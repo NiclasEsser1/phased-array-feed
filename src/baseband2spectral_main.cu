@@ -23,11 +23,11 @@ void usage ()
 {
   fprintf (stdout,
 	   "baseband2spectral_main - Convert BMF 16-bits baseband data into 32-bits float spectral data \n"
-	   "                       - Generate bandpass of received bandwidth in IQUV or AABB\n"
+	   "                       - Configurable to generate bandpass of received bandwidth in IQUV or AABB\n"
 	   "\n"
 	   "Usage: baseband2spectral_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
-	   " -b  Output information, \"k_key_sod, or n_ip_port\""
+	   " -b  Output information, \"k_key_sod, or n_ip_port\"\n"
 	   " -c  The number of data frame (per frequency chunk) of each incoming ring buffer block\n"
 	   " -d  The number of streams \n"
 	   " -e  The number of data frame (per frequency chunk) of each stream\n"
@@ -37,7 +37,7 @@ void usage ()
 	   " -i  FFT length\n"
 	   " -j  Pol type, 1 for Stokes I, 2 for AABB and 4 for IQUV\n"
 	   " -k  The number of buffer blocks to accumulate\n"
-	   " -l  Monitor, Y_ip_port_ptype or N\n"
+	   " -l  Bandpass, Y_ip_port_ptype or N\n"
 	   );
 }
 

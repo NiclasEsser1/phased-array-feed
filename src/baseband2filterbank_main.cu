@@ -24,8 +24,8 @@ void usage ()
 {
   fprintf (stdout,
 	   "baseband2filterbank_main - Convert BMF 16-bits baseband data into 8-bits filterbank data \n"
-	   "                         - Generate bandpass of received bandwidth in IQUV or AABB\n"
-	   "                         - Generate spectral data with sub-band in IQUV and AABB\n" 
+	   "                         - Configurable to generate bandpass of received bandwidth in IQUV or AABB\n"
+	   "                         - Configurable to generate spectral data with sub-band in IQUV or AABB\n" 
 	   "\n"
 	   "Usage: baseband2filterbank_main [options]\n"
 	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
@@ -39,8 +39,8 @@ void usage ()
 	   " -i  Number of chunks of input\n"
 	   " -j  FFT length\n"
 	   " -k  The number of output channels\n"
-	   " -l  Monitor, Y_ip_port_ptype or N\n"
-	   " -m  Commensal spectral, n_ip_port_ptype_chunk0_nchunk_naccumulate_cufft-nx, k_key_sod_ptype_chunk0_nchunk_naccumulate_cufft-nx or N\n"
+	   " -l  Bandpass, Y_ip_port_ptype or N\n"
+	   " -m  Commensal spectral, n_ip_port_ptype_chunk0_nchunk_naccumulate_cufft-nx, \n k_key_sod_ptype_chunk0_nchunk_naccumulate_cufft-nx or N\n"
 	   );
 }
 
