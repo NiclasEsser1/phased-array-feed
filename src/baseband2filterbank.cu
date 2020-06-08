@@ -154,7 +154,10 @@ int initialize_baseband2filterbank(conf_t *conf)
   for(i = 0; i < conf->nstream; i ++)
     {
       CudaSafeCall(cudaStreamCreate(&conf->streams[i]));
-      CufftSafeCall(cufftPlanMany(&conf->fft_plans[i], CUFFT_RANK, &nx, &iembed, istride, idist, &oembed, ostride, odist, CUFFT_C2C, batch));
+      CufftSafeCall(cufftPlanMany(&conf->fft_plans[i], CUFFT_RANK, &nx,
+				  &iembed, istride, idist,
+				  &oembed, ostride, odist,
+				  CUFFT_C2C, batch));
       CufftSafeCall(cufftSetStream(conf->fft_plans[i], conf->streams[i]));
     }
   
