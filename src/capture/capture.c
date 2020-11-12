@@ -55,8 +55,9 @@ int init_buf(conf_t *conf)
   conf->required_pktsz = conf->pktsz - conf->pktoff;
 
   conf->rbufsz = conf->nchk * conf->required_pktsz * conf->rbuf_ndf_chk;  // The required buffer block size in byte;
+	printf("key: %x\n", conf->key)
   conf->hdu = dada_hdu_create(runtime_log);
-  dada_hdu_set_key(conf->hdu, conf->key - 0x0001);
+  dada_hdu_set_key(conf->hdu, conf->key);
   if(dada_hdu_connect(conf->hdu) < 0)
     {
       multilog(runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
