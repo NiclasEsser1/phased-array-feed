@@ -484,8 +484,8 @@ int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *
 
 int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, int sec_prd, uint64_t ndf_chk_prd, int64_t *idf_buf)
 {
-
   *idf_buf = (int64_t)(idf - idf_ref) + (int64_t)(sec - sec_ref) / sec_prd * ndf_chk_prd;
+	printf("idf: %lu; sec: %lu; idf_ref: %lu; sec_ref: %lu; sec_prd: %d; ndf_chk_prd: %lu; idf_buf: %ld\n",idf, sec, idf_ref, sec_ref, sec_prd, ndf_chk_prd, idf_buf);
   return EXIT_SUCCESS;
 }
 
