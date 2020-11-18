@@ -46,7 +46,7 @@ typedef struct conf_t
   int pktsz;
 
   /** Start point or offset of the packet, seems to allow skipping unnecessaey header data **/
-  int pktoff:
+  int pktoff;
 
   /** Actual size that is required for one UDP packet (pktsz - pktoff) **/
   int required_pktsz;

@@ -164,7 +164,7 @@ void *capture(void *conf)
 	int pktoff = captureconf->pktoff;					// Offset, can be used to skip data in bytes; usually set to 0
 	int required_pktsz = captureconf->required_pktsz;	// The total number
 	int ichk;			// Channel chunk identifier
-  struct sockaddr_in sa	// POSIX socket server
+  struct sockaddr_in sa;	// POSIX socket server
 	struct sockaddr_in fromsa; // Assumed to be the POSIX socket client. If so this is not necessary, since the server itself could be used
   struct timeval tout={captureconf->sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
   socklen_t fromlen;	// = sizeof(fromsa);
@@ -239,6 +239,8 @@ void *capture(void *conf)
   }
 	// Get header information, which will be used to get the location of packets
   hdr_keys(df, &hdr0[ithread]);
+  hdr_ref[ithread].idf = hdr0[ithread].idf;
+  hdr_ref[ithread].sec = hdr0[ithread].sec;
 
   fprintf(stdout, "%d\t%"PRIu64"\t%"PRIu64"\n", ithread, hdr0[ithread].sec, hdr0[ithread].idf);
 
@@ -286,7 +288,7 @@ void *capture(void *conf)
     pthread_mutex_unlock(&hdr_current_mutex[ithread]);
     clock_gettime(CLOCK_REALTIME, &stop);
     elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1.0E9L;
-    fprintf(stdout, "%E seconds used for hdr\n", elapsed_time);
+    // fprintf(stdout, "%E seconds used for hdr\n", elapsed_time);
 #endif
 
 		// Calculate the dataframe index of received packet
@@ -310,7 +312,7 @@ void *capture(void *conf)
   	  pthread_exit(NULL);
   	  return NULL;
   	}
-
+    // printf("ichk: %ld, idf: %ld\n", ichk, idf);
     if(idf >= 0)
   	{
 		  // Drop data frams which are behind time;
@@ -401,7 +403,7 @@ void *capture(void *conf)
 
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
 	      cbuf_loc = (uint64_t)((idf * captureconf->nchk + ichk) * required_pktsz); // This is in TFTFP order
-	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) order
+	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) 
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
@@ -485,7 +487,7 @@ int acquire_ichk(double freq, double center_freq, int nchan_chk, int nchk, int *
 int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, int sec_prd, uint64_t ndf_chk_prd, int64_t *idf_buf)
 {
   *idf_buf = (int64_t)(idf - idf_ref) + (int64_t)(sec - sec_ref) / sec_prd * ndf_chk_prd;
-	printf("idf: %lu; sec: %lu; idf_ref: %lu; sec_ref: %lu; sec_prd: %d; ndf_chk_prd: %lu; idf_buf: %ld\n",idf, sec, idf_ref, sec_ref, sec_prd, ndf_chk_prd, idf_buf);
+	// printf("idf: %lu; sec: %lu; idf_ref: %lu; sec_ref: %lu; sec_prd: %d; ndf_chk_prd: %lu; idf_buf: %ld\n",idf, sec, idf_ref, sec_ref, sec_prd, ndf_chk_prd, *idf_buf);
   return EXIT_SUCCESS;
 }
 

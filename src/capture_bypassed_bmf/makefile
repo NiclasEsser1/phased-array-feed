@@ -25,8 +25,8 @@ TARGET       = capture_main
 SRC_DIR      = .
 OBJ_DIR      = .
 
-LIBS         = -lpsrdada -lcudart -lcuda -lm -lrt -lcufft -lpthread
-LIB_DIRS     = -L/usr/local/cuda/lib64
+LIBS         = -lpsrdada -lcudart -lm -lrt -lcufft -lpthread
+LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/lib/x86_64-linux-gnu
 INCLUDE_DIRS = -I/usr/local/include
 
 capture_main:capture_main.o capture.o hdr.o control.o

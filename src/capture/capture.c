@@ -164,7 +164,7 @@ void *capture(void *conf)
 	int pktoff = captureconf->pktoff;					// Offset, can be used to skip data in bytes; usually set to 0
 	int required_pktsz = captureconf->required_pktsz;	// The total number
 	int ichk;			// Channel chunk identifier
-  struct sockaddr_in sa	// POSIX socket server
+  struct sockaddr_in sa;	// POSIX socket server
 	struct sockaddr_in fromsa; // Assumed to be the POSIX socket client. If so this is not necessary, since the server itself could be used
   struct timeval tout={captureconf->sec_prd, 0};  // Force to timeout if we could not receive data frames for one period.
   socklen_t fromlen;	// = sizeof(fromsa);
