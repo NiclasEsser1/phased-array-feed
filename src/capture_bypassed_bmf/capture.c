@@ -62,21 +62,7 @@ int init_buf(conf_t *conf)
     multilog(runtime_log, LOG_ERR, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
     fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-    pthread_mutex_destroy(&ithread_mutex);
-    pthread_mutex_destroy(&quit_mutex);
-    pthread_mutex_destroy(&force_next_mutex);
-    for(i = 0; i < MPORT_CAPTURE; i++)
-		{
-		  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-		  pthread_mutex_destroy(&hdr_current_mutex[i]);
-		  pthread_mutex_destroy(&transit_mutex[i]);
-		  pthread_mutex_destroy(&ndf_port_mutex[i]);
-		}
-
-    for(i = 0; i < MCHK_CAPTURE; i++)
-			pthread_mutex_destroy(&ndf_chk_mutex[i]);
-
-    dada_hdu_destroy(conf->hdu);
+    destroy_capture(conf);
     return EXIT_FAILURE;
   }
 
@@ -85,45 +71,18 @@ int init_buf(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-      pthread_mutex_destroy(&ithread_mutex);
-      pthread_mutex_destroy(&quit_mutex);
-      pthread_mutex_destroy(&force_next_mutex);
-      for(i = 0; i < MPORT_CAPTURE; i++)
-	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-	  pthread_mutex_destroy(&transit_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-	}
-
-      for(i = 0; i < MCHK_CAPTURE; i++)
-	pthread_mutex_destroy(&ndf_chk_mutex[i]);
-
-      dada_hdu_disconnect(conf->hdu);
+      destroy_capture(conf);
       return EXIT_FAILURE;
     }
 
   db = (ipcbuf_t *)conf->hdu->data_block;
   if(conf->rbufsz != ipcbuf_get_bufsz(db))  // Check the buffer size
     {
-      multilog(runtime_log, LOG_ERR, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Buffer size mismatch: allocated ipcbuffer: \"%ld\" not equal conf->rbufsz: \"%ld\", which happens at \"%s\", line [%d], has to abort.\n", ipcbuf_get_bufsz(db), conf->rbufsz, __FILE__, __LINE__);
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-      pthread_mutex_destroy(&ithread_mutex);
-      pthread_mutex_destroy(&quit_mutex);
-      pthread_mutex_destroy(&force_next_mutex);
-      for(i = 0; i < MPORT_CAPTURE; i++)
-	{
-	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-	  pthread_mutex_destroy(&transit_mutex[i]);
-	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-	}
+      destroy_capture(conf);
 
-      for(i = 0; i < MCHK_CAPTURE; i++)
-	pthread_mutex_destroy(&ndf_chk_mutex[i]);
-
-      dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;
     }
   if(ipcbuf_disable_sod(db) < 0)
@@ -131,21 +90,8 @@ int init_buf(conf_t *conf)
       multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
       fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-      pthread_mutex_destroy(&ithread_mutex);
-      pthread_mutex_destroy(&quit_mutex);
-      pthread_mutex_destroy(&force_next_mutex);
-      for(i = 0; i < MPORT_CAPTURE; i++)
-  	{
-  	  pthread_mutex_destroy(&hdr_ref_mutex[i]);
-  	  pthread_mutex_destroy(&hdr_current_mutex[i]);
-  	  pthread_mutex_destroy(&transit_mutex[i]);
-  	  pthread_mutex_destroy(&ndf_port_mutex[i]);
-  	}
+      destroy_capture(conf);
 
-      for(i = 0; i < MCHK_CAPTURE; i++)
-  	pthread_mutex_destroy(&ndf_chk_mutex[i]);
-
-      dada_hdu_unlock_write(conf->hdu);
       return EXIT_FAILURE;
     }
   conf->tbufsz = (conf->required_pktsz + 1) * conf->tbuf_ndf_chk * conf->nchk;
@@ -403,7 +349,7 @@ void *capture(void *conf)
 
 	      // Put data into current ring buffer block if it is before rbuf_ndf_chk;
 	      cbuf_loc = (uint64_t)((idf * captureconf->nchk + ichk) * required_pktsz); // This is in TFTFP order
-	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP) 
+	      //cbuf_loc = (uint64_t)((idf + ichk * captureconf->rbuf_ndf_chk) * required_pktsz);   // This should give us FTTFP (FTFP)
 	      memcpy(cbuf + cbuf_loc, df + pktoff, required_pktsz);
 
 	      pthread_mutex_lock(&ndf_port_mutex[ithread]);
@@ -491,7 +437,7 @@ int acquire_idf(uint64_t idf, uint64_t sec, uint64_t idf_ref, uint64_t sec_ref, 
   return EXIT_SUCCESS;
 }
 
-int destroy_capture(conf_t conf)
+int destroy_capture(conf_t *conf)
 {
   int i;
 
@@ -509,9 +455,9 @@ int destroy_capture(conf_t conf)
   for(i = 0; i < MCHK_CAPTURE; i++)
     pthread_mutex_destroy(&ndf_chk_mutex[i]);
 
-  dada_hdu_unlock_write(conf.hdu);
-  dada_hdu_disconnect(conf.hdu);
-  dada_hdu_destroy(conf.hdu);
+  dada_hdu_unlock_write(conf->hdu);
+  dada_hdu_disconnect(conf->hdu);
+  dada_hdu_destroy(conf->hdu);
 
   return EXIT_SUCCESS;
 }

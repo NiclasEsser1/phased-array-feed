@@ -214,7 +214,7 @@ int init_buf(conf_t *conf);
 
 
 
-int destroy_capture(conf_t conf);
+int destroy_capture(conf_t *conf);
 
 
 
