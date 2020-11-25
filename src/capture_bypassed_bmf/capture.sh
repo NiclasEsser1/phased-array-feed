@@ -5,7 +5,7 @@ dada_db -k dada -d;
 sleep 2
 # Creating dada buffer
 echo "Creating new dada buffer.."
-numactl -m 1 dada_db -k dada -l -p -b 266674176 -n 16
+numactl -m 1 dada_db -k dada -l -p -b 4266786816 -n 4
 sleep 2
 # Reading client
 echo "Connecting dada_dbdisk to dada buffer"
@@ -18,4 +18,4 @@ sleep 2
 # Writing client for UDP capturing
 echo "Starting capturing.."
 # dada_junkdb -k dada -b 17218142208 -c f -r 2432.666 header_dada.txt
-./capture_main -a dada -b 7298 -c 64 -d 10.17.1.1:17100:1:1:2 -d 10.17.1.1:17101:1:1:3 -d 10.17.1.1:17102:1:1:4 -d 10.17.1.1:17103:1:1:5 -f 1140.500000 -g 7 -j ../../log/ -k 6 -l 7 -m 1 -n 27 -o 1 -p 36864 -q 256 -r 250000 -s ./capture.beam17part00.socket -t header_dada.txt
+./capture_main -a dada -b 0 -c 10.17.1.1_17100_9_9_3 -c 10.17.1.1_17101_9_9_3 -c 10.17.1.1_17102_9_9_3 -c 10.17.1.1_17103_9_9_3 -e 1337.0 -f 18444_1_1 -g ../../log/numa1_pacifix1 -i 1 -j 0_2 -k 1 -l 16384 -m 128 -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q 24 -r 36

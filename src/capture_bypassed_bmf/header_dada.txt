@@ -2,6 +2,7 @@ HEADER       DADA                # Distributed aquisition and data analysis
 HDR_VERSION  1.0                 # Version of this ASCII header
 HDR_SIZE     4096                # Size of the header in bytes
 DADA_VERSION 1.0                 # Version of the DADA Software
+PIC_VERSION  1.0                 # Version of the PIC FPGA Software
 
 # CODÌF configuration
 PACKET_SIZE  7298                # CODIF packet with raw and meta data. ETH, IPV4 and UDP excluded
@@ -9,21 +10,35 @@ BUFFER_SIZE  266674176           # 36*1024 packets per block
 
 # DADA parameters
 OBS_ID       unset               # observation ID
-OBS_OFFSET   0                   # bytes offset from the start MJD/UTC
 PRIMARY      BMF                 # primary node host name
 SECONDARY    PACIFIX1            # secondary node host name
 FILE_NAME    test.dada           # full path of the data file
 FILE_SIZE    17218142208          # Total byte size of file BUFFER_SIZE * 48
+
+# time of the rising edge of the first time sample
+UTC_START    unset               # yyyy-mm-dd-hh:mm:ss, no fraction second
+MJD_START    unset               # MJD equivalent to the start UTC
+PICOSECONDS  unset               # fraction second in pico second
+
+OBS_OFFSET   0                   # bytes offset from the start MJD/UTC
+OBS_OVERLAP  0                   # bytes by which neighbouring files overlap
 
 # description of the instrument
 TELESCOPE    Effelsberg        # telescope name
 INSTRUMENT   PAF-BMF           # instrument name
 RECEIVER     PAF               # Frontend receiver
 FREQ         unset             # centre frequency in MHz
-BW           7                 # bandwidth of in MHz (-ve lower sb)
+BW           336               # bandwidth of in MHz (-ve lower sb)
 TSAMP        0.84375           # sampling interval in microseconds
+
+# description of data
 BYTES_PER_SECOND 2432666666.6676
-NBIT        8
+NBIT         16                # number of bits per sample
+NDIM         2                 # dimension of samples (2=complex, 1=real)
+NPOL         2                 # number of polarizations observed
+NCHAN        336               # number of channels here
 RESOLUTION   1
+DSB          1
+
 
 ## end of header

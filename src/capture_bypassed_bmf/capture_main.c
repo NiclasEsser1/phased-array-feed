@@ -3,17 +3,16 @@
 #endif
 
 #include <stdlib.h>
-#include "multilog.h"	// For logging
-#include "dada_def.h"	// Default definitions for psrdada library
-#include "capture.h"	// The actual capture fuctionality
+#include <string.h>
+#include <dirent.h>
+#include <errno.h>
 
-multilog_t *runtime_log; 	// Global variable to access logging enviroment
-extern uint64_t ndf_port[MPORT_CAPTURE];	// Global memory variable to store received dataframes per port. Dual polarization beam with complex 16bit samples; MPORT_CAPTURE = 16 defined in captrue.h
-extern uint64_t ndf_chk[MCHK_CAPTURE]; // Global memory variable to store reveived data frame of frequency chunks; MCHK_CAPTURE = 48 defined in capture.h
+#include "dada_def.h"
+#include "capture.h"
+#include "log.h"
 
-/*
-*	@brief		Displays the usage of the program by passing commandline argument --help or -h
-*/
+extern int quit;
+
 void usage()
 {
   fprintf(stdout,
@@ -21,203 +20,159 @@ void usage()
 	  "\n"
 	  "Usage: paf_capture [options]\n"
 	  " -a Hexadecimal shared memory key for capture \n"
-	  " -b BMF packet size\n"
-	  " -c Start point of packet\n"
-	  " -d Active IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected:nchunk_actual:cpu\" \n"
-	  " -e Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:nchunk_expected\" \n"
-	  " -f The center frequency of captured data\n"
-	  " -g Number of channels of current capture\n"
+	  " -b Start point of packet\n"
+	  " -c Alive IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunkexpected_nchunkactual_cpu\" \n"
+	  " -d Dead IP adress and port, accept multiple values with -e value1 -e value2 ... the format of it is \"ip_port_nchunkexpected\" \n"
+	  " -e The center frequency of captured data\n"
+	  " -f Reference information for the current capture, get from BMF packet header, epoch_sec_idf\n"
+	  " -g Which directory to put runtime file\n"
 	  " -h Show help\n"
-	  " -i Reference information for the current capture, get from BMF packet header, epoch_ref:sec_ref:idf_ref\n"
-	  " -j Which directory to put log file\n"
-	  " -k The CPU for buf control thread\n"
-	  " -l The CPU for capture control thread\n"
-	  " -m Bind thread to CPU or not\n"
-	  " -n Time out for sockets\n"
-	  " -o The number of chunks\n"
-	  " -p The number of data frames in each buffer block of each frequency chunk\n"
-	  " -q The number of data frames in each temp buffer of each frequency chunk\n"
-	  " -r The number of data frames in each period or each frequency chunk\n"
-	  " -s The address to get control signal, currently uses unix socket\n"
-	  " -t The name of header template for PSRDADA\n"
-	  " -u The name of instrument \n"
-	   );
+	  " -i The CPU for buf control thread\n"
+	  " -j The setup for the capture control, the format of it is \"capturectrl_capturectrlcpu\"\n"
+	  " -k Bind thread to CPU or not\n"
+	  " -l The number of data frames in each buffer block of each frequency chunk\n"
+	  " -m The number of data frames in each temp buffer of each frequency chunk\n"
+	  " -n The name of header template for PSRDADA\n"
+	  " -o The source information, which is required for the case without capture control, in the format \"name_ra_dec\" \n"
+	  " -p Force to pad band edge \n"
+	  " -q The index of channel \n" // Must be idnex of channel
+	  " -r Number of beams \n" // Must be idnex of channel
+	  );
 }
 
 int main(int argc, char **argv)
 {
-  int i, arg;
-  conf_t conf;	// conf_t struct declared in "capture.h"
+  /* Initial part */
+  int i, arg, source = 0;
+  conf_t conf;
+  char fname_log[MSTR_LEN] = {'\0'};
 
-	// Initial part
-	// conf_t attributes declared in capture.h
-	// A few of them has to be initialized to zero?!
-  conf.nport_active = 0;
-  conf.nport_dead   = 0;
-  conf.buf_ctrl_cpu     = 0;
-  conf.capture_ctrl_cpu = 0;
-  conf.thread_bind  = 0; // Default do not bind thread to cpu
-  for(i = 0; i < MPORT_CAPTURE; i++)
-    conf.port_cpu[i] = 0;
+  /* default arguments*/
+  default_arguments(&conf);
 
-	// Parse commandline arguments
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:s:t:u:")) != -1)
-  {
-    switch(arg)
-		{
-		case 'h':
-		  usage();
-		  return EXIT_FAILURE;
+  /* read in argument from command line */
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:")) != -1)
+    {
+      switch(arg)
+	{
+	case 'h':
+	  usage();
+	  exit(EXIT_FAILURE);
 
-		case 'a':
-		  if(sscanf(optarg, "%x", &conf.key) != 1)
-		    {
-		      fprintf(stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-		      return EXIT_FAILURE;
-		    }
-		  break;
+	case 'a':
+	  if(sscanf(optarg, "%x", &conf.key) != 1)
+	    {
+	      fprintf(stderr, "CAPTURE_ERROR: Could not parse key from %s, which happens at \"%s\", line [%d], has to abort.\n", optarg, __FILE__, __LINE__);
+	      usage();
 
-		case 'b':
-		  sscanf(optarg, "%d", &conf.pktsz);
-		  break;
+	      exit(EXIT_FAILURE);
+	    }
+	  break;
 
-		case 'c':
-		  sscanf(optarg, "%d", &conf.pktoff);
-		  break;
+	case 'b':
+	  sscanf(optarg, "%d", &conf.dfsz_seek);
+	  break;
 
-		case 'd':
-		  sscanf(optarg, "%[^:]:%d:%d:%d:%d", conf.ip_active[conf.nport_active], &conf.port_active[conf.nport_active], &conf.nchk_active_expect[conf.nport_active], &conf.nchk_active_actual[conf.nport_active], &conf.port_cpu[conf.nport_active]);
-		  conf.nport_active++;
-		  break;
+	case 'c':
+	  sscanf(optarg, "%[^_]_%d_%d_%d_%d", conf.ip_alive[conf.nport_alive], &conf.port_alive[conf.nport_alive], &conf.nbeam_alive_expect_on_port[conf.nport_alive], &conf.nbeam_alive_actual_on_port[conf.nport_alive], &conf.capture_cpu[conf.nport_alive]);
+	  conf.nport_alive++;
+	  break;
 
-		case 'e':
-		  sscanf(optarg, "%[^:]:%d:%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nchk_dead[conf.nport_dead]);
-		  conf.nport_dead++;
-		  break;
+	case 'd':
+	  sscanf(optarg, "%[^_]_%d_%d", conf.ip_dead[conf.nport_dead], &conf.port_dead[conf.nport_dead], &conf.nbeam_dead_on_port[conf.nport_dead]);
+	  conf.nport_dead++;
+	  break;
 
-		case 'f':
-		  sscanf(optarg, "%lf", &conf.center_freq);
-		  break;
+	case 'e':
+	  sscanf(optarg, "%lf", &conf.center_freq);
+	  break;
 
-		case 'g':
-		  sscanf(optarg, "%d", &conf.nchan);
-		  break;
+	case 'f':
+	  sscanf(optarg, "%d_%"SCNd64"_%"SCNd64"", &conf.days_from_1970, &conf.seconds_from_epoch, &conf.df_in_period);
+	  break;
 
-		case 'i':
-		  sscanf(optarg, "%lf:%"SCNu64":%"SCNu64"", &conf.epoch_ref, &conf.sec_ref, &conf.idf_ref);
-		  break;
+	case 'g':
+	  sscanf(optarg, "%s", conf.dir);  // It should be different for different channels and the directory name should be setup by pipeline;
+	  break;
 
-		case 'j':
-		  sscanf(optarg, "%s", conf.dir);
-		  break;
+	case 'i':
+	  sscanf(optarg, "%d", &conf.rbuf_ctrl_cpu);
+	  break;
 
-		case 'k':
-		  sscanf(optarg, "%d", &conf.buf_ctrl_cpu);
-		  break;
+	case 'j':
+	  sscanf(optarg, "%d_%d", &conf.capture_ctrl, &conf.capture_ctrl_cpu);
+	  break;
 
-		case 'l':
-		  sscanf(optarg, "%d", &conf.capture_ctrl_cpu);
-		  break;
+	case 'k':
+	  sscanf(optarg, "%d", &conf.cpu_bind);
+	  break;
 
-		case 'm':
-		  sscanf(optarg, "%d", &conf.thread_bind);
-		  break;
+	case 'l':
+	  sscanf(optarg, "%"SCNu64"", &conf.ndf_per_chunk_rbuf);
+	  break;
 
-		case 'n':
-		  sscanf(optarg, "%d", &conf.sec_prd);
-		  break;
+	case 'm':
+	  sscanf(optarg, "%"SCNu64"", &conf.ndf_per_chunk_tbuf);
+	  break;
 
-		case 'o':
-		  sscanf(optarg, "%d", &conf.nchk);
-		  break;
+	case 'n':
+	  sscanf(optarg, "%s", conf.dada_header_template);
+	  break;
 
-		case 'p':
-		  sscanf(optarg, "%"SCNu64"", &conf.rbuf_ndf_chk);
-		  break;
+	case 'o':
+	  {
+	    sscanf(optarg, "%[^_]_%[^_]_%s", conf.source, conf.ra, conf.dec);
+	    break;
+	  }
 
-		case 'q':
-		  sscanf(optarg, "%"SCNu64"", &conf.tbuf_ndf_chk);
-		  break;
-
-		case 'r':
-		  sscanf(optarg, "%"SCNu64"", &conf.ndf_chk_prd);
-		  break;
-
-		case 's':
-		  sscanf(optarg, "%s", conf.ctrl_addr);
-		  break;
-
-		case 't':
-		  sscanf(optarg, "%s", conf.hfname);
-		  break;
-
-		case 'u':
-		  sscanf(optarg, "%s", conf.instrument);
-		  break;
-		}
-  }
+	case 'p':
+	  sscanf(optarg, "%d", &conf.pad);
+	  break;
+	  // Changed by Niclas
+	case 'q':
+	  sscanf(optarg, "%d", &conf.chan_index);
+	  break;
+	}
+    }
 
   /* Setup log interface */
-  char fname_log[MSTR_LEN];	// reserve space for filename
-  FILE *fp_log = NULL; // File stream for logging
-  sprintf(fname_log, "%s/capture-%s.log", conf.dir, conf.ip_active[0]); // set directory and filename for logging file
-  fp_log = fopen(fname_log, "ab+");	// w+r binary mode
-  if(fp_log == NULL)	// Without logging the program will exit
-  {
-    fprintf(stderr, "Can not open log file %s\n", fname_log);
-    return EXIT_FAILURE;
-  }
-  runtime_log = multilog_open("capture", 1);
-  multilog_add(runtime_log, fp_log);
-  multilog(runtime_log, LOG_INFO, "CAPTURE START\n");
+  DIR* dir = opendir(conf.dir); // First to check if the directory exists
+  if(dir)
+    closedir(dir);
+  else
+    {
+      fprintf(stderr, "CAPTURE_ERROR: Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
+      exit(EXIT_FAILURE);
+    }
+  sprintf(fname_log, "%s/capture.log", conf.dir);  // Open the log file
+  conf.log_file = log_open(fname_log, "ab+");
+  if(conf.log_file == NULL)
+    {
+      fprintf(stderr, "CAPTURE_ERROR: Can not open log file %s, which happends at \"%s\", line [%d], has to abort\n", fname_log, __FILE__, __LINE__);
+      exit(EXIT_FAILURE);
+    }
+  log_add(conf.log_file, "INFO", 1,  "CAPTURE START");
 
-  /* To make sure that we are not going to bind all threads to one sigle CPU */
-	// If CPU bind is desired
-  if(!(conf.thread_bind == 0))
-  {
-    for(i = 0; i < MPORT_CAPTURE; i++)
-		{
-		  if(((conf.port_cpu[i] == conf.capture_ctrl_cpu)?0:1) == 1)
-		    break;
-		  if(((conf.port_cpu[i] == conf.buf_ctrl_cpu)?0:1) == 1)
-		    break;
-		}
-    if(i == MPORT_CAPTURE)
-		{
-		  fprintf(stdout, "We can not bind all threads into one single CPU, has to abort!\n");
-		  multilog(runtime_log, LOG_ERR, "We can not bind all threads into one single CPU, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-		  return EXIT_FAILURE;
-		}
-  }
+  /* check the command line and record it */
+  examine_record_arguments(conf, argv, argc);
 
-  /* Init capture */
-  if(init_capture(&conf))
-  {
-    multilog(runtime_log, LOG_ERR, "Can not initial capture, has to abort, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-    fprintf(stderr, "Can not initial capture, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-    multilog(runtime_log, LOG_INFO, "CAPTURE END\n\n");
-    multilog_close(runtime_log);
-    fclose(fp_log);
-    return EXIT_FAILURE;
-  }
+  /* Initialize capture */
+  initialize_capture(&conf);
 
   /* Do the job */
   threads(&conf);
-
-  fprintf(stdout, "HERE, ENF OF THREADS\n");
 
   /* Destory capture */
   destroy_capture(conf);
 
   /* Destory log interface */
-  multilog(runtime_log, LOG_INFO, "CAPTURE END\n\n");
-  multilog_close(runtime_log);
-  fclose(fp_log);
+  log_add(conf.log_file, "INFO", 1,  "The last quit is %d", quit);
+  log_add(conf.log_file, "INFO", 1,  "CAPTURE END");
+  fclose(conf.log_file);
 
-  //for(i = 0; i < 6; i++)
-  //  fprintf(stdout, "%"PRIu64"\t", ndf_port[i]);
-  //fprintf(stdout, "\n");
+  /* termine it */
+  if(quit > 1)
+    exit(EXIT_FAILURE);
 
   return EXIT_SUCCESS;
 }
