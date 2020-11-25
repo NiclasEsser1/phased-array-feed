@@ -27,9 +27,9 @@ OBJ_DIR      = .
 
 LIBS         = -lpsrdada -lcudart -lm -lrt -lcufft -lpthread
 LIB_DIRS     = -L/usr/local/cuda/lib64 -L/usr/lib/x86_64-linux-gnu
-INCLUDE_DIRS = -I/usr/local/include
+INCLUDE_DIRS = -I/usr/local/include -I/usr/local/cuda/include
 
-capture_main:capture_main.o capture.o hdr.o control.o
+capture_main:capture_main.o capture.o log.o
 	$(CC) -o capture_main capture_main.o capture.o log.o $(LIB_DIRS) $(LIBS)
 
 capture_main.o:capture_main.c

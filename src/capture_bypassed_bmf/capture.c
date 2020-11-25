@@ -135,7 +135,7 @@ void *do_capture(void *conf)
       seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
       writebuf = bswap_64(*(ptr + 2));
 			freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
-      beam_index = (((writebuf & 0x000000000000ffff) >> 16);
+      beam_index = ((writebuf & 0x000000000000ffff) >> 16);
 	  // TODO get beam_index
 
       //chunk_index = (int)((freq - capture_conf->center_freq + 0.5)/NCHAN_PER_CHUNK + capture_conf->nbeam/2);
@@ -219,6 +219,7 @@ int initialize_capture(conf_t *conf)
   char *dbuf = NULL;
   time_t now;
   int beam_index;
+  int chan_index;
 
   /* Unix socket for capture control*/
   if(conf->capture_ctrl)
@@ -262,8 +263,9 @@ int initialize_capture(conf_t *conf)
   time(&now);
   if(abs(conf->seconds_from_1970 - now) > 10 * PERIOD)  // No plan to offset the reference time by 10 times of period
     {
+      printf("Now: %ld, Ref: %ld\n",now, conf->seconds_from_1970);
       log_add(conf->log_file, "ERR", 1,  "the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort.\n",__FILE__, __LINE__);
 
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
@@ -394,11 +396,12 @@ int initialize_capture(conf_t *conf)
   df_in_period = writebuf & 0x00000000ffffffff;
   seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
   writebuf = bswap_64(*(ptr + 2));
+  chan_index = (writebuf & 0x00000000ffff0000) >> 16;	// TODO: Instead of beam_index get channel_index
   beam_index = writebuf & 0x000000000000ffff;	// TODO: Instead of beam_index get channel_index
-  if(beam_index != conf->beam_index) // Check the beam index TODO: Instead of beam_index get channel_index
+  if(chan_index != conf->chan_index) // Check the beam index TODO: Instead of beam_index get channel_index
     {
-      log_add(conf->log_file, "ERR", 1,  "beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort", beam_index, conf->beam_index, __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: beam_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort\n", beam_index, conf->beam_index, __FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "chan_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort", chan_index, conf->chan_index, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: chan_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort\n", chan_index, conf->chan_index, __FILE__, __LINE__);
 
       free(dbuf);
       close(sock);
@@ -1187,14 +1190,14 @@ int examine_record_arguments(conf_t conf, char **argv, int argc)
     }
   log_add(conf.log_file, "INFO", 1,  "The command line is \"%s\"", command);
 	// Changed by Niclas
-  if((conf.chan_index<0) || (conf.chan_index>=NCHUNK_FULL_BEAM)) // More careful check later
-    {
-      fprintf(stderr, "CAPTURE_ERROR: The chan index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.chan_index, NCHUNK_FULL_BEAM - 1, __FILE__, __LINE__);
-      log_add(conf.log_file, "ERR", 1,  "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.", conf.chan_index, NCHUNK_FULL_BEAM - 1, __FILE__, __LINE__);
-
-      fclose(conf.log_file);
-      exit(EXIT_FAILURE);
-    }
+  // if((conf.chan_index<0) || (conf.chan_index>=NCHUNK_FULL_BEAM)) // More careful check later
+  //   {
+  //     fprintf(stderr, "CAPTURE_ERROR: The chan index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.\n", conf.chan_index, NCHUNK_FULL_BEAM - 1, __FILE__, __LINE__);
+  //     log_add(conf.log_file, "ERR", 1,  "The beam index is %d, which is not in range [0 %d), happens at \"%s\", line [%d], has to abort.", conf.chan_index, NCHUNK_FULL_BEAM - 1, __FILE__, __LINE__);
+  //
+  //     fclose(conf.log_file);
+  //     exit(EXIT_FAILURE);
+  //   }
   log_add(conf.log_file, "INFO", 1,  "We capture data with beam %d", conf.chan_index);
 
   log_add(conf.log_file, "INFO", 1,  "Hexadecimal shared memory key for capture is %x", conf.key); // Check it when create HDU

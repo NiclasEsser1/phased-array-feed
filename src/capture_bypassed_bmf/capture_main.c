@@ -30,13 +30,12 @@ void usage()
 	  " -i The CPU for buf control thread\n"
 	  " -j The setup for the capture control, the format of it is \"capturectrl_capturectrlcpu\"\n"
 	  " -k Bind thread to CPU or not\n"
-	  " -l The number of data frames in each buffer block of each frequency chunk\n"
-	  " -m The number of data frames in each temp buffer of each frequency chunk\n"
+	  " -l The number of data frames in each buffer block of each beam\n"
+	  " -m The number of data frames in each temp buffer of each beam\n"
 	  " -n The name of header template for PSRDADA\n"
 	  " -o The source information, which is required for the case without capture control, in the format \"name_ra_dec\" \n"
 	  " -p Force to pad band edge \n"
 	  " -q The index of channel \n" // Must be idnex of channel
-	  " -r Number of beams \n" // Must be idnex of channel
 	  );
 }
 

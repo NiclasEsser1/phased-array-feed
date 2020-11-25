@@ -16,3 +16,7 @@
 
 # Logs
 *.log
+
+# Executables
+core
+capture_main
