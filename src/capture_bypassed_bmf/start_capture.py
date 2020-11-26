@@ -55,6 +55,11 @@ def refinfo(ip, port):
     epoch_idx = (hdr_part & np.uint64(
         0x00000000fc000000)) >> np.uint64(26)
 
+    hdr_part = np.uint64(struct.unpack(
+        "<Q", struct.pack(">Q", data[2]))[0])
+    freq = (hdr_part & np.uint64(
+        0x00000000ffff0000)) >> np.uint64(16)
+
     for epoch in EPOCHS:
         if epoch[1] == epoch_idx:
             break
@@ -62,13 +67,13 @@ def refinfo(ip, port):
 
     sock.close()
 
-    return epoch_ref, int(sec_ref), int(idf_ref)
+    return epoch_ref, int(sec_ref), int(idf_ref), float(freq)
 
 def synced_refinfo(utc_start_capture, ip, port):
         # Capture one packet to see what is current epoch, seconds and idf
         # We need to do that because the seconds is not always matched with
         # estimated value
-        epoch_ref, sec_ref, idf_ref = refinfo(ip, port)
+        epoch_ref, sec_ref, idf_ref, freq = refinfo(ip, port)
 
         while utc_start_capture.unix > (epoch_ref * 86400.0 + sec_ref + PAF_PERIOD):
             sec_ref = sec_ref + PAF_PERIOD
@@ -78,13 +83,14 @@ def synced_refinfo(utc_start_capture, ip, port):
         idf_ref = (utc_start_capture.unix - epoch_ref *
                    86400.0 - sec_ref) / PAF_PERIOD
 
-        return epoch_ref, sec_ref, int(idf_ref)
+        return epoch_ref, sec_ref, int(idf_ref), freq
 
 
 
 _utc_start_capture = Time(Time.now(), format='isot', scale='utc')
 # epoch_ref, sec_ref, idf_ref = _synced_refinfo("10.17.1.1", 17100)
-epoch_ref, sec_ref, idf_ref = synced_refinfo(_utc_start_capture, "10.17.1.1", 17100)
-command = "./capture_main -a dada -b 0 -c 10.17.1.1_17100_9_9_3 -c 10.17.1.1_17101_9_9_4 -c 10.17.1.1_17102_9_9_5 -c 10.17.1.1_17103_9_9_6 -e 1337.0 -f "+str(epoch_ref)+"_"+str(sec_ref)+"_"+str(idf_ref)+" -g ../../log/numa1_pacifix1 -i 1 -j 0_2 -k 1 -l 1024 -m 128 -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q 1140"
-print(command)
+epoch_ref, sec_ref, idf_ref, freq = synced_refinfo(_utc_start_capture, "10.17.1.1", 17100)
+# print(epoch_ref, sec_ref, idf_ref, freq)
+command = "./capture_main -a dada -b 0 -c 10.17.1.1_17100_9_9_3 -c 10.17.1.1_17101_9_9_4 -c 10.17.1.1_17102_9_9_5 -c 10.17.1.1_17103_9_9_6 -e 1337.0 -f "+str(epoch_ref)+"_"+str(sec_ref)+"_"+str(idf_ref)+" -g ../../log/numa1_pacifix1 -i 1 -j 0_2 -k 1 -l 4096 -m 128 -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q "+str(freq)
+print("Executing: " + command)
 os.system(command)

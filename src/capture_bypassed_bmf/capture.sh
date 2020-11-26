@@ -5,11 +5,11 @@
 # sleep 2
 # # Creating dada buffer
  echo "Creating new dada buffer.."
- numactl -m 1 dada_db -k dada -l -p -b 266600448 -n 16
+ numactl -m 1 dada_db -k dada -l -p -b 1066401792 -n 32
 #
 # # Reading client
  echo "Connecting dada_dbdisk to dada buffer"
- dada_dbdisk -k dada -D /beegfsEDD/NESSER -W -d -s # Problem is here: No errors thrown, but data aren't written to a file. Also tested with -D /beegfsEDD/NESSER/test.dada which throws "No such file or directory"
+ dada_dbdisk -k dada -D /beegfsEDD/NESSER -W -d -s -t# Problem is here: No errors thrown, but data aren't written to a file. Also tested with -D /beegfsEDD/NESSER/test.dada which throws "No such file or directory"
 #
 # # Monitor
 # #echo "Conncetion dada_dbmonitor to dada buffer"

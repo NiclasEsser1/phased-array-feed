@@ -56,6 +56,8 @@ void *do_capture(void *conf)
   register uint64_t rbuf_ndf_per_chunk_tbuf = capture_conf->ndf_per_chunk_rbuf + capture_conf->ndf_per_chunk_tbuf;
   register int thread_index = capture_conf->thread_index;
 
+  int temp_write_cnt = 0;
+
   dbuf = (char *)malloc(NBYTE_CHAR * DFSZ);
   log_add(capture_conf->log_file, "INFO", 1,  "In funtion thread id = %ld, %d, %d", (long)pthread_self(), capture_conf->thread_index, thread_index);
 
@@ -105,7 +107,6 @@ void *do_capture(void *conf)
     writebuf = bswap_64(*(ptr + 2));
     freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
     beam_index = ((writebuf & 0x000000000000ffff));
-    printf("Beamidx: %d; df_in_period: %lu; seconds_from_epoch: %lu; freq: %lf; threadidx: %d\n", beam_index,df_in_period,seconds_from_epoch,freq,thread_index);
 
     pthread_mutex_lock(&ref_mutex[thread_index]);
     df_in_blk = (int64_t)(df_in_period - df_in_period_ref[thread_index]) + ((double)seconds_from_epoch - (double)seconds_from_epoch_ref[thread_index]) / time_res_df;
@@ -405,7 +406,6 @@ int initialize_capture(conf_t *conf)
   chan_index = (writebuf & 0x00000000ffff0000) >> 16;	// TODO: Instead of beam_index get channel_index
   beam_index = writebuf & 0x000000000000ffff;	// TODO: Instead of beam_index get channel_index
 
-  printf("Beamidx: %d; chan_index %d; df_in_period: %lu; seconds_from_epoch: %lu\n", beam_index,chan_index,df_in_period,seconds_from_epoch);
 
   if(chan_index != conf->chan_index) // Check the channel index TODO: Instead of beam_index get channel_index
     {
@@ -847,8 +847,8 @@ void *buf_control(void *conf)
   uint64_t ndf_blk_actual = 0, ndf_blk_expect = 0;
   double sleep_time = 0.5 * capture_conf->time_res_blk;
   unsigned int sleep_sec = (int)sleep_time;
-  useconds_t sleep_usec  = 1.0E6 * (sleep_time - sleep_sec);
-
+  useconds_t sleep_usec = 1.0E6 * (sleep_time - sleep_sec);
+  printf("\t\t Running [s]\tTotal loss[%%]\t Block loss[%%]\n"); // Pass the status to stdout
   while(!quit)
     {
       /*
@@ -862,7 +862,6 @@ void *buf_control(void *conf)
     	    //transited = transited && transit[i]; // all happen, take action
     	    transited = transited || transit[i]; // one happens, take action
     	}
-      printf("transited %d\n",transited);
       if(quit == 1)
     	{
     	  log_add(capture_conf->log_file, "INFO", 1,  "Quit just after the buffer transit state change");
@@ -903,7 +902,7 @@ void *buf_control(void *conf)
       log_add(capture_conf->log_file, "INFO", 1,  "%s starts from port %d, packet loss rate %d %f %E %E", capture_conf->ip_alive[0], capture_conf->port_alive[0], rbuf_nblk * capture_conf->time_res_blk, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
       log_add(capture_conf->log_file, "INFO", 1,  "Packets counters, %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"", ndf_actual, ndf_expect, ndf_blk_actual, ndf_blk_expect);
 
-      fprintf(stdout, "CAPTURE_STATUS: %f %E %E\n", rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect), fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)); // Pass the status to stdout
+      fprintf(stdout, "CAPTURE_STATUS: \t%.2f \t%.2E \t%.2E\n", rbuf_nblk * capture_conf->time_res_blk, fabs(1.0 - ndf_actual/(double)ndf_expect)*100, fabs(1.0 - ndf_blk_actual/(double)ndf_blk_expect)*100); // Pass the status to stdout
       fflush(stdout);
       log_add(capture_conf->log_file, "INFO", 1,  "After fflush stdout");
       log_add(capture_conf->log_file, "INFO", 1,  "Before mark filled");
