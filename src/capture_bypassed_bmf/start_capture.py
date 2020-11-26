@@ -85,6 +85,6 @@ def synced_refinfo(utc_start_capture, ip, port):
 _utc_start_capture = Time(Time.now(), format='isot', scale='utc')
 # epoch_ref, sec_ref, idf_ref = _synced_refinfo("10.17.1.1", 17100)
 epoch_ref, sec_ref, idf_ref = synced_refinfo(_utc_start_capture, "10.17.1.1", 17100)
-command = "./capture_main -a dada -b 0 -c 10.17.1.1_17100_9_9_3 -c 10.17.1.1_17101_9_9_3 -c 10.17.1.1_17102_9_9_3 -c 10.17.1.1_17103_9_9_3 -e 1337.0 -f "+str(epoch_ref)+"_"+str(sec_ref)+"_"+str(idf_ref)+" -g ../../log/numa1_pacifix1 -i 1 -j 0_2 -k 1 -l 16384 -m 128 -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q 1340"
+command = "./capture_main -a dada -b 0 -c 10.17.1.1_17100_9_9_3 -c 10.17.1.1_17101_9_9_4 -c 10.17.1.1_17102_9_9_5 -c 10.17.1.1_17103_9_9_6 -e 1337.0 -f "+str(epoch_ref)+"_"+str(sec_ref)+"_"+str(idf_ref)+" -g ../../log/numa1_pacifix1 -i 1 -j 0_2 -k 1 -l 1024 -m 128 -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q 1140"
 print(command)
 os.system(command)

@@ -13,7 +13,7 @@ OBS_ID       unset               # observation ID
 PRIMARY      BMF                 # primary node host name
 SECONDARY    PACIFIX1            # secondary node host name
 FILE_NAME    test.dada           # full path of the data file
-FILE_SIZE    17218142208          # Total byte size of file BUFFER_SIZE * 48
+FILE_SIZE    4265607168          # Total byte size of file BUFFER_SIZE * 48
 
 # time of the rising edge of the first time sample
 UTC_START    unset               # yyyy-mm-dd-hh:mm:ss, no fraction second

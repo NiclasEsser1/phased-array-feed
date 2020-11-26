@@ -87,21 +87,25 @@ void *do_capture(void *conf)
   do{
     if(recvfrom(sock, (void *)dbuf, DFSZ, 0, (struct sockaddr *)&fromsa, &fromlen) == -1)
       {
-		log_add(capture_conf->log_file, "ERR", 1,  "Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort",
-			    inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
-		fprintf(stderr,	"Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort.\n",
-			inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+    		log_add(capture_conf->log_file, "ERR", 1,  "Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort",
+    			    inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
+    		fprintf(stderr,	"Can not receive data from %s_%d, which happens at \"%s\", line [%d], has to abort.\n",
+    			inet_ntoa(sa.sin_addr), ntohs(sa.sin_port), __FILE__, __LINE__);
 
-		quit = 2;
-		close(sock);
-		free(dbuf);
-		pthread_exit(NULL);
+    		quit = 2;
+    		close(sock);
+    		free(dbuf);
+    		pthread_exit(NULL);
       }
 
     ptr = (uint64_t*)dbuf;
     writebuf = bswap_64(*ptr);
     df_in_period = writebuf & 0x00000000ffffffff;
     seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
+    writebuf = bswap_64(*(ptr + 2));
+    freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
+    beam_index = ((writebuf & 0x000000000000ffff));
+    printf("Beamidx: %d; df_in_period: %lu; seconds_from_epoch: %lu; freq: %lf; threadidx: %d\n", beam_index,df_in_period,seconds_from_epoch,freq,thread_index);
 
     pthread_mutex_lock(&ref_mutex[thread_index]);
     df_in_blk = (int64_t)(df_in_period - df_in_period_ref[thread_index]) + ((double)seconds_from_epoch - (double)seconds_from_epoch_ref[thread_index]) / time_res_df;
@@ -135,7 +139,7 @@ void *do_capture(void *conf)
       seconds_from_epoch = (writebuf & 0x3fffffff00000000) >> 32;
       writebuf = bswap_64(*(ptr + 2));
 			freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
-      beam_index = ((writebuf & 0x000000000000ffff) >> 16);
+      beam_index = (writebuf & 0x000000000000ffff);
 	  // TODO get beam_index
 
       //chunk_index = (int)((freq - capture_conf->center_freq + 0.5)/NCHAN_PER_CHUNK + capture_conf->nbeam/2);
@@ -143,57 +147,58 @@ void *do_capture(void *conf)
       //fprintf(stdout, "%f\t%d\n", freq, chunk_index);
 
       if (beam_index < 0 || beam_index >= capture_conf->nbeam)
-		{
-		  log_add(capture_conf->log_file, "ERR", 1,  "Beam is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", capture_conf->nbeam, __FILE__, __LINE__);
-		  fprintf(stderr, "CAPTURE_ERROR: Beam is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort.\n",
-			  capture_conf->nbeam, __FILE__, __LINE__);
+  		{
+  		  log_add(capture_conf->log_file, "ERR", 1,  "Beam is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort", capture_conf->nbeam, __FILE__, __LINE__);
+  		  fprintf(stderr, "CAPTURE_ERROR: Beam is outside the range [0 %d], which happens at \"%s\", line [%d], has to abort.\n",
+  			  capture_conf->nbeam, __FILE__, __LINE__);
 
-		  quit = 2;
-		  close(sock);
-		  free(dbuf);
-		  pthread_exit(NULL);
-		}
+  		  quit = 2;
+  		  close(sock);
+  		  free(dbuf);
+  		  pthread_exit(NULL);
+  		}
 
       pthread_mutex_lock(&ref_mutex[thread_index]);
       df_in_blk = (int64_t)(df_in_period - df_in_period_ref[thread_index]) + ((double)seconds_from_epoch - (double)seconds_from_epoch_ref[thread_index]) / time_res_df;
       pthread_mutex_unlock(&ref_mutex[thread_index]);
-
       if(df_in_blk>=0) // Only check the "current" packets
-	{
-	  if(df_in_blk < ndf_per_chunk_rbuf)  // packets belong to current ring buffer block
-	    {
-	      transit[thread_index] = 0;      // tell buffer control thread that current capture thread has updated reference time
-	      cbuf_loc = (uint64_t)((df_in_blk * nbeam + beam_index) * dfsz_keep);         // This is in TFTFP order
-	      memcpy(cbuf + cbuf_loc, dbuf + dfsz_seek, dfsz_keep);
+    	{
+        // printf("df_in_blk: %ld\n",df_in_blk);
+    	  if(df_in_blk < ndf_per_chunk_rbuf)  // packets belong to current ring buffer block
+    	    {
+    	      transit[thread_index] = 0;      // tell buffer control thread that current capture thread has updated reference time
+    	      cbuf_loc = (uint64_t)((df_in_blk * nbeam + beam_index) * dfsz_keep);         // This is in TAFTP order
+    	      memcpy(cbuf + cbuf_loc, dbuf + dfsz_seek, dfsz_keep);
 
-	      pthread_mutex_lock(&ndf_mutex[thread_index]);
-	      ndf[thread_index]++; // Packet counter
-	      pthread_mutex_unlock(&ndf_mutex[thread_index]);
-	    }
-	  else
-	    {
-	      //log_add(capture_conf->log_file, "INFO", 1,  "Cross the boundary");
+    	      pthread_mutex_lock(&ndf_mutex[thread_index]);
+    	      ndf[thread_index]++; // Packet counter
+    	      pthread_mutex_unlock(&ndf_mutex[thread_index]);
+            // printf("cbuf: %lu, thread %d,\n", cbuf_loc, thread_index);
+    	    }
+    	  else
+    	    {
+    	      //log_add(capture_conf->log_file, "INFO", 1,  "Cross the boundary");
 
-	      transit[thread_index] = 1; // tell buffer control thread that current capture thread is crossing the boundary
-	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf)
-		{
-		  tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nbeam + beam_index); // This is in TFTFP order
-		  tbuf_loc           = (uint64_t)(tail[thread_index] * (dfsz_keep + 1));
+    	      transit[thread_index] = 1; // tell buffer control thread that current capture thread is crossing the boundary
+    	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf)
+        		{
+        		  tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nbeam + beam_index); // This is in TFTFP order
+        		  tbuf_loc           = (uint64_t)(tail[thread_index] * (dfsz_keep + 1));
 
-		  tail[thread_index]++;  // have to ++, otherwise we will miss the last available data frame in tbuf;
+        		  tail[thread_index]++;  // have to ++, otherwise we will miss the last available data frame in tbuf;
 
-		  tbuf[tbuf_loc] = 'Y';
-		  memcpy(tbuf + tbuf_loc + 1, dbuf + dfsz_seek, dfsz_keep);
+        		  tbuf[tbuf_loc] = 'Y';
+        		  memcpy(tbuf + tbuf_loc + 1, dbuf + dfsz_seek, dfsz_keep);
 
-		  pthread_mutex_lock(&ndf_mutex[thread_index]);
-		  ndf[thread_index]++;
-		  pthread_mutex_unlock(&ndf_mutex[thread_index]);
-		}
+        		  pthread_mutex_lock(&ndf_mutex[thread_index]);
+        		  ndf[thread_index]++;
+        		  pthread_mutex_unlock(&ndf_mutex[thread_index]);
+        		}
 
-	    }
-	}
-      else
-	transit[thread_index] = 0;
+    	    }
+  	   }
+     else
+	    transit[thread_index] = 0;
     }
   log_add(capture_conf->log_file, "INFO", 1,  "DONE the capture thread, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
 
@@ -208,6 +213,7 @@ void *do_capture(void *conf)
 
 int initialize_capture(conf_t *conf)
 {
+  printf("Initializing...\n");
   int enable = 1;
   int i, sock, nblk_behind = 0;
   time_t seconds_from_1970;
@@ -329,14 +335,14 @@ int initialize_capture(conf_t *conf)
   if(conf->capture_ctrl)
     {
       if(ipcbuf_disable_sod(conf->data_block) < 0)
-	{
-	  log_add(conf->log_file, "ERR", 1,  "Can not write data before start, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    	{
+    	  log_add(conf->log_file, "ERR", 1,  "Can not write data before start, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+    	  fprintf(stderr, "CAPTURE_ERROR: Can not write data before start, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-	  destroy_capture(*conf);
-	  log_close(conf->log_file);
-	  exit(EXIT_FAILURE);
-	}
+    	  destroy_capture(*conf);
+    	  log_close(conf->log_file);
+    	  exit(EXIT_FAILURE);
+    	}
     }
   else  // For the case which enables the SOD at the beginning
     {
@@ -398,7 +404,10 @@ int initialize_capture(conf_t *conf)
   writebuf = bswap_64(*(ptr + 2));
   chan_index = (writebuf & 0x00000000ffff0000) >> 16;	// TODO: Instead of beam_index get channel_index
   beam_index = writebuf & 0x000000000000ffff;	// TODO: Instead of beam_index get channel_index
-  if(chan_index != conf->chan_index) // Check the beam index TODO: Instead of beam_index get channel_index
+
+  printf("Beamidx: %d; chan_index %d; df_in_period: %lu; seconds_from_epoch: %lu\n", beam_index,chan_index,df_in_period,seconds_from_epoch);
+
+  if(chan_index != conf->chan_index) // Check the channel index TODO: Instead of beam_index get channel_index
     {
       log_add(conf->log_file, "ERR", 1,  "chan_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort", chan_index, conf->chan_index, __FILE__, __LINE__);
       fprintf(stderr, "CAPTURE_ERROR: chan_index here is %d, but the input is %d, which happens at \"%s\", line [%d], has to abort\n", chan_index, conf->chan_index, __FILE__, __LINE__);
@@ -425,39 +434,43 @@ int initialize_capture(conf_t *conf)
     {
       nblk_behind = (int)floor(df_in_blk/(double)conf->ndf_per_chunk_rbuf);
       for(i = 0; i < nblk_behind; i++)
-	{
-	  cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
-	  if(cbuf == NULL)
-	    {
-	      log_add(conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	      fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    	{
+    	  cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
+    	  if(cbuf == NULL)
+    	    {
+    	      log_add(conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+    	      fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-	      free(dbuf);
-	      close(sock);
-	      destroy_capture(*conf);
-	      log_close(conf->log_file);
-	      exit(EXIT_FAILURE);
-	    }
+    	      free(dbuf);
+    	      close(sock);
+    	      destroy_capture(*conf);
+    	      log_close(conf->log_file);
+    	      exit(EXIT_FAILURE);
+    	    }
 
-	  if(ipcbuf_mark_filled(conf->data_block, conf->blksz_rbuf) < 0) // write nothing to it
-	    {
-	      log_add(conf->log_file, "ERR", 1,  "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	      fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    	  // if(ipcbuf_mark_filled(conf->data_block, conf->blksz_rbuf) < 0) // write nothing to it
+        // {
+        //   log_add(conf->log_file, "ERR", 1,  "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+        //   fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+        //
+        //   free(dbuf);
+        //   close(sock);
+        //   destroy_capture(*conf);
+        //   log_close(conf->log_file);
+        //   exit(EXIT_FAILURE);
+        // }
+        // // Added by Niclas
+        // else{
+        //   printf("ipcbuf_mark_filled\n");
+        // }
 
-	      free(dbuf);
-	      close(sock);
-	      destroy_capture(*conf);
-	      log_close(conf->log_file);
-	      exit(EXIT_FAILURE);
-	    }
-
-	  conf->df_in_period += conf->ndf_per_chunk_rbuf;
-	  if(conf->df_in_period >= NDF_PER_CHUNK_PER_PERIOD)
-	    {
-	      conf->seconds_from_epoch  += PERIOD;
-	      conf->df_in_period        -= NDF_PER_CHUNK_PER_PERIOD;
-	    }
-	}
+    	  conf->df_in_period += conf->ndf_per_chunk_rbuf;
+    	  if(conf->df_in_period >= NDF_PER_CHUNK_PER_PERIOD)
+    	    {
+    	      conf->seconds_from_epoch  += PERIOD;
+    	      conf->df_in_period        -= NDF_PER_CHUNK_PER_PERIOD;
+    	    }
+    	}
     }
   free(dbuf);
   close(sock);
@@ -481,7 +494,7 @@ int initialize_capture(conf_t *conf)
       seconds_from_epoch_ref[i] = conf->seconds_from_epoch;
       df_in_period_ref[i]       = conf->df_in_period;
     }
-
+  printf("Initialized...\n");
   return EXIT_SUCCESS;
 }
 
@@ -767,19 +780,21 @@ int threads(conf_t *conf)
       thread_conf[i].thread_index = i;
 
       if(!(conf->cpu_bind == 0))
-	{
-	  pthread_attr_init(&attr);
-	  CPU_ZERO(&cpus);
-	  CPU_SET(conf->capture_cpu[i], &cpus);
-	  pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-	  ret[i] = pthread_create(&thread[i], &attr, do_capture, (void *)&thread_conf[i]);
-	  pthread_attr_destroy(&attr);
-	}
+    	{
+    	  pthread_attr_init(&attr);
+    	  CPU_ZERO(&cpus);
+    	  CPU_SET(conf->capture_cpu[i], &cpus);
+    	  pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+    	  ret[i] = pthread_create(&thread[i], &attr, do_capture, (void *)&thread_conf[i]);
+    	  pthread_attr_destroy(&attr);
+    	}
       else
-	ret[i] = pthread_create(&thread[i], &attr, do_capture, (void *)&thread_conf[i]);
+	    {
+        ret[i] = pthread_create(&thread[i], &attr, do_capture, (void *)&thread_conf[i]);
+      }
     }
 
-  if(!(conf->cpu_bind == 0))
+    if(!(conf->cpu_bind == 0))
     {
       pthread_attr_init(&attr);
       CPU_ZERO(&cpus);
@@ -789,34 +804,38 @@ int threads(conf_t *conf)
       pthread_attr_destroy(&attr);
 
       if(conf->capture_ctrl)
-	{
-	  pthread_attr_init(&attr);
-	  CPU_ZERO(&cpus);
-	  CPU_SET(conf->capture_ctrl_cpu, &cpus);
-	  pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-	  ret[nport_alive + 1] = pthread_create(&thread[nport_alive + 1], &attr, capture_control, (void *)conf);
-	  pthread_attr_destroy(&attr);
-	}
+    	{
+    	  pthread_attr_init(&attr);
+    	  CPU_ZERO(&cpus);
+    	  CPU_SET(conf->capture_ctrl_cpu, &cpus);
+    	  pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+    	  ret[nport_alive + 1] = pthread_create(&thread[nport_alive + 1], &attr, capture_control, (void *)conf);
+    	  pthread_attr_destroy(&attr);
+    	}
     }
-  else
+    else
     {
       ret[nport_alive] = pthread_create(&thread[nport_alive], NULL, buf_control, (void *)conf);
       if(conf->capture_ctrl)
-	ret[nport_alive + 1] = pthread_create(&thread[nport_alive + 1], NULL, capture_control, (void *)conf);
+	    {
+        ret[nport_alive + 1] = pthread_create(&thread[nport_alive + 1], NULL, capture_control, (void *)conf);
+      }
     }
 
-  if (conf->capture_ctrl)
-    nthread = nport_alive + 2;
-  else
-    nthread = nport_alive + 1;
+    if (conf->capture_ctrl)
+      nthread = nport_alive + 2;
+    else
+      nthread = nport_alive + 1;
 
-  log_add(conf->log_file, "INFO", 1,  "Join threads? Before it");
-  for(i = 0; i < nthread; i++)   // Join threads and unbind cpus
-    pthread_join(thread[i], NULL);
+    log_add(conf->log_file, "INFO", 1,  "Join threads? Before it");
+    for(i = 0; i < nthread; i++)   // Join threads and unbind cpus
+    {
+      pthread_join(thread[i], NULL);
+      printf("Thread %d joined\n",i);
+    }
+    log_add(conf->log_file, "INFO", 1,  "Join threads? The last quit is %d", quit);
 
-  log_add(conf->log_file, "INFO", 1,  "Join threads? The last quit is %d", quit);
-
-  return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
 
 void *buf_control(void *conf)
@@ -837,25 +856,25 @@ void *buf_control(void *conf)
 	If all ports have packet arrive after current ring buffer block, start to change the block
       */
       while((!transited) && (!quit))
-	{
-	  transited = transit[0];
-	  for(i = 1; i < capture_conf->nport_alive; i++) // When all ports are on the transit status
-	    //transited = transited && transit[i]; // all happen, take action
-	    transited = transited || transit[i]; // one happens, take action
-	}
-
+    	{
+    	  transited = transit[0];
+    	  for(i = 1; i < capture_conf->nport_alive; i++) // When all ports are on the transit status
+    	    //transited = transited && transit[i]; // all happen, take action
+    	    transited = transited || transit[i]; // one happens, take action
+    	}
+      printf("transited %d\n",transited);
       if(quit == 1)
-	{
-	  log_add(capture_conf->log_file, "INFO", 1,  "Quit just after the buffer transit state change");
-	  pthread_exit(NULL);
-	}
+    	{
+    	  log_add(capture_conf->log_file, "INFO", 1,  "Quit just after the buffer transit state change");
+    	  pthread_exit(NULL);
+    	}
       if(quit == 2)
-	{
-	  log_add(capture_conf->log_file, "ERR", 1,  "Quit just after the buffer transit state change with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the buffer transit state change with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+    	{
+    	  log_add(capture_conf->log_file, "ERR", 1,  "Quit just after the buffer transit state change with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+    	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the buffer transit state change with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 
-	  pthread_exit(NULL);
-	}
+    	  pthread_exit(NULL);
+    	}
       log_add(capture_conf->log_file, "INFO", 1,  "Just after buffer transit state change");
 
       /* Check the traffic of previous buffer cycle */
@@ -863,20 +882,22 @@ void *buf_control(void *conf)
       ndf_blk_expect = 0;
       ndf_blk_actual = 0;
       for(i = 0; i < capture_conf->nport_alive; i++)
-	{
-	  pthread_mutex_lock(&ndf_mutex[i]);
-	  ndf_blk_actual += ndf[i];
-	  ndf[i] = 0;
-	  pthread_mutex_unlock(&ndf_mutex[i]);
-	}
+    	{
+    	  pthread_mutex_lock(&ndf_mutex[i]);
+    	  ndf_blk_actual += ndf[i];
+    	  ndf[i] = 0;
+    	  pthread_mutex_unlock(&ndf_mutex[i]);
+    	}
       ndf_actual += ndf_blk_actual;
       if(rbuf_nblk==1)
-	{
-	  for(i = 0; i < capture_conf->nport_alive; i++)
-	    ndf_blk_expect += (capture_conf->ndf_per_chunk_rbuf - ndf_advance[i]) * capture_conf->nbeam_alive_actual_on_port[i];
-	}
+    	{
+    	  for(i = 0; i < capture_conf->nport_alive; i++)
+    	    ndf_blk_expect += (capture_conf->ndf_per_chunk_rbuf - ndf_advance[i]) * capture_conf->nbeam_alive_actual_on_port[i];
+    	}
       else
-	ndf_blk_expect += capture_conf->ndf_per_chunk_rbuf * capture_conf->nbeam_alive; // Only for current buffer
+      {
+        ndf_blk_expect += capture_conf->ndf_per_chunk_rbuf * capture_conf->nbeam_alive; // Only for current buffer
+      }
       ndf_expect += ndf_blk_expect;
 
       log_add(capture_conf->log_file, "INFO", 1,  "%s starts from port %d, packet loss rate %d %f %E %E", capture_conf->ip_alive[0], capture_conf->port_alive[0], rbuf_nblk * capture_conf->time_res_blk, (1.0 - ndf_actual/(double)ndf_expect), (1.0 - ndf_blk_actual/(double)ndf_blk_expect));
@@ -889,13 +910,13 @@ void *buf_control(void *conf)
 
       /* Close current buffer */
       if(ipcbuf_mark_filled(capture_conf->data_block, capture_conf->blksz_rbuf) < 0)
-	{
-	  log_add(capture_conf->log_file, "ERR", 1,  "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    	{
+    	  log_add(capture_conf->log_file, "ERR", 1,  "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+    	  fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-	  quit = 2;
-	  pthread_exit(NULL);
-	}
+    	  quit = 2;
+    	  pthread_exit(NULL);
+    	}
       log_add(capture_conf->log_file, "INFO", 1,  "Mark filled done");
 
       /*
@@ -903,104 +924,106 @@ void *buf_control(void *conf)
 	If we have a reader, there will be at least one buffer which is not full
       */
       if(ipcbuf_get_nfull(capture_conf->data_block) >= (ipcbuf_get_nbufs(capture_conf->data_block) - 1))
-	{
-	  log_add(capture_conf->log_file, "ERR", 1,  "buffers are all full, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: buffers are all full, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    	{
+    	  log_add(capture_conf->log_file, "ERR", 1,  "buffers are all full, which happens at \"%s\", line [%d], has to abort.", __FILE__, __LINE__);
+    	  fprintf(stderr, "CAPTURE_ERROR: buffers are all full, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-	  quit = 2;
-	  pthread_exit(NULL);
-	}
+    	  quit = 2;
+    	  pthread_exit(NULL);
+    	}
       log_add(capture_conf->log_file, "INFO", 1,  "Available buffer block check done");
 
       /* Get new buffer block */
       cbuf = ipcbuf_get_next_write(capture_conf->data_block);
       log_add(capture_conf->log_file, "INFO", 1,  "Get next write done");
       if(cbuf == NULL)
-	{
-	  log_add(capture_conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    	{
+    	  log_add(capture_conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+    	  fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-	  quit = 2;
-	  pthread_exit(NULL);
-	}
+    	  quit = 2;
+    	  pthread_exit(NULL);
+    	}
 
       /* Update reference point */
       for(i = 0; i < capture_conf->nport_alive; i++)
-	{
-	  // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block or be dropped;
-	  // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
+    	{
+    	  // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block or be dropped;
+    	  // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
 
-	  pthread_mutex_lock(&ref_mutex[i]);
-	  log_add(capture_conf->log_file, "INFO", 1,  "Start to change the reference information %"PRIu64" %"PRIu64"", seconds_from_epoch_ref[i], df_in_period_ref[i]);
-	  df_in_period_ref[i] += capture_conf->ndf_per_chunk_rbuf;
-	  if(df_in_period_ref[i] >= NDF_PER_CHUNK_PER_PERIOD)
-	    {
-	      seconds_from_epoch_ref[i]  += PERIOD;
-	      df_in_period_ref[i] -= NDF_PER_CHUNK_PER_PERIOD;
-	    }
-	  log_add(capture_conf->log_file, "INFO", 1,  "Finish the change of reference information %"PRIu64" %"PRIu64"", seconds_from_epoch_ref[i], df_in_period_ref[i]);
-	  pthread_mutex_unlock(&ref_mutex[i]);
-	}
+    	  pthread_mutex_lock(&ref_mutex[i]);
+    	  log_add(capture_conf->log_file, "INFO", 1,  "Start to change the reference information %"PRIu64" %"PRIu64"", seconds_from_epoch_ref[i], df_in_period_ref[i]);
+    	  df_in_period_ref[i] += capture_conf->ndf_per_chunk_rbuf;
+    	  if(df_in_period_ref[i] >= NDF_PER_CHUNK_PER_PERIOD)
+    	    {
+    	      seconds_from_epoch_ref[i]  += PERIOD;
+    	      df_in_period_ref[i] -= NDF_PER_CHUNK_PER_PERIOD;
+    	    }
+    	  log_add(capture_conf->log_file, "INFO", 1,  "Finish the change of reference information %"PRIu64" %"PRIu64"", seconds_from_epoch_ref[i], df_in_period_ref[i]);
+    	  pthread_mutex_unlock(&ref_mutex[i]);
+    	}
 
       /* To see if we need to copy data from temp buffer into ring buffer */
       log_add(capture_conf->log_file, "INFO", 1,  "Just before the second transit state change");
       while(transited && (!quit))
-	{
-	  transited = transit[0];
-	  for(i = 1; i < capture_conf->nport_alive; i++)
-	    //transited = transited || transit[i]; // all happen, take action
-	    transited = transited && transit[i]; // one happens, take action
-	}
+    	{
+    	  transited = transit[0];
+    	  for(i = 1; i < capture_conf->nport_alive; i++)
+    	    //transited = transited || transit[i]; // all happen, take action
+    	    transited = transited && transit[i]; // one happens, take action
+    	}
       if(quit == 1)
-	{
-	  log_add(capture_conf->log_file, "INFO", 1,  "Quit just after the second transit state change");
-	  pthread_exit(NULL);
-	}
+    	{
+    	  log_add(capture_conf->log_file, "INFO", 1,  "Quit just after the second transit state change");
+    	  pthread_exit(NULL);
+    	}
       if(quit == 2)
-	{
-	  log_add(capture_conf->log_file, "ERR", 1,  "Quit just after the second transit state change with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
-	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the second transit state change with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  pthread_exit(NULL);
-	}
+    	{
+    	  log_add(capture_conf->log_file, "ERR", 1,  "Quit just after the second transit state change with error, which happens at \"%s\", line [%d]", __FILE__, __LINE__);
+    	  fprintf(stderr, "CAPTURE_ERROR: Quit with ERROR just after the second transit state change with error, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+    	  pthread_exit(NULL);
+    	}
 
       ntail = 0;
       for(i = 0; i < capture_conf->nport_alive; i++)
-	ntail = (tail[i] > ntail) ? tail[i] : ntail;
-
+      {
+         ntail = (tail[i] > ntail) ? tail[i] : ntail;
+      }
       log_add(capture_conf->log_file, "INFO", 1,  "The location of the last packet in temp buffer is %"PRIu64"", ntail);
       for(i = 0; i < ntail; i++)
-	{
-	  tbuf_loc = (uint64_t)(i * (capture_conf->dfsz_keep + 1));
-	  if(tbuf[tbuf_loc] == 'Y')
-	    {
-	      cbuf_loc = (uint64_t)(i * capture_conf->dfsz_keep);  // This is for the TFTFP order temp buffer copy;
-	      memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, capture_conf->dfsz_keep);
-	      tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
-	      // If we do not do that, we may have too many data frames to copy later
-	    }
-	}
+    	{
+    	  tbuf_loc = (uint64_t)(i * (capture_conf->dfsz_keep + 1));
+    	  if(tbuf[tbuf_loc] == 'Y')
+  	    {
+  	      cbuf_loc = (uint64_t)(i * capture_conf->dfsz_keep);  // This is for the TFTFP order temp buffer copy;
+  	      memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, capture_conf->dfsz_keep);
+  	      tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
+  	      // If we do not do that, we may have too many data frames to copy later
+  	    }
+    	}
       for(i = 0; i < capture_conf->nport_alive; i++)
-	tail[i] = 0;  // Reset the location of tbuf;
-
+      {
+        tail[i] = 0;  // Reset the location of tbuf;
+      }
       sleep(sleep_sec);
       usleep(sleep_usec);
     }
 
   /* Exit */
-  if(ipcbuf_mark_filled(capture_conf->data_block, capture_conf->blksz_rbuf) < 0)
-    {
-      log_add(capture_conf->log_file, "ERR", 1,  "ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+    if(ipcbuf_mark_filled(capture_conf->data_block, capture_conf->blksz_rbuf) < 0)
+      {
+        log_add(capture_conf->log_file, "ERR", 1,  "ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+        fprintf(stderr, "CAPTURE_ERROR: ipcio_close_block failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-      quit = 2;
-      pthread_exit(NULL);
-    }
+        quit = 2;
+        pthread_exit(NULL);
+      }
 
-  if (quit == 0)
-    quit = 1;
+    if (quit == 0)
+      quit = 1;
 
-  log_add(capture_conf->log_file, "INFO", 1,  "Normale quit of buffer control thread");
-  pthread_exit(NULL);
+    log_add(capture_conf->log_file, "INFO", 1,  "Normale quit of buffer control thread");
+    pthread_exit(NULL);
 }
 
 
