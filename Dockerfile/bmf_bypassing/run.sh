@@ -23,4 +23,4 @@ docker run --name="$DOCKERNAME" --rm \
         -e NVIDIA_VISIBLE_DEVICES=0 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --cap-add=SYS_PTRACE \
-        -it $DOCKERIMAGE /bin/bash -ic "bash;cd phased-array-feed/;git pull;python phased-array-feed/scripts/start_bypassed_capture.py -k $DADA_KEY -nid $NODEID -ip $IPADDRESS -p $PACKETS"
+        -it $DOCKERIMAGE /bin/bash -ic "cd phased-array-feed/;git pull;script/start_bypassed_capture.py -k $DADA_KEY -nid $NODEID -ip $IPADDRESS -p $PACKETS;bash;"
