@@ -93,7 +93,7 @@ def synced_refinfo(utc_start_capture, ip, port):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='options', formatter_class=RawTextHelpFormatter)
     # parser.add_argument('--key', '-k', action = "store", default ="dada", dest = "key", help = "Shared memory key")
-    parser.add_argument('--node_id', '-nid', action = "store", default =0, dest = "nodeid", help = "ID of the numa node")
+    parser.add_argument('--node_id', '-i', action = "store", default =0, dest = "nodeid", help = "ID of the numa node")
     # parser.add_argument('--time_ref', '-ref', action = "store", dest = "time_ref", help = "Time reference string epoch_seconds_dataframe")
     # parser.add_argument('--ip_addr', '-ip', action = "store", dest = "ip_addr", help = "Ip address")
     # parser.add_argument('--freq', '-f', action = "store", dest = "freq", help = "Base frequency of channel group")
@@ -111,28 +111,30 @@ if __name__ == "__main__":
     # ip_addr = parser.parse_args().ip_addr
 
     print(nodeid)
-    # block_size = packets*36*PAF_DF_PACKETSZ
-    # nof_blocks = 8
-    # disk_folder = "/beegfsEDD/NESSER"
-    # # print(block_size)
-    # # print("numactl -m "+str(nodeid)+" dada_db -k "+key+" -l -p -b "+str(block_size)+" -n "+str(nof_blocks))
-    # os.system("dada_db -k "+key+" -d")
-    # os.system("numactl -m "+str(nodeid)+" dada_db -k "+key+" -l -p -b "+str(block_size)+" -n "+str(nof_blocks))
-    # os.system("numactl -m 0 dada_dbdisk -k "+key+" -D "+disk_folder+" -W -d -s")
-    #
-    # _utc_start_capture = Time(Time.now(), format='isot', scale='utc')
-    # epoch_ref, sec_ref, idf_ref, freq = synced_refinfo(_utc_start_capture, ip_addr, 17100)
-    # time_ref = str(epoch_ref)+"_"+str(sec_ref)+"_"+str(idf_ref)
-    #
-    # if nodeid == 0:
-    #     capture_conf = "-c 10.17.1.1_17100_9_9_2 -c 10.17.1.1_17101_9_9_3 -c 10.17.1.1_17102_9_9_4 -c 10.17.1.1_17103_9_9_5"
-    #     capture_ctrl_cpu = "0_1"
-    #     buffer_ctrl_cpu = "0"
-    # else:
-    #     capture_conf = "-c 10.17.1.2_17100_9_9_12 -c 10.17.1.2_17101_9_9_13 -c 10.17.1.2_17102_9_9_14 -c 10.17.1.2_17103_9_9_15"
-    #     capture_ctrl_cpu = "0_11"
-    #     buffer_ctrl_cpu = "10"
-    #
-    # cmd = "numactl -m "+str(nodeid)+" /home/pulsar/nesser/Projects/phased-array-feed/src/capture_bypassed_bmf/capture_main " + "-a "+key+" -b 0 "+capture_conf+" -e 1337.0 -f "+time_ref+" -g ../../log/numa1_pacifix1 -i "+str(buffer_ctrl_cpu)+" -j "+str(capture_ctrl_cpu)+" -k 1 -l "+str(packets)+" -m "+str(temp_packets)+" -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q "+str(freq)
-    # print(cmd)
+    block_size = 16384*36*PAF_DF_PACKETSZ
+    nof_blocks = 8
+    disk_folder = "/beegfsEDD/NESSER"
+    key = "dada"
+    temp_packets = 128
+    # print(block_size)
+    # print("numactl -m "+str(nodeid)+" dada_db -k "+key+" -l -p -b "+str(block_size)+" -n "+str(nof_blocks))
+    os.system("dada_db -k "+key+" -d")
+    os.system("numactl -m "+str(nodeid)+" dada_db -k "+key+" -l -p -b "+str(block_size)+" -n "+str(nof_blocks))
+    os.system("numactl -m 0 dada_dbdisk -k "+key+" -D "+disk_folder+" -W -d -s")
+
+    _utc_start_capture = Time(Time.now(), format='isot', scale='utc')
+    epoch_ref, sec_ref, idf_ref, freq = synced_refinfo(_utc_start_capture, ip_addr, 17100)
+    time_ref = str(epoch_ref)+"_"+str(sec_ref)+"_"+str(idf_ref)
+
+    if nodeid == 0:
+        capture_conf = "-c 10.17.1.1_17100_9_9_2 -c 10.17.1.1_17101_9_9_3 -c 10.17.1.1_17102_9_9_4 -c 10.17.1.1_17103_9_9_5"
+        capture_ctrl_cpu = "0_1"
+        buffer_ctrl_cpu = "0"
+    else:
+        capture_conf = "-c 10.17.1.2_17100_9_9_12 -c 10.17.1.2_17101_9_9_13 -c 10.17.1.2_17102_9_9_14 -c 10.17.1.2_17103_9_9_15"
+        capture_ctrl_cpu = "0_11"
+        buffer_ctrl_cpu = "10"
+
+    cmd = "numactl -m "+str(nodeid)+" /home/pulsar/nesser/Projects/phased-array-feed/src/capture_bypassed_bmf/capture_main " + "-a "+key+" -b 0 "+capture_conf+" -e 1337.0 -f "+time_ref+" -g ../../log/numa1_pacifix1 -i "+str(buffer_ctrl_cpu)+" -j "+str(capture_ctrl_cpu)+" -k 1 -l "+str(packets)+" -m "+str(temp_packets)+" -n header_dada.txt -o UNKOWN_00:00:00.00_00:00:00.00 -p 0 -q "+str(freq)
+    print(cmd)
     # p = subprocess.Popen(cmd, shell=True)#, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
