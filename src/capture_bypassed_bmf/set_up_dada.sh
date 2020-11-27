@@ -1,19 +1,31 @@
-
+STARTTIME=$(date +%s)
+#command block that takes time to complete...
+#........
 # Make sure that no dada buffers with the same key are alive. Destroy them if necessary...
  echo "Destroying existing dada buffer.."
  dada_db -k dada -d;
+
+ echo "Destroying existing dada buffer.."
+ dada_db -k dadc -d;
 # sleep 2
 # # Creating dada buffer
- echo "Creating new dada buffer.."
- numactl -m 1 dada_db -k dada -l -p -b 1066401792 -n 32
-#
-# # Reading client
+ echo "Creating new dada buffer numa node 0.."
+ numactl -m 0 dada_db -k dada -l -p -b 4265607168 -n 4
  echo "Connecting dada_dbdisk to dada buffer"
- dada_dbdisk -k dada -D /beegfsEDD/NESSER -W -d -s -t# Problem is here: No errors thrown, but data aren't written to a file. Also tested with -D /beegfsEDD/NESSER/test.dada which throws "No such file or directory"
+ numactl -m 0 dada_dbdisk -k dada -D /beegfsEDD/NESSER -W -d -s
+
+
+ echo "Creating new dada buffer numa node 1.."
+ numactl -m 1 dada_db -k dadc -l -p -b 4265607168 -n 4
+ echo "Connecting dada_dbdisk to dada buffer"
+ numactl -m 1 dada_dbdisk -k dadc -D /beegfsEDD/NESSER -W -d -s
+ ENDTIME=$(date +%s)
+ echo "It took $(($ENDTIME - $STARTTIME)) to setup up dada buffers..."
+
 #
 # # Monitor
 # #echo "Conncetion dada_dbmonitor to dada buffer"
-dada_dbmonitor -k dada -d -v
+# dada_dbmonitor -k dada -d -v
 # #sleep 2
 # # Writing client for UDP capturing
 
