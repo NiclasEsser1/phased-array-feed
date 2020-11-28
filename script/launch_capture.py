@@ -11,8 +11,8 @@ if __name__ == "__main__":
 
     disk="/beegfsEDD/NESSER"
     dockerimage="edd01:5000/capture_bypassed_bmf"
-    dockername="niclas_numa_"+parser.parse_args().nid
-
+    dockername="capture_bypassed_bmf_numa_"+parser.parse_args().nid
+    print()
     cmd = "docker run --name="+dockername+" --rm \
         --privileged=true \
         --ipc=shareable \
@@ -26,15 +26,18 @@ if __name__ == "__main__":
         -e NVIDIA_VISIBLE_DEVICES=0 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --cap-add=SYS_PTRACE \
-        -it "+dockerimage+" /bin/bash -ic 'cd phased-array-feed/;git pull;python script/start_bypassed_capture.py -i "+parser.parse_args().nid+";bash'"
+        -it "+dockerimage+" /bin/bash -ic 'cd phased-array-feed/;git pull; bash'"
 
 
     pty, tty = pty.openpty()
     print(cmd)
 
-    p1 = subprocess.Popen(cmd, shell=True,stdin=tty, stdout=tty, stderr=tty)
+    # p1 = subprocess.Popen(cmd, shell=True)#,stdin=tty, stdout=tty, stderr=tty)
+    print("Entering docker " + dockername)
+    os.system(cmd)
+    print("dockername)
+    # raw_input("Press key to stop...")
+    # time.sleep(20)
 
-    raw_input("Press key to stop...")
-
-    os.system("docker container stop "+dockername)
-    print("container stopped")
+    # os.system("docker container stop "+dockername)
+    # print("container stopped")
