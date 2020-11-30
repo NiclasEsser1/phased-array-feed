@@ -24,7 +24,7 @@ if __name__ == "__main__":
     with open(cmd_file) as f:
         cmd_list = f.read().splitlines()
     f.close()
-    os.remove(cmd_file)
+    # os.remove(cmd_file)
     capture_main_cmd = "docker exec -it "+dockername+" "+cmd_list[3]
     print(capture_main_cmd)
     # os.remove(cmd_file)
