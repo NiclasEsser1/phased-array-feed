@@ -19,4 +19,5 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
   pip install --no-cache-dir -r python_requirements.txt
 
 RUN git clone https://github.com/NiclasEsser1/phased-array-feed.git && \
-  cd phased-array-feed && git checkout bmf_bypassing
+  cd phased-array-feed && git checkout bmf_bypassing \
+  && cd src/capture_bypassed_bmf/ && make
