@@ -888,7 +888,7 @@ void *buf_control(void *conf)
     	  pthread_mutex_unlock(&ndf_mutex[i]);
     	}
       ndf_actual += ndf_blk_actual;
-      if(ndf_actual >= capture_conf.total_data_frames && capture_conf.total_data_frames >= 0)
+      if(ndf_actual >= capture_conf->total_data_frames && capture_conf->total_data_frames >= 0)
       {
         log_add(capture_conf->log_file, "INFO", 1,  "All data collected \"%s\", line [%d], program gets ended.", __FILE__, __LINE__);
         fprintf(stderr, "CAPTURE_ERROR: All data collected \"%s\", line [%d], program gets ended.\n", __FILE__, __LINE__);
