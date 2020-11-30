@@ -37,13 +37,12 @@ if __name__ == "__main__":
         --ulimit memlock=-1:-1 \
         --net=host \
         -v "+DISK+":"+DISK+" \
-        -v /h:"+DISK+" \
         -e DISPLAY \
         -e USER=root \
         --runtime=nvidia \
         -e NVIDIA_VISIBLE_DEVICES=0 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --cap-add=SYS_PTRACE \
-        -it "+DOCKERIMAGE+" /bin/bash -ic 'cd /phased-array-feed/;git pull;cd /phased-array-feed/src/capture_bypassed_bmf/;make"+remove_dada_cmd+";"+setup_dada_cmd+";"+setup_dada_disk_cmd+";bash'"
+        -it "+DOCKERIMAGE+" /bin/bash -ic 'cd /phased-array-feed/;git pull;"+remove_dada_cmd+";"+setup_dada_cmd+";"+setup_dada_disk_cmd+";bash'"
     print(docker_cmd)
     os.system(docker_cmd)
