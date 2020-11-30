@@ -56,6 +56,8 @@ typedef struct conf_t
   char utc_start[MSTR_LEN];
   double mjd_start;
 
+  int total_data_frames;
+
   struct timeval tout;
 }conf_t;
 

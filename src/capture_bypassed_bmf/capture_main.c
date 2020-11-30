@@ -35,7 +35,8 @@ void usage()
 	  " -n The name of header template for PSRDADA\n"
 	  " -o The source information, which is required for the case without capture control, in the format \"name_ra_dec\" \n"
 	  " -p Force to pad band edge \n"
-	  " -q The index of channel \n" // Must be idnex of channel
+    " -q The index of channel \n" // Must be idnex of channel
+	  " -r Number of chunks to receive \n" // Must be idnex of channel
 	  );
 }
 
@@ -50,7 +51,7 @@ int main(int argc, char **argv)
   default_arguments(&conf);
 
   /* read in argument from command line */
-  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:m:n:o:p:q:r:")) != -1)
     {
       switch(arg)
 	{
@@ -130,6 +131,9 @@ int main(int argc, char **argv)
 	  // Changed by Niclas
 	case 'q':
 	  sscanf(optarg, "%d", &conf.chan_index);
+	  break;
+  case 'r':
+	  sscanf(optarg, "%d", &conf.total_data_frames);
 	  break;
 	}
     }
