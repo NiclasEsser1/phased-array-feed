@@ -435,18 +435,18 @@ int initialize_capture(conf_t *conf)
       nblk_behind = (int)floor(df_in_blk/(double)conf->ndf_per_chunk_rbuf);
       for(i = 0; i < nblk_behind; i++)
     	{
-    	  cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
-    	  if(cbuf == NULL)
-    	    {
-    	      log_add(conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-    	      fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-
-    	      free(dbuf);
-    	      close(sock);
-    	      destroy_capture(*conf);
-    	      log_close(conf->log_file);
-    	      exit(EXIT_FAILURE);
-    	    }
+    	  // cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
+    	  // if(cbuf == NULL)
+    	  //   {
+    	  //     log_add(conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+    	  //     fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+        //
+    	  //     free(dbuf);
+    	  //     close(sock);
+    	  //     destroy_capture(*conf);
+    	  //     log_close(conf->log_file);
+    	  //     exit(EXIT_FAILURE);
+    	  //   }
 
     	  // if(ipcbuf_mark_filled(conf->data_block, conf->blksz_rbuf) < 0) // write nothing to it
         // {
