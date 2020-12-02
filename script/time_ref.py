@@ -43,8 +43,11 @@ def refinfo(ip, port):
     sock.settimeout(1)
     server_address = (ip, port)
     sock.bind(server_address)
-
-    nbyte, address = sock.recvfrom_into(data, PAF_DF_PACKETSZ)
+    try:
+        nbyte, address = sock.recvfrom_into(data, PAF_DF_PACKETSZ)
+    except socket.timeout, e:
+        print("timeout " + e)
+        sys.exit(1)
     data = np.fromstring(str(data), dtype='uint64')
 
     hdr_part = np.uint64(struct.unpack(
