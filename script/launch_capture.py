@@ -8,16 +8,18 @@ from argparse import RawTextHelpFormatter
 from subprocess import Popen, PIPE
 
 
-DOCKERIMAGE = "edd01:5000/capture_bypassed_bmf_2"
+# DOCKERIMAGE = "edd01:5000/capture_bypassed_bmf_2"
 DISK = "/beegfsEDD/NESSER"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Launch container for PAF pipeline development')
     parser.add_argument('-n', '--numa_name', action="store", dest="name", help='The ID of NUMA node')
     parser.add_argument('-c', '--cmd_file', action="store", dest="cmd_file", help='The ID of NUMA node')
+    parser.add_argument('-d', '--docker_image', action="store", dest="dockerimage", help='The ID of NUMA node')
 
     dockername = parser.parse_args().name
     cmd_file = parser.parse_args().cmd_file
+    dockerimage = parser.parse_args().dockerimage
     with open(cmd_file) as f:
         cmd_list = f.read().splitlines()
     #
@@ -43,6 +45,6 @@ if __name__ == "__main__":
         -e NVIDIA_VISIBLE_DEVICES=0 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --cap-add=SYS_PTRACE \
-        -it "+DOCKERIMAGE+" /bin/bash -ic 'cd /phased-array-feed/;git pull;cd /phased-array-feed/src/capture_bypassed_bmf/;make;"+remove_dada_cmd+";"+setup_dada_cmd+";"+setup_dada_disk_cmd+";bash'"
+        -it "+dockerimage+" /bin/bash -ic 'cd /phased-array-feed/;git pull;cd /phased-array-feed/src/capture_bypassed_bmf/;make;"+remove_dada_cmd+";"+setup_dada_cmd+";"+setup_dada_disk_cmd+";bash'"
     print(docker_cmd)
     os.system(docker_cmd)

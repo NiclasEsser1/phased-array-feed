@@ -7,8 +7,6 @@ import socket
 from argparse import RawTextHelpFormatter
 from subprocess import Popen, PIPE
 
-
-DOCKERIMAGE = "edd01:5000/capture_bypassed_bmf_2"
 DISK = "/beegfsEDD/NESSER"
 CONF_DIR="/phased-array-feed/config/"
 
