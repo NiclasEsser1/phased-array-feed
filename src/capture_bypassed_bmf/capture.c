@@ -459,10 +459,6 @@ int initialize_capture(conf_t *conf)
         //   log_close(conf->log_file);
         //   exit(EXIT_FAILURE);
         // }
-        // // Added by Niclas
-        // else{
-        //   printf("ipcbuf_mark_filled\n");
-        // }
 
     	  conf->df_in_period += conf->ndf_per_chunk_rbuf;
     	  if(conf->df_in_period >= NDF_PER_CHUNK_PER_PERIOD)
