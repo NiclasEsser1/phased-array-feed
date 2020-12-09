@@ -42,7 +42,7 @@ typedef struct conf_t
 
   char obs_id[MSTR_LEN];
 
-  char dir[MSTR_LEN], dada_header_template[MSTR_LEN];
+  char dir[MSTR_LEN], dada_header_template[MSTR_LEN], fname_log;
   char source[MSTR_LEN], ra[MSTR_LEN], dec[MSTR_LEN];
 
   double center_freq, freq_res, bandwidth;

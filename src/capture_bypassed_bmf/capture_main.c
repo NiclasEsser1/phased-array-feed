@@ -36,6 +36,7 @@ void usage()
 	  " -o The source information, which is required for the case without capture control, in the format \"name_ra_dec\" \n"
 	  " -p Force to pad band edge \n"
     " -q The index of channel \n" // Must be idnex of channel
+    " -r Number of chunks to receive \n" // Must be idnex of channel
 	  " -r Number of chunks to receive \n" // Must be idnex of channel
 	  );
 }
@@ -136,7 +137,7 @@ int main(int argc, char **argv)
 	  sscanf(optarg, "%d", &conf.total_data_frames);
 	  break;
   case 's':
-	  sscanf(optarg, "%s", fname_log);
+	  sscanf(optarg, "%s", conf.fname_log);
 	  break;
 	}
     }
@@ -150,11 +151,8 @@ int main(int argc, char **argv)
       fprintf(stderr, "CAPTURE_ERROR: Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
-  if(fname_log[0]=='\0')
-    sprintf(fname_log, "%s/capture.log", conf.dir);  // Open the log file
-  else
-    strcat(fname_log, conf.dir);  // Open the log file
-  printf("%s", fname_log);
+  sprintf(fname_log, "%s/%s", conf.dir, conf.fname_log);  // Open the log file
+  printf("%s\n", fname_log);
   conf.log_file = log_open(fname_log, "ab+");
   if(conf.log_file == NULL)
     {
