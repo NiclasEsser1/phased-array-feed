@@ -22,15 +22,11 @@ if __name__ == "__main__":
     dockerimage = parser.parse_args().dockerimage
     with open(cmd_file) as f:
         cmd_list = f.read().splitlines()
-    #
+
     remove_dada_cmd = cmd_list[0]
     setup_dada_cmd = cmd_list[1]
     setup_dada_disk_cmd = cmd_list[2]
-    print(remove_dada_cmd)
-    print(setup_dada_cmd)
-    print(setup_dada_disk_cmd)
     f.close()
-    # os.remove(cmd_file)
 
     docker_cmd = "docker run --name="+dockername+" --rm \
         --privileged=true \
@@ -46,5 +42,4 @@ if __name__ == "__main__":
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --cap-add=SYS_PTRACE \
         -it "+dockerimage+" /bin/bash -ic 'cd /phased-array-feed/;git pull;cd /phased-array-feed/src/capture_bypassed_bmf/;make;"+remove_dada_cmd+";"+setup_dada_cmd+";"+setup_dada_disk_cmd+";bash'"
-    print(docker_cmd)
     os.system(docker_cmd)

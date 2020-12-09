@@ -33,6 +33,7 @@ uint64_t seconds_from_epoch_ref[NPORT_MAX];
 
 pthread_mutex_t ref_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutex_t ndf_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
+pthread_mutex_t tail_mutex[NPORT_MAX] = {PTHREAD_MUTEX_INITIALIZER};
 
 void *do_capture(void *conf)
 {
@@ -57,6 +58,8 @@ void *do_capture(void *conf)
   register int thread_index = capture_conf->thread_index;
 
   int temp_write_cnt = 0;
+
+  transit[thread_index] = 0;
 
   dbuf = (char *)malloc(NBYTE_CHAR * DFSZ);
   log_add(capture_conf->log_file, "INFO", 1,  "In funtion thread id = %ld, %d, %d", (long)pthread_self(), capture_conf->thread_index, thread_index);
@@ -141,7 +144,6 @@ void *do_capture(void *conf)
       writebuf = bswap_64(*(ptr + 2));
 			freq     = (double)((writebuf & 0x00000000ffff0000) >> 16);
       beam_index = (writebuf & 0x000000000000ffff);
-	  // TODO get beam_index
 
       //chunk_index = (int)((freq - capture_conf->center_freq + 0.5)/NCHAN_PER_CHUNK + capture_conf->nbeam/2);
       // chunk_index = (int)(freq/NCHAN_PER_CHUNK + chunk_index0);
@@ -183,10 +185,11 @@ void *do_capture(void *conf)
     	      transit[thread_index] = 1; // tell buffer control thread that current capture thread is crossing the boundary
     	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf)
         		{
-        		  tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nbeam + beam_index); // This is in TFTFP order
+        		  pthread_mutex_lock(&tail_mutex[thread_index]);
+        		  tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nbeam + beam_index); // This is in TATFP order
         		  tbuf_loc           = (uint64_t)(tail[thread_index] * (dfsz_keep + 1));
-
         		  tail[thread_index]++;  // have to ++, otherwise we will miss the last available data frame in tbuf;
+        		  pthread_mutex_lock(&tail_mutex[thread_index]);
 
         		  tbuf[tbuf_loc] = 'Y';
         		  memcpy(tbuf + tbuf_loc + 1, dbuf + dfsz_seek, dfsz_keep);
@@ -991,7 +994,9 @@ void *buf_control(void *conf)
       ntail = 0;
       for(i = 0; i < capture_conf->nport_alive; i++)
       {
+         pthread_mutex_lock(&tail_mutex[[i])
          ntail = (tail[i] > ntail) ? tail[i] : ntail;
+         pthread_mutex_unlock(&tail_mutex[[i])
       }
       log_add(capture_conf->log_file, "INFO", 1,  "The location of the last packet in temp buffer is %"PRIu64"", ntail);
       for(i = 0; i < ntail; i++)
@@ -1001,7 +1006,7 @@ void *buf_control(void *conf)
   	    {
   	      cbuf_loc = (uint64_t)(i * capture_conf->dfsz_keep);  // This is for the TFTFP order temp buffer copy;
   	      memcpy(cbuf + cbuf_loc, tbuf + tbuf_loc + 1, capture_conf->dfsz_keep);
-  	      tbuf[tbuf_loc + 1] = 'N';  // Make sure that we do not copy the data later;
+  	      tbuf[tbuf_loc] = 'N';  // Make sure that we do not copy the data later;
   	      // If we do not do that, we may have too many data frames to copy later
   	    }
     	}
