@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 
 # DOCKERIMAGE = "edd01:5000/capture_bypassed_bmf_2"
 DISK = "/beegfsEDD/NESSER"
-
+ROOT = "/home/pulsar/nesser/Projects/phased-array-feed"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Launch container for PAF pipeline development')
     parser.add_argument('-n', '--numa_name', action="store", dest="name", help='The ID of NUMA node')
@@ -35,6 +35,7 @@ if __name__ == "__main__":
         --ulimit memlock=-1:-1 \
         --net=host \
         -v "+DISK+":"+DISK+" \
+        -v "+ROOT+":"+ROOT+" \
         -e DISPLAY \
         -e USER=root \
         --runtime=nvidia \

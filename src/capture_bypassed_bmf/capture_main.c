@@ -135,6 +135,9 @@ int main(int argc, char **argv)
   case 'r':
 	  sscanf(optarg, "%d", &conf.total_data_frames);
 	  break;
+  case 's':
+	  sscanf(optarg, "%s", fname_log);
+	  break;
 	}
     }
 
@@ -147,7 +150,10 @@ int main(int argc, char **argv)
       fprintf(stderr, "CAPTURE_ERROR: Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
-  sprintf(fname_log, "%s/capture.log", conf.dir);  // Open the log file
+  if(fname_log[0]=="\n")
+    sprintf(fname_log, "%s/capture.log", conf.dir);  // Open the log file
+  else
+    strcat(fname_log, conf.dir);  // Open the log file
   conf.log_file = log_open(fname_log, "ab+");
   if(conf.log_file == NULL)
     {
