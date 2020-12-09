@@ -994,9 +994,9 @@ void *buf_control(void *conf)
       ntail = 0;
       for(i = 0; i < capture_conf->nport_alive; i++)
       {
-         pthread_mutex_lock(&tail_mutex[[i]);
+         pthread_mutex_lock(&tail_mutex[i]);
          ntail = (tail[i] > ntail) ? tail[i] : ntail;
-         pthread_mutex_unlock(&tail_mutex[[i]);
+         pthread_mutex_unlock(&tail_mutex[i]);
       }
       log_add(capture_conf->log_file, "INFO", 1,  "The location of the last packet in temp buffer is %"PRIu64"", ntail);
       for(i = 0; i < ntail; i++)
