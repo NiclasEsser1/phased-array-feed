@@ -46,7 +46,6 @@ int main(int argc, char **argv)
   int i, arg, source = 0;
   conf_t conf;
   char fname_log[MSTR_LEN] = {'\0'};
-  char fname_log1[MSTR_LEN];
 
   /* default arguments*/
   default_arguments(&conf);
@@ -135,9 +134,6 @@ int main(int argc, char **argv)
 	  break;
   case 'r':
 	  sscanf(optarg, "%d", &conf.total_data_frames);
-	  break;
-  case 's':
-	  sscanf(optarg, "%s", fname_log1);
 	  break;
 	}
     }
