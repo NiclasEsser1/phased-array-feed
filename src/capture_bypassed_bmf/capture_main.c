@@ -151,7 +151,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "CAPTURE_ERROR: Failed to open %s with opendir or it does not exist, which happens at which happens at \"%s\", line [%d], has to abort\n", conf.dir, __FILE__, __LINE__);
       exit(EXIT_FAILURE);
     }
-  sprintf(fname_log, "%s/%s%x.log", conf.dir, hostname, &conf.key);  // Open the log file
+  sprintf(fname_log, "%s/%s_%d.log", conf.dir, hostname, conf.chan_index);  // Open the log file
   conf.log_file = log_open(fname_log, "ab+");
   if(conf.log_file == NULL)
     {
