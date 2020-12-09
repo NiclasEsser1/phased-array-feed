@@ -183,10 +183,10 @@ void *do_capture(void *conf)
     	      log_add(capture_conf->log_file, "INFO", 1,  "Cross the boundary");
 
     	      transit[thread_index] = 1; // tell buffer control thread that current capture thread is crossing the boundary
-    	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf + ndf_per_chunk_rbuf)
+    	      if(df_in_blk < rbuf_ndf_per_chunk_tbuf)
         		{
         		  pthread_mutex_lock(&tail_mutex[thread_index]);
-        		  tail[thread_index] = (uint64_t)((df_in_blk - rbuf_ndf_per_chunk_rbuf) * nbeam + beam_index); // This is in TATFP order
+        		  tail[thread_index] = (uint64_t)((df_in_blk - ndf_per_chunk_rbuf) * nbeam + beam_index); // This is in TATFP order
         		  tbuf_loc           = (uint64_t)(tail[thread_index] * (dfsz_keep + 1));
         		  tail[thread_index]++;  // have to ++, otherwise we will miss the last available data frame in tbuf;
         		  pthread_mutex_unlock(&tail_mutex[thread_index]);
