@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     sprintf(fname_log, "%s/capture.log", conf.dir);  // Open the log file
   else
     strcat(fname_log, conf.dir);  // Open the log file
-  printf("%s", fname);
+  printf("%s", fname_log);
   conf.log_file = log_open(fname_log, "ab+");
   if(conf.log_file == NULL)
     {
