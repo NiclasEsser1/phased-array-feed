@@ -1,0 +1,40 @@
+{
+  "dada_key_odd" : "dada",
+  "dada_key_even" : "dadc",
+  "packet_start" : 0,
+  "center_freq" : 1337.0,
+  "band_groups" : 48,
+  "bandwidth_group" : 7,
+  "cpus_per_node" : 10,
+  "capture_control" : 0,
+  "bind_cpu" : 1,
+  "nof_data_frame_per_block" : 16384,
+  "nof_dada_blocks" : 14,
+  "dada_block_size" : 4265607168,
+  "nof_data_frame_tmp_buffer" : 128,
+  "nof_data_frame_per_capture" : 163840,
+  "template_dada_header" : "header_dada.txt",
+  "soure_information" : "UNKNOWN_00:00:00.00_00:00:00.00",
+  "padding" : 0,
+  "root_storage_dir" : "/beegfsEDD/NESSER/",
+  "routing_table" : "routing_table_mid_band.csv",
+  "log_dir" : "/home/pulsar/nesser/Projects/phased-array-feed/log/",
+  "remote_config_dir" : "/home/pulsar/nesser/Projects/phased-array-feed/config/",
+  "local_config_dir" : "/media/scratch/nesser/Projects/phased-array-feed/config/",
+  "script_dir" : "/home/pulsar/nesser/Projects/phased-array-feed/script/",
+  "docker_config_dir" : "/phased-array-feed/config/",
+  "dockername" : "capture_bypassed_bmf_",
+  "dockerimage" : "edd01:5000/capture_bypassed_bmf_2",
+  "launch_script" : "launch_capture.py",
+  "start_script" : "start_capture.py",
+  "time_ref_script" : {
+      "name" : "time_ref.py",
+      "expected_start" : "SOS",
+      "expected_end" : "EOS",
+      "failed" : "timeout"
+  },
+  "capture_main" : {
+      "directory" : "/phased-array-feed/src/capture_bypassed_bmf/",
+      "name" : "capture_main"
+  }
+}

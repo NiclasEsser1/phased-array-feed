@@ -1,6 +1,0 @@
-#ifndef ELEMENT2BEAM_CUH
-#define ELEMENT2BEAM_CUH
-
-#include
-
-#endif ELEMENT2BEAM_CUH
