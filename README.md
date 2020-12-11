@@ -1,8 +1,8 @@
 # Introduction
 
-This branch 'bmf_bypassing_2' is a special implementation of the phased-array-feed project. Instead of implementing a GPU-back-end pipeline, it bypasses the BMF stage to capture non-beam-formed raw voltage data from the PAF. The GPU-back-end consists of 18 different NUMA nodes, each is able to capture a subgroup of channels (7 MHz in total) and 36 dual-polarized elements. Here the term element is technically speaking a beam processed by the BMF, but by using "special" beam-weights where each weight is set to 0 except a single is set to 1 allows, to forward one dual-polarized element in the PAF per beam. The output of the BMF is limited up to 36 dual-polarized beams on 33 channels, hence we can bypass 36 elements as already mentioned.
+This branch 'bmf_bypassing_2' is a special implementation of the phased-array-feed project. Instead of implementing a GPU-back-end pipeline, it bypasses the BMF stage to capture non-beam-formed raw voltage data from the PAF. The GPU-back-end consists of 18 different NUMA nodes, each is able to capture a subgroup of channels (7 MHz in total) and 36 dual-polarized elements. Here the term element is technically speaking a beam processed by the BMF, but by using "special" beam-weights where each weight is set to 0 except a single is set to 1 allows to forward one dual-polarized element in the PAF per beam. The output of the BMF is limited up to 36 dual-polarized beams on 33 channels, hence we can bypass a maximum of 36 elements as already mentioned.
 
-BMF bypassing can be divided into two parts, one Controller instance and up to 18 Workers. One worker is running on one NUMA while the controller can be started from any system that has SSH access to the GPU back-end.
+BMF bypassing can be divided into two parts, one controller instance and up to 18 workers. One worker is running on one NUMA while the controller can be started from any system that has SSH access to the GPU back-end.
 
 # Usage
 ## Configuration
@@ -33,7 +33,22 @@ In the last step we will launch all worker containers by executing
 `python rollout_capture.py`
 
 
-What will exactly happen? The script will parse the provided configuration, access all workers via SSH, launches one worker container on each NUMA node, allocates ringbuffers inside the dockers via `dada_db`, starts the disk writer tool `dada_dbdisk` and waits for a signal to start capturing. Caution must be taken when inserted the start signal, since there is no verification whether `dada_db` has completely allocated the memory or not (The roll out is in this way just uni-directional). To make sure that all NUMA nodes are ready for capturing, it is recommended to log in to each node separately and display `htop`. When the memory has been fully allocated, the start signal can be given with ('y'). The `capture_main` process will then executed on each node and  RAM gets written. Since the input data stream is an order of magnitude higher than the `dada_dbdisk` can write to disk, the ring buffers are filled after 25 seconds and `capture_main` gets terminated. Before starting the next capturing or closing the connections to the GPU back-end, make sure `dada_dbdisk` has completely finished work on each NUMA node.
+What will exactly happen?
+The script will...
+1. parse the provided configuration
+2. access all workers via SSH
+3. launches one worker container on each NUMA node
+4. allocates ringbuffers inside the dockers via `dada_db`
+5. starts the disk writer tool `dada_dbdisk`
+6. and waits for a signal to start capturing.
+
+Caution must be taken when inserted the start signal, since there is no verification whether `dada_db` has completely allocated the memory or not (The roll out is in this way just uni-directional). To make sure that all NUMA nodes are ready for capturing, it is recommended to log in to each node separately and display `htop`.
+
+When the memory has been fully allocated, the start signal can be given with ('y'). The `capture_main` process will then be executed on each node and RAM gets written. Since the input data stream is an order of magnitude higher than the `dada_dbdisk` can write to disk, the ring buffers are filled after 25 seconds and `capture_main` gets terminated. Before starting the next capturing or closing the connections to the GPU back-end, make sure `dada_dbdisk` has completely finished work on each NUMA node.
+
+## Additional Information
+The data are in stored as CODIF packets with header information. These containing reference timestamp, dataframe id, beam id / element id etc. The complete packet structure is defined in PAFDocuments. To readout the data from disk one may use the python tools in this [repo](https://github.com/NiclasEsser1/script_collection)  
+
 
 # Contact
 
