@@ -16,15 +16,22 @@ There a four different files that configure BMF bypassing
 * Note: Uploading the routing table can be done manually via Tossix VNC or automatically by `routing_table.py`. The latter caused problems in the past, since it changes the center frequency of the DRX (reason still unkown). The procedure for uploading the routing table as well as the beam weights is described in the Tossix manual.
 ## Launch the environment
 Once the configuration is successfully completed the initial environment can be launch. To do so start the control docker (assumed we are in the root project directory on control system):
+
 `bash Dockerfile/bmf_bypass_controller/run.sh`
+
 If the system couldn't found a valid Kerberos TGT we are asked to initialize one by inserting our LDAP credentials. (The Kerberos authentication is required to access the GPU back-end via SSH)
 
 If the docker is launched we can first make a port scan to verify if all desired nodes/workers are receiving packets on each desired port (specified by `routing_table.csv`)
+
+
 `python port_scan.py`
 
 ## Start capturing
 In the last step we will launch all worker containers by executing
+
+
 `python rollout_capture.py`
+
 
 What will exactly happen? The script will parse the provided configuration, access all workers via SSH, launches one worker container on each NUMA node, allocates ringbuffers inside the dockers via `dada_db`, starts the disk writer tool `dada_dbdisk` and waits for a signal to start capturing. Caution must be taken when inserted the start signal, since there is no verification whether `dada_db` has completely allocated the memory or not (The roll out is in this way just uni-directional). To make sure that all NUMA nodes are ready for capturing, it is recommended to log in to each node separately and display `htop`. When the memory has been fully allocated, the start signal can be given with ('y'). The `capture_main` process will then executed on each node and  RAM gets written. Since the input data stream is an order of magnitude higher than the `dada_dbdisk` can write to disk, the ring buffers are filled after 25 seconds and `capture_main` gets terminated. Before starting the next capturing or closing the connections to the GPU back-end, make sure `dada_dbdisk` has completely finished work on each NUMA node.
 
