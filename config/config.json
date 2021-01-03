@@ -34,7 +34,7 @@
       "failed" : "timeout"
   },
   "capture_main" : {
-      "directory" : "/phased-array-feed/src/capture_bypassed_bmf/",
+      "directory" : "/phased-array-feed/src/",
       "name" : "capture_main"
   }
 }
