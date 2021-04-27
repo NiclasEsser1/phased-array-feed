@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <limits.h>
+#include <dada_def.h>
 
-#include "dada_def.h"
 #include "capture.h"
 #include "log.h"
 

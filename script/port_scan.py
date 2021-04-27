@@ -1,12 +1,13 @@
-from inc.ssh_client import *
-from inc.config import *
 import subprocess
 from subprocess import Popen, PIPE
 import time
 
+from inc.ssh_client import *
+from inc.config import *
+
 def sniff_packet(node, port_idx = 0):
     print("Sniffing packet on "+node.host+":"+str(node.ports[port_idx])+" to determine time reference")
-    sniffer = (SSHConnector(host=node.host, user=USER, gss_auth=True, gss_kex=True, logfile="log/snifflogger_" + node.node_name))
+    sniffer = SSHConnector(host=node.host, user=USER, gss_auth=False, gss_kex=False, logfile="../log/snifflogger_" + node.node_name)
     # sniffer = SSHConnector(host="192.168.0.3", user=USER, logfile="log/snifflogger_"+ node.node_name+".log")
     sniffer.connect()
     sniffer.open_shell()
@@ -21,7 +22,7 @@ def sniff_packet(node, port_idx = 0):
         return time_ref
     return out
 
-config = Config("./config", "config.json")
+config = Config("../config", "config.json")
 script_dir = config.data["script_dir"]
 
 client_list = []
@@ -29,7 +30,7 @@ process_list = []
 cmdline_file = config.data["remote_config_dir"]+ "command_line"
 
 # Scan ports by sniffing packets. If a node has a dead port it can be be removed from list
-for node in config.numa_list:
+for node in config.node_list:
     for port_idx in range(len(node.ports)):
         out = sniff_packet(node, port_idx)
         if out == "failed":

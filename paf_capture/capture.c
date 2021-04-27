@@ -14,9 +14,9 @@
 #include <byteswap.h>
 #include <linux/un.h>
 #include <unistd.h>
+#include <dada_cuda.h>
+#include <ipcbuf.h>
 
-#include "dada_cuda.h"
-#include "ipcbuf.h"
 #include "capture.h"
 #include "log.h"
 
@@ -273,9 +273,8 @@ int initialize_capture(conf_t *conf)
   time(&now);
   if(abs(conf->seconds_from_1970 - now) > 10 * PERIOD)  // No plan to offset the reference time by 10 times of period
     {
-      printf("Now: %ld, Ref: %ld\n",now, conf->seconds_from_1970);
-      log_add(conf->log_file, "ERR", 1,  "the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-      fprintf(stderr, "CAPTURE_ERROR: the reference information offset from current time by 10 times of period, which happens at \"%s\", line [%d], has to abort.\n",__FILE__, __LINE__);
+      log_add(conf->log_file, "ERR", 1,  "the reference information offset from current time by 10 times of period (now: %ld; provided: %ld), which happens at \"%s\", line [%d], has to abort",now, conf->seconds_from_1970, __FILE__, __LINE__);
+      fprintf(stderr, "CAPTURE_ERROR: the reference information offset from current time by 10 times of period (now: %ld; provided: %ld), which happens at \"%s\", line [%d], has to abort.\n",now, conf->seconds_from_1970,__FILE__, __LINE__);
 
       fclose(conf->log_file);
       exit(EXIT_FAILURE);
@@ -438,30 +437,30 @@ int initialize_capture(conf_t *conf)
       nblk_behind = (int)floor(df_in_blk/(double)conf->ndf_per_chunk_rbuf);
       for(i = 0; i < nblk_behind; i++)
     	{
-    	  // cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
-    	  // if(cbuf == NULL)
-    	  //   {
-    	  //     log_add(conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-    	  //     fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-        //
-    	  //     free(dbuf);
-    	  //     close(sock);
-    	  //     destroy_capture(*conf);
-    	  //     log_close(conf->log_file);
-    	  //     exit(EXIT_FAILURE);
-    	  //   }
+    	  cbuf = ipcbuf_get_next_write(conf->data_block); // Open a ring buffer block
+    	  if(cbuf == NULL)
+    	    {
+    	      log_add(conf->log_file, "ERR", 1,  "open_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+    	      fprintf(stderr, "CAPTURE_ERROR: open_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
 
-    	  // if(ipcbuf_mark_filled(conf->data_block, conf->blksz_rbuf) < 0) // write nothing to it
-        // {
-        //   log_add(conf->log_file, "ERR", 1,  "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
-        //   fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
-        //
-        //   free(dbuf);
-        //   close(sock);
-        //   destroy_capture(*conf);
-        //   log_close(conf->log_file);
-        //   exit(EXIT_FAILURE);
-        // }
+    	      free(dbuf);
+    	      close(sock);
+    	      destroy_capture(*conf);
+    	      log_close(conf->log_file);
+    	      exit(EXIT_FAILURE);
+    	    }
+
+    	  if(ipcbuf_mark_filled(conf->data_block, conf->blksz_rbuf) < 0) // write nothing to it
+        {
+          log_add(conf->log_file, "ERR", 1,  "close_buffer failed, which happens at \"%s\", line [%d], has to abort", __FILE__, __LINE__);
+          fprintf(stderr, "CAPTURE_ERROR: close_buffer failed, which happens at \"%s\", line [%d], has to abort.\n", __FILE__, __LINE__);
+
+          free(dbuf);
+          close(sock);
+          destroy_capture(*conf);
+          log_close(conf->log_file);
+          exit(EXIT_FAILURE);
+        }
 
     	  conf->df_in_period += conf->ndf_per_chunk_rbuf;
     	  if(conf->df_in_period >= NDF_PER_CHUNK_PER_PERIOD)
@@ -1153,8 +1152,8 @@ void *capture_control(void *conf)
 	  start_buf_mini = ipcbuf_get_sod_minbuf (capture_conf->data_block);
 	  if(start_buf < start_buf_mini)
 	    {
-	      log_add(capture_conf->log_file, "ERR", 1,  "start_buf [%"PRIu64"] < start_buf_mini [%"PRIu64"], which happens at \"%s\", line [%d]", start_buf, start_buf_mini, __FILE__, __LINE__);
-	      fprintf(stderr, "CAPTURE_ERROR: start_buf [%"PRIu64"] < start_buf_mini [%"PRIu64"], has to abort, which happens at \"%s\", line [%d].\n", start_buf, start_buf_mini, __FILE__, __LINE__);
+	      log_add(capture_conf->log_file, "ERR", 1,  "control command %s; start_buf [%"PRIu64"] < start_buf_mini [%"PRIu64"], which happens at \"%s\", line [%d]",capture_control_command, start_buf, start_buf_mini, __FILE__, __LINE__);
+	      fprintf(stderr, "CAPTURE_ERROR: control command %s; start_buf [%"PRIu64"] < start_buf_mini [%"PRIu64"], has to abort, which happens at \"%s\", line [%d].\n", capture_control_command, start_buf, start_buf_mini, __FILE__, __LINE__);
 
 	      quit = 2;
 	      close(sock);

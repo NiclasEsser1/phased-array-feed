@@ -7,12 +7,12 @@ extern "C" {
 #include <netinet/in.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include "dada_hdu.h"
-#include "dada_def.h"
-#include "ipcio.h"
-#include "ascii_header.h"
-#include "daemon.h"
-#include "futils.h"
+#include <dada_hdu.h>
+#include <dada_def.h>
+#include <ipcio.h>
+#include <ascii_header.h>
+#include <daemon.h>
+#include <futils.h>
 #include "constants.h"
 
 typedef struct conf_t

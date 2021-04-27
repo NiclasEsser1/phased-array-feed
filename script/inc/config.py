@@ -8,7 +8,7 @@ import numpy as np
 UNSET_PORT=0
 UNSET_MAC="0x020000000000"
 UNSET_IP="00.00.0.0"
-USER="pulsar"
+USER="nesser"
 PASSWORD=""
 
 
@@ -33,27 +33,6 @@ inet = {
     "10.17.8.2" : "pacifix8"
 }
 
-# Used for test purposes on edd01
-# inet = {
-#     "10.17.0.1" : "edd01",
-#     "10.17.0.2" : "edd01",
-#     "10.17.1.1" : "edd01",
-#     "10.17.1.2" : "edd01",
-#     "10.17.2.1" : "edd01",
-#     "10.17.2.2" : "edd01",
-#     "10.17.3.1" : "edd01",
-#     "10.17.3.2" : "edd01",
-#     "10.17.4.1" : "edd01",
-#     "10.17.4.2" : "edd01",
-#     "10.17.5.1" : "edd01",
-#     "10.17.5.2" : "edd01",
-#     "10.17.6.1" : "edd01",
-#     "10.17.6.2" : "edd01",
-#     "10.17.7.1" : "edd01",
-#     "10.17.7.1" : "edd01",
-#     "10.17.8.1" : "edd01",
-#     "10.17.8.1" : "edd01"
-# }
 
 class ConfigError(Exception):
     pass
@@ -68,7 +47,7 @@ class Config:
         print(self.conf_path)
         # Load all config files
         try:
-            self.config_file = open(self.conf_path, 'r')
+            self.config_file = open(os.path.relpath(self.conf_path), 'r')
             self.data = json.load(self.config_file)
         except Exception as e:
             raise ConfigError("Failed to init json config: " + str(e.__class__) + str(e))
@@ -81,7 +60,7 @@ class Config:
         # Parse them
         # Parse routing table, determine which mac, ip corresponse to which ports
         numa_id = "numa0"
-        self.numa_dict = {numa_id:{}}
+        self.node_dict = {numa_id:{}}
         self.mac_list = []
         self.nof_nodes = 0
         for key_out in self.rt.keys():
@@ -92,21 +71,22 @@ class Config:
                         self.mac_list.append(val)
                         numa_id = re.sub(r'\d', "", numa_id)
                         numa_id += str(str(int(self.nof_nodes)))
-                        self.numa_dict[numa_id] = {}
-                        self.numa_dict[numa_id]["beams"] = []
+                        self.node_dict[numa_id] = {}
+                        self.node_dict[numa_id]["beams"] = []
                         self.nof_nodes += 1
-                    self.numa_dict[numa_id]["mac"] = val
-                    self.numa_dict[numa_id]["ip"] = self.rt[key_out]["IP"+str(beamid)]
-                    self.numa_dict[numa_id]["beams"].append([beamid,self.rt[key_out]["PORT"+str(beamid)]])
-                    self.numa_dict[numa_id]["bandid"] = self.rt[key_out]["BANDID"]
-        # print(self.numa_dict)
-        f = open('config/parsed_numa_config.json', 'w')
-        json.dump(self.numa_dict, f, indent=4)
+                    self.node_dict[numa_id]["mac"] = val
+                    self.node_dict[numa_id]["ip"] = self.rt[key_out]["IP"+str(beamid)]
+                    self.node_dict[numa_id]["beams"].append([beamid,self.rt[key_out]["PORT"+str(beamid)]])
+                    self.node_dict[numa_id]["bandid"] = self.rt[key_out]["BANDID"]
+        # print(self.node_dict)
+        f = open(os.path.relpath('../tmp/parsed_numa_config.json'), 'w')
+        json.dump(self.node_dict, f, indent=4)
         # construct command line pattern for argument 'c' of capture_main program (ip_port_expectedbeams_actualbeams_cpu)
-        self.numa_list = []
-        for idx, key in enumerate(self.numa_dict.keys()):
-            self.numa_list.append(NumaNode(idx, key, self.data, self.numa_dict[key]))
-            self.numa_list[-1].construct_pattern()
+        self.node_list = []
+        for idx, key in enumerate(self.node_dict.keys()):
+            self.node_list.append(NumaNode(idx, key, self.data, self.node_dict[key]))
+            self.node_list[-1].construct_pattern()
+        self.node_list.sort(key=lambda x: x.ip)
 
 class NumaNode:
     def __init__(self, id, node_name, config, dictionary):

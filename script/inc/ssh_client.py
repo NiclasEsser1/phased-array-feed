@@ -167,38 +167,38 @@ class SSHConnector():
         print("Trying to connect: " + str(self.user) + "@"+ str(self.host) + ":" + str(self.port))
         try:
             self.client = paramiko.SSHClient()
-            self.client.load_system_host_keys()
-            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            # Try usual SSH connection
-            if self.gss_auth != True:
-                try:
-                    self.client.connect(
-                        hostname=self.host,
-                        port=self.port,
-                        username=self.user,
-                        password=self.password,
-                        timeout=self.timeout)
-                except Exception as e:
-                    self.log.error("Could not connect via SSH: " + str(e.__class__) + ": " + str(e))
-                    raise SSHConnectorError("Could not connect via SSH: " + str(e.__class__) + ": " + str(e))
-            # Try to connect with gssapi and Kerberos ticket authentication
-            else:
-                try:
-                    self.client.connect(
-                        hostname=self.host,
-                        port=self.port,
-                        username=self.user,
-                        password=self.password,
-                        timeout=self.timeout,
-                        gss_auth=self.gss_auth,
-                        gss_kex=self.gss_kex)
-                except Exception as e:
-                    self.log.error("Could not connect via Kerberos; Error: " + str(e.__class__) + ": " + str(e))
-                    raise SSHConnectorError("Could not connect via Kerberos; Error: " + str(e.__class__) + ": " + str(e))
-            print("Connected!")
         except Exception as e:
                 self.log.error("connect() failed with: "  + str(e.__class__) + ": " + str(e))
                 raise SSHConnectorError("connect() failed with: "  + str(e.__class__) + ": " + str(e))
+        # Try usual SSH connection
+        if self.gss_auth == False:
+            try:
+                self.client.connect(
+                    hostname=self.host,
+                    port=self.port,
+                    username=self.user,
+                    password=self.password,
+                    timeout=self.timeout)
+            except Exception as e:
+                self.log.error("Could not connect via SSH: " + str(e.__class__) + ": " + str(e))
+                raise SSHConnectorError("Could not connect via SSH: " + str(e.__class__) + ": " + str(e))
+        # Try to connect with gssapi and Kerberos ticket authentication
+        else:
+            try:
+                self.client.load_system_host_keys()
+                self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                self.client.connect(
+                    hostname=self.host,
+                    port=self.port,
+                    username=self.user,
+                    password=self.password,
+                    timeout=self.timeout,
+                    gss_auth=self.gss_auth,
+                    gss_kex=self.gss_kex)
+            except Exception as e:
+                self.log.error("Could not connect via Kerberos; Error: " + str(e.__class__) + ": " + str(e))
+                raise SSHConnectorError("Could not connect via Kerberos; Error: " + str(e.__class__) + ": " + str(e))
+        print("Connected!")
 
         self.sftp = 0
         self.shell = 0

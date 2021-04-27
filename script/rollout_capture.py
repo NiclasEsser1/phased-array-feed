@@ -30,7 +30,7 @@ cmdline_file = config.data["remote_config_dir"]+ "command_line"
 
 
 print("Launching capture dockers on pacifix nodes")
-for node in config.numa_list:
+for node in config.node_list:
     # Create a storage directory for each node
     if not os.path.exists(node.storage_dir):
         os.mkdir(node.storage_dir)
@@ -58,8 +58,8 @@ for node in config.numa_list:
 # print("Wait for init...")
 time.sleep(10)
 while raw_input("Start capture?y/n") == "y":
-    time_ref = sniff_packet(config.numa_list[0])
-    for node in config.numa_list:
+    time_ref = sniff_packet(config.node_list[0])
+    for node in config.node_list:
         node.cmd_pattern += " -f " + str(time_ref)
         # node.cmd_pattern = "dada_junkdb -k " +node.key+ " -b 8531214336 -c f -r 2432.666 "+ config.data["docker_config_dir"] + config.data["template_dada_header"]
 
@@ -69,10 +69,10 @@ while raw_input("Start capture?y/n") == "y":
         node.ssh_client2.execute(start_cmd, "", "failed")
 
 
-for node in config.numa_list:
+for node in config.node_list:
     node.ssh_client.execute("docker stop "+node.dockername, "", "failed")
     node.ssh_client.execute("docker container rm "+node.dockername, "", "failed")
     print("Docker " +  node.dockername + " stopped")
 
-for node in config.numa_list:
+for node in config.node_list:
     node.ssh_client.close()
