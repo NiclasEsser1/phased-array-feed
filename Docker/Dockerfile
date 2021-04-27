@@ -5,19 +5,13 @@
 # as you do not remove the above attribution and reasonably
 # inform receipients that you have modified the original work.
 
-FROM xinpingdeng/paf-base
+FROM eddinfra0:5000/eddbase:latest
 
 MAINTAINER Niclas Esser "nesser@mpifr-bonn.mpg.com"
 
-# User pulsar
-#USER pulsar
-
-COPY python_requirements.txt ./
-
 RUN export DEBIAN_FRONTEND=noninteractive && \
-  apt-get update -qq && \
-  pip install --no-cache-dir -r python_requirements.txt
+  apt-get update -qq
 
 RUN git clone https://github.com/NiclasEsser1/phased-array-feed.git && \
-  cd phased-array-feed && git checkout bmf_bypassing_2 \
-  && cd src/capture_bypassed_bmf/ && make \
+  cd phased-array-feed && git checkout bmf_bypassing \
+  && cd paf_capture && make && make install \

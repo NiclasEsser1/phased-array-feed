@@ -26,9 +26,6 @@ paf_capture_cli:capture_main.o capture.o log.o
 %.o: %.c
 	$(CC) $(INCLUDE_DIRS) -c $< -o $@
 install:
-	cp paf_capture_cli /tmp/
-	sudo cp /tmp/paf_capture_cli /usr/local/bin
-	rm /tmp/paf_capture_cli
+	cp paf_capture_cli /usr/local/bin
 clean:
-	rm *.o paf_capture_cli
-	sudo rm /usr/local/bin/paf_capture_cli
+	rm *.o paf_capture_cli /usr/local/bin/paf_capture_cli
